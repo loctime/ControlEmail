@@ -23,6 +23,11 @@ interface LocalIngestPayload {
   }
 }
 
+function logIngest(msg: string, data?: Record<string, unknown>) {
+  if (data != null) console.log("[email-local-ingest]", msg, data)
+  else console.log("[email-local-ingest]", msg)
+}
+
 export async function POST(request: Request) {
   const token = request.headers.get("x-local-token")
   const expected = process.env.LOCAL_INGEST_TOKEN
@@ -38,8 +43,15 @@ export async function POST(request: Request) {
     const normalized = normalizeLocalIngestPayload(payload)
     const { saveRawEmailInInbox, saveVehicleEvents } = defaultEmailLocalIngestAdapters
 
+    const bodyText = normalized.body_text ?? ""
+    const totalLines = bodyText.split(/\r?\n/).length
+    const linesWithKmh = bodyText.split(/\r?\n/).filter((line) => /Km\/h/i.test(line))
+    logIngest("Líneas en body / con Km/h", { totalLines, linesWithKmh: linesWithKmh.length })
+
     const storedEmail = await saveRawEmailInInbox(normalized)
     const parsedEvents = parseVehicleEventsFromBody(storedEmail.body_text)
+
+    logIngest("Eventos generados por parser", { count: parsedEvents.length })
 
     const eventsToPersist = parsedEvents.map((event) => ({
       plate: event.plate,
@@ -55,21 +67,30 @@ export async function POST(request: Request) {
       rawEmailId: storedEmail.id,
     }))
 
-    const { stored, skippedDuplicates } = await saveVehicleEvents(eventsToPersist)
+    const result = await saveVehicleEvents(eventsToPersist)
+
+    logIngest("Eventos guardados / duplicados omitidos / placas actualizadas", {
+      stored: result.stored,
+      skippedDuplicates: result.skippedDuplicates,
+      platesUpdated: result.platesUpdated,
+    })
 
     return NextResponse.json({
       ok: true,
       rawEmailId: storedEmail.id,
       eventsDetected: eventsToPersist.length,
-      eventsStored: stored,
-      skippedDuplicates,
+      eventsStored: result.stored,
+      skippedDuplicates: result.skippedDuplicates,
+      platesUpdated: result.platesUpdated,
     })
   } catch (error) {
+    const message = error instanceof Error ? error.message : "unknown_error"
+    logIngest("Error", { error: message })
     return NextResponse.json(
       {
         ok: false,
         message: "Unable to ingest local email",
-        error: error instanceof Error ? error.message : "unknown_error",
+        error: message,
       },
       { status: 500 },
     )

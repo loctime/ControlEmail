@@ -61,6 +61,7 @@ export interface VehicleEventToPersist {
 export interface SaveVehicleEventsResult {
   stored: number
   skippedDuplicates: number
+  platesUpdated: string[]
 }
 
 export interface EmailLocalIngestAdapters {
@@ -347,7 +348,7 @@ function deterministicEventId(event: VehicleEventToPersist): string {
 
 /** Actualiza o crea el documento del vehículo con la última actividad. */
 async function upsertVehicleLastActivity(event: VehicleEventToPersist): Promise<void> {
-  const vehiclePath = `apps/vehicles/${event.plate}`
+  const vehiclePath = `apps/emails/vehicles/${event.plate}`
   const eventDate = event.eventDate instanceof Date ? event.eventDate : new Date(event.eventDate)
 
   await setDocument(
@@ -368,12 +369,13 @@ async function upsertVehicleLastActivity(event: VehicleEventToPersist): Promise<
 async function saveVehicleEvents(events: VehicleEventToPersist[]): Promise<SaveVehicleEventsResult> {
   let stored = 0
   let skippedDuplicates = 0
+  const platesUpdated: string[] = []
 
   for (const event of events) {
     const eventId = deterministicEventId(event)
-    const documentPath = `apps/vehicleEvents/${eventId}`
+    const documentPath = `apps/emails/vehicleEvents/${eventId}`
 
-    const existing = await firestoreRequest(`documents/${documentPath}`, { method: "GET" })
+    const existing = await firestoreRequest(`documents/${documentPath.replace(/\//g, "%2F")}`, { method: "GET" })
     if (existing.ok) {
       skippedDuplicates += 1
       continue
@@ -403,9 +405,10 @@ async function saveVehicleEvents(events: VehicleEventToPersist[]): Promise<SaveV
 
     await upsertVehicleLastActivity(event)
     stored += 1
+    if (!platesUpdated.includes(event.plate)) platesUpdated.push(event.plate)
   }
 
-  return { stored, skippedDuplicates }
+  return { stored, skippedDuplicates, platesUpdated }
 }
 
 export const defaultEmailLocalIngestAdapters: EmailLocalIngestAdapters = {

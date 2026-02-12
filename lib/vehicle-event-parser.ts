@@ -18,7 +18,11 @@ export interface ParsedVehicleEvent {
   rawLine: string
 }
 
-const PLATE_REGEX = /([A-Z]{2}-\d{3}-[A-Z]{2})/
+const PLATE_REGEX = /([A-Z]{2}[-\s]?\d{3}[-\s]?[A-Z]{2})/
+
+function normalizePlate(plate: string): string {
+  return plate.replace(/\s+/g, "-").toUpperCase()
+}
 
 function normalizeWhitespace(value: string): string {
   return value.replace(/\s+/g, " ").trim()
@@ -80,7 +84,7 @@ function parseFormat1(line: string): ParsedVehicleEvent | null {
   }
 
   return {
-    plate,
+    plate: normalizePlate(plate),
     brand: vehicle.brand,
     model: vehicle.model,
     eventDate,
@@ -113,7 +117,7 @@ function parseFormat2(line: string): ParsedVehicleEvent | null {
   }
 
   return {
-    plate,
+    plate: normalizePlate(plate),
     brand: vehicle.brand,
     model: vehicle.model,
     eventDate,
@@ -167,13 +171,14 @@ function extractVehicleDriverAndLocation(tail: string): {
 }
 
 function parseFormat3(line: string): ParsedVehicleEvent | null {
-  const match = line.match(/^(\d+)\s*Km\/h\s+(\d{2}\/\d{2}\/\d{2})\s+(\d{2}:\d{2}:\d{2})\s+([A-Z]{2}-\d{3}-[A-Z]{2})\s+-\s+(.+)$/i)
+  const match = line.match(/^(\d+)\s*Km\/h\s+(\d{2}\/\d{2}\/\d{2})\s+(\d{2}:\d{2}:\d{2})\s+([A-Z]{2}[-\s]?\d{3}[-\s]?[A-Z]{2})\s+-\s+(.+)$/i)
 
   if (!match) {
     return null
   }
 
-  const [, rawSpeed, rawDate, rawTime, plate, tail] = match
+  const [, rawSpeed, rawDate, rawTime, plateRaw, tail] = match
+  const plate = normalizePlate(plateRaw)
   const eventDate = parseDateTime(rawDate, rawTime)
 
   if (!eventDate) {
@@ -214,9 +219,14 @@ export function parseVehicleEventLine(line: string): ParsedVehicleEvent | null {
  * y extrae: velocidad, fecha, hora, patente, modelo, ubicación.
  */
 export function parseVehicleEventsFromBody(bodyText: string): ParsedVehicleEvent[] {
+  if (!bodyText || typeof bodyText !== "string") return []
   const lines = bodyText.split(/\r?\n/)
-  return lines
-    .filter((line) => /Km\/h/i.test(line))
+  const linesWithKmh = lines.filter((line) => /Km\/h/i.test(line))
+  const parsed = linesWithKmh
     .map((line) => parseVehicleEventLine(line))
     .filter((event): event is ParsedVehicleEvent => Boolean(event))
+  if (process.env.NODE_ENV !== "production" && linesWithKmh.length > 0 && parsed.length === 0) {
+    console.warn("[vehicle-event-parser] Líneas con Km/h detectadas pero ninguna parseada:", linesWithKmh.length, "ejemplo:", linesWithKmh[0]?.slice(0, 80))
+  }
+  return parsed
 }

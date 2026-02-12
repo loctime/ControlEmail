@@ -174,7 +174,7 @@ export async function listCollection(
 }
 
 export async function listVehicleEvents(): Promise<VehicleEventDoc[]> {
-  const items = await listCollection("apps/vehicleEvents")
+  const items = await listCollection("apps/emails/vehicleEvents")
   return items.map(({ id, data }) => {
     const rawDate = data.eventDate
     let eventDate = new Date().toISOString()
@@ -200,7 +200,7 @@ export async function listVehicleEvents(): Promise<VehicleEventDoc[]> {
 }
 
 export async function listVehicles(): Promise<VehicleDoc[]> {
-  const items = await listCollection("apps/vehicles")
+  const items = await listCollection("apps/emails/vehicles")
   return items.map(({ id, data }) => ({
     id,
     plate: String(data.plate ?? id),
