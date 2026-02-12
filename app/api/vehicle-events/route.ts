@@ -32,16 +32,20 @@ function eventDocToVehicleEvent(doc: Awaited<ReturnType<typeof listVehicleEvents
 }
 
 export async function GET() {
+  console.log("[api/vehicle-events] GET: leyendo eventos desde Firestore (apps/emails/vehicleEvents)")
   try {
     const docs = await listVehicleEvents()
+    console.log("[api/vehicle-events] GET: recibidos", docs.length, "documentos de Firestore")
     const events: VehicleEvent[] = docs.map(eventDocToVehicleEvent)
     events.sort((a, b) => {
       const da = `${a.fecha}T${a.hora}`
       const db = `${b.fecha}T${b.hora}`
       return da > db ? -1 : da < db ? 1 : 0
     })
+    console.log("[api/vehicle-events] GET: respondiendo", events.length, "eventos")
     return NextResponse.json(events)
   } catch (error) {
+    console.error("[api/vehicle-events] GET error:", error instanceof Error ? error.message : error)
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "unknown_error",

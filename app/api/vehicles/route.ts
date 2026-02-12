@@ -20,11 +20,13 @@ function vehicleDocToVehicle(
 }
 
 export async function GET() {
+  console.log("[api/vehicles] GET: leyendo vehículos y eventos desde Firestore (apps/emails/vehicles, apps/emails/vehicleEvents)")
   try {
     const [vehicleDocs, eventDocs] = await Promise.all([
       listVehicles(),
       listVehicleEvents(),
     ])
+    console.log("[api/vehicles] GET: Firestore devolvió", vehicleDocs.length, "vehículos y", eventDocs.length, "eventos")
     const today = new Date().toISOString().slice(0, 10)
     const eventosHoyByPlate: Record<string, number> = {}
     for (const e of eventDocs) {
@@ -37,8 +39,10 @@ export async function GET() {
     const vehicles: Vehicle[] = vehicleDocs.map((doc) =>
       vehicleDocToVehicle(doc, eventosHoyByPlate),
     )
+    console.log("[api/vehicles] GET: respondiendo", vehicles.length, "vehículos")
     return NextResponse.json(vehicles)
   } catch (error) {
+    console.error("[api/vehicles] GET error:", error instanceof Error ? error.message : error)
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "unknown_error",

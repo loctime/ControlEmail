@@ -16,11 +16,32 @@ function getEnvOrThrow(name: string, fallbackName?: string): string {
   const value =
     process.env[name] ?? (fallbackName ? process.env[fallbackName] : undefined)
   if (!value) {
+    console.error("[firestore-read] Variable de entorno faltante:", {
+      name,
+      fallbackName,
+      hasFallback: fallbackName ? !!process.env[fallbackName] : null,
+    })
     throw new Error(
       `Missing required environment variable: ${name}${fallbackName ? ` or ${fallbackName}` : ""}`,
     )
   }
   return value
+}
+
+/** Log de qué variables de entorno están definidas (sin mostrar valores). */
+function logEnvCheck(): void {
+  const vars = [
+    "FIREBASE_PROJECT_ID",
+    "NEXT_PUBLIC_FIREBASE_PROJECT_ID",
+    "GOOGLE_SERVICE_ACCOUNT_EMAIL",
+    "FIREBASE_ADMIN_CLIENT_EMAIL",
+    "GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY",
+    "FIREBASE_ADMIN_PRIVATE_KEY",
+  ]
+  const state = Object.fromEntries(
+    vars.map((v) => [v, !!process.env[v]])
+  )
+  console.log("[firestore-read] Env check:", state)
 }
 
 function toBase64Url(input: string): string {
@@ -31,6 +52,8 @@ async function getGoogleAccessToken(): Promise<string> {
   if (cachedToken && cachedToken.expiresAtMs > Date.now() + 60_000) {
     return cachedToken.value
   }
+  logEnvCheck()
+  console.log("[firestore-read] Obteniendo token de Google OAuth2...")
   const clientEmail = getEnvOrThrow(
     "GOOGLE_SERVICE_ACCOUNT_EMAIL",
     "FIREBASE_ADMIN_CLIENT_EMAIL",
@@ -62,9 +85,12 @@ async function getGoogleAccessToken(): Promise<string> {
     }),
   })
   if (!response.ok) {
+    const text = await response.text()
+    console.error("[firestore-read] Error obteniendo token:", response.status, text)
     throw new Error(`Unable to obtain Google access token: ${response.status}`)
   }
   const token = (await response.json()) as GoogleAccessToken
+  console.log("[firestore-read] Token obtenido correctamente")
   cachedToken = {
     value: token.access_token,
     expiresAtMs: Date.now() + token.expires_in * 1000,
@@ -104,8 +130,10 @@ async function firestoreRequest(path: string, init: RequestInit): Promise<Respon
     "NEXT_PUBLIC_FIREBASE_PROJECT_ID",
   )
   const token = await getGoogleAccessToken()
-  return fetch(
-    `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/${path}`,
+  const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/${path}`
+  console.log("[firestore-read] Request Firestore:", { projectId, path })
+  const res = await fetch(
+    url,
     {
       ...init,
       headers: {
@@ -115,6 +143,13 @@ async function firestoreRequest(path: string, init: RequestInit): Promise<Respon
       },
     },
   )
+  if (!res.ok) {
+    const body = await res.clone().text()
+    console.error("[firestore-read] Firestore request failed:", { status: res.status, path, body: body.slice(0, 300) })
+  } else {
+    console.log("[firestore-read] Firestore request OK:", { path, status: res.status })
+  }
+  return res
 }
 
 export interface VehicleEventDoc {
@@ -150,12 +185,14 @@ export async function listCollection(
   collectionPath: string,
   pageSize = 200,
 ): Promise<Array<{ id: string; data: Record<string, unknown> }>> {
+  console.log("[firestore-read] listCollection:", { collectionPath, pageSize })
   const enc = collectionPath.replace(/\//g, "%2F")
   const res = await firestoreRequest(
     `documents/${enc}?pageSize=${pageSize}`,
     { method: "GET" },
   )
   if (!res.ok) {
+    console.error("[firestore-read] listCollection failed:", { collectionPath, status: res.status })
     if (res.status === 404) return []
     throw new Error(`Firestore list failed: ${res.status}`)
   }
@@ -166,6 +203,7 @@ export async function listCollection(
     }>
   }
   const documents = json.documents ?? []
+  console.log("[firestore-read] listCollection OK:", { collectionPath, count: documents.length })
   return documents.map((doc) => {
     const id = doc.name.split("/").pop() ?? ""
     const data = doc.fields ? parseFields(doc.fields) : {}
@@ -174,7 +212,10 @@ export async function listCollection(
 }
 
 export async function listVehicleEvents(): Promise<VehicleEventDoc[]> {
-  const items = await listCollection("apps/emails/vehicleEvents")
+  const path = "apps/emails/vehicleEvents"
+  console.log("[firestore-read] listVehicleEvents: leyendo desde", path)
+  const items = await listCollection(path)
+  console.log("[firestore-read] listVehicleEvents: leídos", items.length, "eventos")
   return items.map(({ id, data }) => {
     const rawDate = data.eventDate
     let eventDate = new Date().toISOString()
@@ -200,7 +241,10 @@ export async function listVehicleEvents(): Promise<VehicleEventDoc[]> {
 }
 
 export async function listVehicles(): Promise<VehicleDoc[]> {
-  const items = await listCollection("apps/emails/vehicles")
+  const path = "apps/emails/vehicles"
+  console.log("[firestore-read] listVehicles: leyendo desde", path)
+  const items = await listCollection(path)
+  console.log("[firestore-read] listVehicles: leídos", items.length, "vehículos")
   return items.map(({ id, data }) => ({
     id,
     plate: String(data.plate ?? id),
