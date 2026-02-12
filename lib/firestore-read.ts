@@ -180,17 +180,18 @@ export interface VehicleDoc {
   updatedAt?: string
 }
 
-/** Lista documentos de una colección (una página). */
+/**
+ * Lista documentos de una colección (una página).
+ * La REST API espera path con segmentos reales: documents/apps/emails/vehicleEvents
+ * (NO codificar barras como %2F, sino la API interpreta una sola colección raíz y devuelve 0).
+ */
 export async function listCollection(
   collectionPath: string,
   pageSize = 200,
 ): Promise<Array<{ id: string; data: Record<string, unknown> }>> {
   console.log("[firestore-read] listCollection:", { collectionPath, pageSize })
-  const enc = collectionPath.replace(/\//g, "%2F")
-  const res = await firestoreRequest(
-    `documents/${enc}?pageSize=${pageSize}`,
-    { method: "GET" },
-  )
+  const path = `documents/${collectionPath}?pageSize=${pageSize}`
+  const res = await firestoreRequest(path, { method: "GET" })
   if (!res.ok) {
     console.error("[firestore-read] listCollection failed:", { collectionPath, status: res.status })
     if (res.status === 404) return []
