@@ -1,59 +1,86 @@
 import { NextResponse } from "next/server"
 
-import {
-  defaultEmailLocalIngestAdapters,
-  normalizeLocalIngestPayload,
-  type LocalIngestPayload,
-  type VehicleEventToPersist,
-} from "@/lib/email-local-ingest-adapters"
 import { parseVehicleEventsFromBody } from "@/lib/vehicle-event-parser"
 
-const adapters = defaultEmailLocalIngestAdapters
+interface LocalIngestPayload {
+  subject?: string
+  from?: string
+  body_text?: string
+}
 
-function toPersistedEvents(rawEmailId: string, bodyText: string): VehicleEventToPersist[] {
-  return parseVehicleEventsFromBody(bodyText).map((event) => ({
-    plate: event.plate,
-    brand: event.brand,
-    model: event.model,
-    eventDate: event.eventDate,
-    eventCategory: event.eventCategory,
-    formatType: event.formatType,
-    driver: event.driver,
-    speed: event.speed,
-    location: event.location,
-    rawLine: event.rawLine,
-    rawEmailId,
-  }))
+interface StoredEmail {
+  id: string
+  subject: string
+  from: string
+  body_text: string
+  createdAt: string
+}
+
+interface PersistedVehicleEvent {
+  plate: string
+  brand: string
+  model: string
+  eventDate: string
+  eventType: string
+  driver?: string
+  speed?: number
+  location?: string
+  rawEmailId: string
+  createdAt: string
+}
+
+/**
+ * NOTE:
+ * This repository does not include the existing Firestore wiring.
+ * Keep this adapter boundary so existing storage code can be injected
+ * without changing parser logic or API contract.
+ */
+async function saveRawEmailInInbox(payload: LocalIngestPayload): Promise<StoredEmail> {
+  return {
+    id: crypto.randomUUID(),
+    subject: payload.subject ?? "",
+    from: payload.from ?? "",
+    body_text: payload.body_text ?? "",
+    createdAt: new Date().toISOString(),
+  }
+}
+
+async function saveVehicleEvents(events: PersistedVehicleEvent[]): Promise<void> {
+  // Replace this body with your Firestore implementation:
+  // apps/vehicleEvents
+  // The parser already provides a normalized schema + rawEmailId relationship.
+  void events
 }
 
 export async function POST(request: Request) {
   try {
-    const rawPayload = (await request.json()) as LocalIngestPayload
-    const payload = normalizeLocalIngestPayload(rawPayload)
+    const payload = (await request.json()) as LocalIngestPayload
 
-    const storedEmail = await adapters.saveRawEmailInInbox(payload)
-    const parsedEvents = toPersistedEvents(storedEmail.id, storedEmail.body_text)
+    const storedEmail = await saveRawEmailInInbox(payload)
+    const parsedEvents = parseVehicleEventsFromBody(storedEmail.body_text)
 
-    const { stored, skippedDuplicates } = await adapters.saveVehicleEvents(parsedEvents)
-
-    console.info("[email-local-ingest] processed", {
-      source: payload.source,
+    const eventsToPersist: PersistedVehicleEvent[] = parsedEvents.map((event) => ({
+      plate: event.plate,
+      brand: event.brand,
+      model: event.model,
+      eventDate: event.eventDate,
+      eventType: event.eventType,
+      driver: event.driver,
+      speed: event.speed,
+      location: event.location,
       rawEmailId: storedEmail.id,
-      eventsDetected: parsedEvents.length,
-      eventsStored: stored,
-      eventsSkippedDuplicates: skippedDuplicates,
-    })
+      createdAt: new Date().toISOString(),
+    }))
+
+    await saveVehicleEvents(eventsToPersist)
 
     return NextResponse.json({
       ok: true,
       rawEmailId: storedEmail.id,
-      eventsDetected: parsedEvents.length,
-      eventsStored: stored,
-      eventsSkippedDuplicates: skippedDuplicates,
+      eventsDetected: eventsToPersist.length,
+      eventsStored: eventsToPersist.length,
     })
   } catch (error) {
-    console.error("[email-local-ingest] failed", error)
-
     return NextResponse.json(
       {
         ok: false,

@@ -1,19 +1,11 @@
-export type FormatType = "table_simple" | "evento_simple" | "exceso_velocidad"
-
-export type EventCategory =
-  | "exceso_velocidad"
-  | "llave_sin_cargar"
-  | "conductor_inactivo"
-  | "no_identificado"
-  | "registro_simple"
+export type VehicleEventFormat = "table_simple" | "evento_simple" | "exceso_velocidad"
 
 export interface ParsedVehicleEvent {
   plate: string
   brand: string
   model: string
-  eventDate: Date
-  eventCategory: EventCategory
-  formatType: FormatType
+  eventDate: string
+  eventType: VehicleEventFormat
   driver?: string
   speed?: number
   location?: string
@@ -26,47 +18,27 @@ function normalizeWhitespace(value: string): string {
   return value.replace(/\s+/g, " ").trim()
 }
 
-function parseDateTimeUtc(rawDate: string, rawTime: string): Date | null {
+function parseDateTime(rawDate: string, rawTime: string): string | null {
   const dateParts = rawDate.includes("-") ? rawDate.split("-") : rawDate.split("/")
+
   if (dateParts.length !== 3) {
     return null
   }
 
   let [day, month, year] = dateParts
+
   if (year.length === 2) {
     year = `20${year}`
   }
 
-  const timeParts = rawTime.split(":")
-  if (timeParts.length !== 3) {
+  const isoDate = `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}T${rawTime}`
+  const date = new Date(isoDate)
+
+  if (Number.isNaN(date.getTime())) {
     return null
   }
 
-  const dd = Number(day)
-  const mm = Number(month)
-  const yyyy = Number(year)
-  const hh = Number(timeParts[0])
-  const min = Number(timeParts[1])
-  const sec = Number(timeParts[2])
-
-  if ([dd, mm, yyyy, hh, min, sec].some((n) => Number.isNaN(n))) {
-    return null
-  }
-
-  const eventDate = new Date(Date.UTC(yyyy, mm - 1, dd, hh, min, sec))
-
-  if (
-    eventDate.getUTCFullYear() !== yyyy ||
-    eventDate.getUTCMonth() !== mm - 1 ||
-    eventDate.getUTCDate() !== dd ||
-    eventDate.getUTCHours() !== hh ||
-    eventDate.getUTCMinutes() !== min ||
-    eventDate.getUTCSeconds() !== sec
-  ) {
-    return null
-  }
-
-  return eventDate
+  return date.toISOString()
 }
 
 function splitBrandAndModel(vehicleText: string): { brand: string; model: string } | null {
@@ -75,44 +47,27 @@ function splitBrandAndModel(vehicleText: string): { brand: string; model: string
     return null
   }
 
-  const words = normalized.split(" ")
+  const parts = normalized.split(" ")
+  if (parts.length < 2) {
+    return { brand: parts[0], model: "" }
+  }
+
   return {
-    brand: words[0].toUpperCase(),
-    model: words.slice(1).join(" "),
+    brand: parts[0],
+    model: parts.slice(1).join(" "),
   }
-}
-
-function inferEventCategory(rawLine: string, formatType: FormatType): EventCategory {
-  const lower = rawLine.toLowerCase()
-
-  if (lower.includes("sin llave")) {
-    return "llave_sin_cargar"
-  }
-
-  if (lower.includes("conductor inactivo")) {
-    return "conductor_inactivo"
-  }
-
-  if (lower.includes("no identificado")) {
-    return "no_identificado"
-  }
-
-  if (formatType === "exceso_velocidad") {
-    return "exceso_velocidad"
-  }
-
-  return "registro_simple"
 }
 
 function parseFormat1(line: string): ParsedVehicleEvent | null {
   const match = line.match(/^(.*?)\s+([A-Z]{2}-\d{3}-[A-Z]{2})\s+(\d{2}-\d{2}-\d{4})\s+(\d{2}:\d{2}:\d{2})$/)
+
   if (!match) {
     return null
   }
 
   const [, vehicleText, plate, rawDate, rawTime] = match
   const vehicle = splitBrandAndModel(vehicleText)
-  const eventDate = parseDateTimeUtc(rawDate, rawTime)
+  const eventDate = parseDateTime(rawDate, rawTime)
 
   if (!vehicle || !eventDate) {
     return null
@@ -123,20 +78,21 @@ function parseFormat1(line: string): ParsedVehicleEvent | null {
     brand: vehicle.brand,
     model: vehicle.model,
     eventDate,
-    eventCategory: inferEventCategory(line, "table_simple"),
-    formatType: "table_simple",
+    eventType: "table_simple",
     rawLine: line,
   }
 }
 
 function parseFormat2(line: string): ParsedVehicleEvent | null {
   const match = line.match(/^(\d{2}\/\d{2}\/\d{2})\s+(\d{2}:\d{2}:\d{2})\s+([A-Z]{2}-\d{3}-[A-Z]{2})\s+-\s+(.+)$/)
+
   if (!match) {
     return null
   }
 
   const [, rawDate, rawTime, plate, tail] = match
-  const eventDate = parseDateTimeUtc(rawDate, rawTime)
+  const eventDate = parseDateTime(rawDate, rawTime)
+
   if (!eventDate) {
     return null
   }
@@ -144,8 +100,8 @@ function parseFormat2(line: string): ParsedVehicleEvent | null {
   const withDriver = tail.match(/^(.*?)\s*\(([^)]+)\)\s*$/)
   const vehicleText = withDriver ? withDriver[1] : tail
   const driver = withDriver ? normalizeWhitespace(withDriver[2]) : undefined
-
   const vehicle = splitBrandAndModel(vehicleText)
+
   if (!vehicle) {
     return null
   }
@@ -155,99 +111,96 @@ function parseFormat2(line: string): ParsedVehicleEvent | null {
     brand: vehicle.brand,
     model: vehicle.model,
     eventDate,
-    eventCategory: inferEventCategory(driver ? `${line} ${driver}` : line, "evento_simple"),
-    formatType: "evento_simple",
+    eventType: "evento_simple",
     driver,
     rawLine: line,
   }
 }
 
-function extractLocation(value: string): { main: string; location?: string } {
-  const tokens = normalizeWhitespace(value).split(" ")
-  const locationStarters = new Set(["ruta", "rn", "autopista", "av", "av.", "avenida", "calle", "km", "camino", "zona"])
+function extractVehicleDriverAndLocation(tail: string): {
+  brand: string
+  model: string
+  driver?: string
+  location?: string
+} | null {
+  const normalizedTail = normalizeWhitespace(tail)
+  const withParen = normalizedTail.match(/^(.*?\([^)]*\))(?:\s+(.+))?$/)
 
-  const locationIndex = tokens.findIndex((token) => locationStarters.has(token.toLowerCase()))
-  if (locationIndex <= 0) {
-    return { main: normalizeWhitespace(value) }
-  }
+  const vehicleAndDriverChunk = withParen ? withParen[1] : normalizedTail
+  const location = withParen?.[2] ? normalizeWhitespace(withParen[2]) : undefined
 
-  return {
-    main: normalizeWhitespace(tokens.slice(0, locationIndex).join(" ")),
-    location: normalizeWhitespace(tokens.slice(locationIndex).join(" ")),
-  }
-}
+  const vehicleDriverWithParen = vehicleAndDriverChunk.match(/^(.*?)\s+([^\s].*\([^)]*\))$/)
 
-function extractDriverFromTail(mainText: string): { vehicleText: string; driver?: string } {
-  const normalized = normalizeWhitespace(mainText)
+  if (vehicleDriverWithParen) {
+    const vehicleText = vehicleDriverWithParen[1]
+    const driverText = vehicleDriverWithParen[2]
+    const vehicle = splitBrandAndModel(vehicleText)
 
-  const driverMatchers = ["Conductor inactivo:", "No identificado", "Desconocido"]
-  for (const marker of driverMatchers) {
-    const idx = normalized.toLowerCase().indexOf(marker.toLowerCase())
-    if (idx > 0) {
-      return {
-        vehicleText: normalizeWhitespace(normalized.slice(0, idx)),
-        driver: normalizeWhitespace(normalized.slice(idx)),
-      }
+    if (!vehicle) {
+      return null
     }
-  }
 
-  const parenMatch = normalized.match(/^(.*?)\s+([^\s].*\([^)]*\))$/)
-  if (parenMatch) {
     return {
-      vehicleText: normalizeWhitespace(parenMatch[1]),
-      driver: normalizeWhitespace(parenMatch[2]),
+      brand: vehicle.brand,
+      model: vehicle.model,
+      driver: normalizeWhitespace(driverText),
+      location,
     }
   }
 
-  return { vehicleText: normalized }
-}
-
-function parseFormat3(line: string): ParsedVehicleEvent | null {
-  const match = line.match(/^(\d+)\s*Km\/h\s+(\d{2}\/\d{2}\/\d{2})\s+(\d{2}:\d{2}:\d{2})\s+([A-Z]{2}-\d{3}-[A-Z]{2})\s+-\s+(.+)$/i)
-  if (!match) {
-    return null
-  }
-
-  const [, speedRaw, rawDate, rawTime, plate, tail] = match
-  const eventDate = parseDateTimeUtc(rawDate, rawTime)
-  if (!eventDate) {
-    return null
-  }
-
-  const speed = Number(speedRaw)
-  if (Number.isNaN(speed)) {
-    return null
-  }
-
-  const locationSplit = extractLocation(tail)
-  const driverSplit = extractDriverFromTail(locationSplit.main)
-  const vehicle = splitBrandAndModel(driverSplit.vehicleText)
-
+  const vehicle = splitBrandAndModel(vehicleAndDriverChunk)
   if (!vehicle) {
     return null
   }
 
   return {
-    plate,
     brand: vehicle.brand,
     model: vehicle.model,
+    location,
+  }
+}
+
+function parseFormat3(line: string): ParsedVehicleEvent | null {
+  const match = line.match(/^(\d+)\s*Km\/h\s+(\d{2}\/\d{2}\/\d{2})\s+(\d{2}:\d{2}:\d{2})\s+([A-Z]{2}-\d{3}-[A-Z]{2})\s+-\s+(.+)$/i)
+
+  if (!match) {
+    return null
+  }
+
+  const [, rawSpeed, rawDate, rawTime, plate, tail] = match
+  const eventDate = parseDateTime(rawDate, rawTime)
+
+  if (!eventDate) {
+    return null
+  }
+
+  const details = extractVehicleDriverAndLocation(tail)
+
+  if (!details) {
+    return null
+  }
+
+  return {
+    plate,
+    brand: details.brand,
+    model: details.model,
     eventDate,
-    eventCategory: inferEventCategory(driverSplit.driver ? `${line} ${driverSplit.driver}` : line, "exceso_velocidad"),
-    formatType: "exceso_velocidad",
-    driver: driverSplit.driver,
-    speed,
-    location: locationSplit.location,
+    eventType: "exceso_velocidad",
+    driver: details.driver,
+    speed: Number(rawSpeed),
+    location: details.location,
     rawLine: line,
   }
 }
 
 export function parseVehicleEventLine(line: string): ParsedVehicleEvent | null {
-  const rawLine = normalizeWhitespace(line)
-  if (!rawLine || !PLATE_REGEX.test(rawLine)) {
+  const normalizedLine = normalizeWhitespace(line)
+
+  if (!normalizedLine || !PLATE_REGEX.test(normalizedLine)) {
     return null
   }
 
-  return parseFormat3(rawLine) ?? parseFormat2(rawLine) ?? parseFormat1(rawLine)
+  return parseFormat3(normalizedLine) ?? parseFormat2(normalizedLine) ?? parseFormat1(normalizedLine)
 }
 
 export function parseVehicleEventsFromBody(bodyText: string): ParsedVehicleEvent[] {
