@@ -1,7 +1,6 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { chartData } from "@/lib/data"
 import {
   BarChart,
   Bar,
@@ -13,7 +12,18 @@ import {
   Legend,
 } from "recharts"
 
-export function EventsChart() {
+interface ChartDataItem {
+  hora: string
+  excesos: number
+  desvios: number
+  otros: number
+}
+
+interface EventsChartProps {
+  chartData: ChartDataItem[]
+}
+
+export function EventsChart({ chartData }: EventsChartProps) {
   return (
     <Card>
       <CardHeader className="pb-2">

@@ -1,55 +1,26 @@
 import { NextResponse } from "next/server"
 
+import {
+  defaultEmailLocalIngestAdapters,
+  normalizeLocalIngestPayload,
+} from "@/lib/email-local-ingest-adapters"
 import { parseVehicleEventsFromBody } from "@/lib/vehicle-event-parser"
 
 interface LocalIngestPayload {
   subject?: string
   from?: string
   body_text?: string
-}
-
-interface StoredEmail {
-  id: string
-  subject: string
-  from: string
-  body_text: string
-  createdAt: string
-}
-
-interface PersistedVehicleEvent {
-  plate: string
-  brand: string
-  model: string
-  eventDate: string
-  eventType: string
-  driver?: string
-  speed?: number
-  location?: string
-  rawEmailId: string
-  createdAt: string
-}
-
-/**
- * NOTE:
- * This repository does not include the existing Firestore wiring.
- * Keep this adapter boundary so existing storage code can be injected
- * without changing parser logic or API contract.
- */
-async function saveRawEmailInInbox(payload: LocalIngestPayload): Promise<StoredEmail> {
-  return {
-    id: crypto.randomUUID(),
-    subject: payload.subject ?? "",
-    from: payload.from ?? "",
-    body_text: payload.body_text ?? "",
-    createdAt: new Date().toISOString(),
+  source?: string
+  message_id?: string
+  to?: string[] | string
+  body_html?: string
+  received_at?: string
+  email?: {
+    subject?: string
+    from?: string
+    body_text?: string
+    [key: string]: unknown
   }
-}
-
-async function saveVehicleEvents(events: PersistedVehicleEvent[]): Promise<void> {
-  // Replace this body with your Firestore implementation:
-  // apps/vehicleEvents
-  // The parser already provides a normalized schema + rawEmailId relationship.
-  void events
 }
 
 export async function POST(request: Request) {
@@ -64,30 +35,34 @@ export async function POST(request: Request) {
 
   try {
     const payload = (await request.json()) as LocalIngestPayload
+    const normalized = normalizeLocalIngestPayload(payload)
+    const { saveRawEmailInInbox, saveVehicleEvents } = defaultEmailLocalIngestAdapters
 
-    const storedEmail = await saveRawEmailInInbox(payload)
+    const storedEmail = await saveRawEmailInInbox(normalized)
     const parsedEvents = parseVehicleEventsFromBody(storedEmail.body_text)
 
-    const eventsToPersist: PersistedVehicleEvent[] = parsedEvents.map((event) => ({
+    const eventsToPersist = parsedEvents.map((event) => ({
       plate: event.plate,
       brand: event.brand,
       model: event.model,
-      eventDate: event.eventDate,
-      eventType: event.eventType,
+      eventDate: new Date(event.eventDate),
+      eventCategory: event.eventType,
+      formatType: event.eventType,
       driver: event.driver,
       speed: event.speed,
       location: event.location,
+      rawLine: event.rawLine,
       rawEmailId: storedEmail.id,
-      createdAt: new Date().toISOString(),
     }))
 
-    await saveVehicleEvents(eventsToPersist)
+    const { stored, skippedDuplicates } = await saveVehicleEvents(eventsToPersist)
 
     return NextResponse.json({
       ok: true,
       rawEmailId: storedEmail.id,
       eventsDetected: eventsToPersist.length,
-      eventsStored: eventsToPersist.length,
+      eventsStored: stored,
+      skippedDuplicates,
     })
   } catch (error) {
     return NextResponse.json(

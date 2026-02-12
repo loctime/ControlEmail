@@ -99,12 +99,11 @@ export function normalizeLocalIngestPayload(payload: LocalIngestPayload): Normal
   }
 }
 
-function getEnvOrThrow(name: string): string {
-  const value = process.env[name]
+function getEnvOrThrow(name: string, fallbackName?: string): string {
+  const value = process.env[name] ?? (fallbackName ? process.env[fallbackName] : undefined)
   if (!value) {
-    throw new Error(`Missing required environment variable: ${name}`)
+    throw new Error(`Missing required environment variable: ${name}${fallbackName ? ` or ${fallbackName}` : ""}`)
   }
-
   return value
 }
 
@@ -117,8 +116,14 @@ async function getGoogleAccessToken(): Promise<string> {
     return cachedToken.value
   }
 
-  const clientEmail = getEnvOrThrow("GOOGLE_SERVICE_ACCOUNT_EMAIL")
-  const privateKey = getEnvOrThrow("GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY").replace(/\\n/g, "\n")
+  const clientEmail = getEnvOrThrow(
+    "GOOGLE_SERVICE_ACCOUNT_EMAIL",
+    "FIREBASE_ADMIN_CLIENT_EMAIL",
+  )
+  const privateKey = getEnvOrThrow(
+    "GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY",
+    "FIREBASE_ADMIN_PRIVATE_KEY",
+  ).replace(/\\n/g, "\n")
 
   const now = Math.floor(Date.now() / 1000)
   const unsigned = `${toBase64Url(JSON.stringify({ alg: "RS256", typ: "JWT" }))}.${toBase64Url(
@@ -206,7 +211,10 @@ function toFirestoreFields(data: Record<string, unknown>): Record<string, unknow
 }
 
 async function firestoreRequest(path: string, init: RequestInit): Promise<Response> {
-  const projectId = getEnvOrThrow("FIREBASE_PROJECT_ID")
+  const projectId = getEnvOrThrow(
+    "FIREBASE_PROJECT_ID",
+    "NEXT_PUBLIC_FIREBASE_PROJECT_ID",
+  )
   const token = await getGoogleAccessToken()
 
   return fetch(`https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/${path}`, {
@@ -224,7 +232,10 @@ async function commitDocument(
   data: Record<string, unknown>,
   serverTimestampFields: string[],
 ): Promise<void> {
-  const projectId = getEnvOrThrow("FIREBASE_PROJECT_ID")
+  const projectId = getEnvOrThrow(
+    "FIREBASE_PROJECT_ID",
+    "NEXT_PUBLIC_FIREBASE_PROJECT_ID",
+  )
   const documentName = `projects/${projectId}/databases/(default)/documents/${documentPath}`
 
   const writes: Array<Record<string, unknown>> = [
@@ -258,6 +269,51 @@ async function commitDocument(
   }
 }
 
+/** Crea o actualiza un documento (upsert). Si no existe se crea; si existe se actualiza. */
+async function setDocument(
+  documentPath: string,
+  data: Record<string, unknown>,
+  serverTimestampFields: string[],
+): Promise<void> {
+  const projectId = getEnvOrThrow(
+    "FIREBASE_PROJECT_ID",
+    "NEXT_PUBLIC_FIREBASE_PROJECT_ID",
+  )
+  const docPathForGet = documentPath.replace(/\//g, "%2F")
+  const getRes = await firestoreRequest(`documents/${docPathForGet}`, { method: "GET" })
+  const documentName = `projects/${projectId}/databases/(default)/documents/${documentPath}`
+  const fields = toFirestoreFields(data)
+  const segments = documentPath.split("/")
+  const documentId = segments.pop() ?? ""
+  const parentPath = segments.join("/")
+
+  if (getRes.status === 404) {
+    const parentEnc = parentPath.replace(/\//g, "%2F")
+    const body: Record<string, unknown> = {
+      name: documentName,
+      fields,
+    }
+    const createRes = await firestoreRequest(
+      `documents/${parentEnc}?documentId=${encodeURIComponent(documentId)}`,
+      { method: "POST", body: JSON.stringify(body) },
+    )
+    if (!createRes.ok) {
+      const errText = await createRes.text()
+      throw new Error(`Failed to create document ${documentPath}: ${createRes.status} ${errText}`)
+    }
+    if (serverTimestampFields.length > 0) {
+      const withTimestamps = { ...data }
+      await commitDocument(documentPath, withTimestamps, serverTimestampFields)
+    }
+    return
+  }
+
+  if (!getRes.ok) {
+    throw new Error(`Failed to get document ${documentPath}: ${getRes.status}`)
+  }
+  await commitDocument(documentPath, data, serverTimestampFields)
+}
+
 function buildPreview(bodyText: string): string {
   return bodyText.replace(/\s+/g, " ").trim().slice(0, 200)
 }
@@ -287,6 +343,26 @@ async function saveRawEmailInInbox(payload: NormalizedEmailPayload): Promise<Sto
 
 function deterministicEventId(event: VehicleEventToPersist): string {
   return createHash("sha256").update(`${event.plate}|${event.eventDate.toISOString()}|${event.rawLine}`).digest("hex")
+}
+
+/** Actualiza o crea el documento del vehículo con la última actividad. */
+async function upsertVehicleLastActivity(event: VehicleEventToPersist): Promise<void> {
+  const vehiclePath = `apps/vehicles/${event.plate}`
+  const eventDate = event.eventDate instanceof Date ? event.eventDate : new Date(event.eventDate)
+
+  await setDocument(
+    vehiclePath,
+    {
+      plate: event.plate,
+      brand: event.brand,
+      model: event.model,
+      lastLocation: event.location ?? null,
+      lastEventAt: eventDate,
+      lastEventId: deterministicEventId(event),
+      driver: event.driver ?? null,
+    },
+    ["updatedAt"],
+  )
 }
 
 async function saveVehicleEvents(events: VehicleEventToPersist[]): Promise<SaveVehicleEventsResult> {
@@ -325,6 +401,7 @@ async function saveVehicleEvents(events: VehicleEventToPersist[]): Promise<SaveV
       ["createdAt"],
     )
 
+    await upsertVehicleLastActivity(event)
     stored += 1
   }
 

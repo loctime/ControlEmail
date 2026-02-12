@@ -1,5 +1,11 @@
 export type VehicleEventFormat = "table_simple" | "evento_simple" | "exceso_velocidad"
 
+/** Tipo de evento para persistencia (compatible con adapters). */
+export type EventCategory = VehicleEventFormat
+
+/** Formato detectado del evento (compatible con adapters). */
+export type FormatType = VehicleEventFormat
+
 export interface ParsedVehicleEvent {
   plate: string
   brand: string
@@ -203,9 +209,14 @@ export function parseVehicleEventLine(line: string): ParsedVehicleEvent | null {
   return parseFormat3(normalizedLine) ?? parseFormat2(normalizedLine) ?? parseFormat1(normalizedLine)
 }
 
+/**
+ * Parsea solo las líneas del body que contienen "Km/h" (exceso de velocidad)
+ * y extrae: velocidad, fecha, hora, patente, modelo, ubicación.
+ */
 export function parseVehicleEventsFromBody(bodyText: string): ParsedVehicleEvent[] {
-  return bodyText
-    .split(/\r?\n/)
+  const lines = bodyText.split(/\r?\n/)
+  return lines
+    .filter((line) => /Km\/h/i.test(line))
     .map((line) => parseVehicleEventLine(line))
     .filter((event): event is ParsedVehicleEvent => Boolean(event))
 }

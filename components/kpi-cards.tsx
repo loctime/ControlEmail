@@ -14,7 +14,8 @@ interface KPICardsProps {
 }
 
 export function KPICards({ events }: KPICardsProps) {
-  const todayEvents = events.filter((e) => e.fecha === "2026-02-05")
+  const today = new Date().toISOString().slice(0, 10)
+  const todayEvents = events.filter((e) => e.fecha === today)
   const speedEvents = todayEvents.filter(
     (e) => e.tipo === "exceso_velocidad"
   )
