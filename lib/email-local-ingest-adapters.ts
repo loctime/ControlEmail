@@ -295,7 +295,7 @@ async function saveVehicleEvents(events: VehicleEventToPersist[]): Promise<SaveV
 
   for (const event of events) {
     const eventId = deterministicEventId(event)
-    const documentPath = `apps/vehicleEvents/events/${eventId}`
+    const documentPath = `apps/vehicleEvents/${eventId}`
 
     const existing = await firestoreRequest(`documents/${documentPath}`, { method: "GET" })
     if (existing.ok) {

@@ -53,6 +53,15 @@ async function saveVehicleEvents(events: PersistedVehicleEvent[]): Promise<void>
 }
 
 export async function POST(request: Request) {
+  const token = request.headers.get("x-local-token")
+  const expected = process.env.LOCAL_INGEST_TOKEN
+  if (!expected || token !== expected) {
+    return NextResponse.json(
+      { ok: false, message: "Unauthorized" },
+      { status: 401 },
+    )
+  }
+
   try {
     const payload = (await request.json()) as LocalIngestPayload
 
