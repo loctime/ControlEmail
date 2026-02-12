@@ -1,11 +1,12 @@
 import { DebugVehicleEventsClient } from "./vehicle-events.client"
 
 type PageProps = {
-  searchParams?: Record<string, string | string[] | undefined>
+  searchParams?: Promise<Record<string, string | string[] | undefined>>
 }
 
-export default function Page({ searchParams }: PageProps) {
-  const token = typeof searchParams?.token === "string" ? searchParams?.token : ""
+export default async function Page({ searchParams }: PageProps) {
+  const params = await searchParams
+  const token = typeof params?.token === "string" ? params.token : ""
 
   const serverToken = process.env.DEBUG_ADMIN_TOKEN
   const tokenConfigured = Boolean(serverToken)

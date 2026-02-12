@@ -81,24 +81,38 @@ type VehicleFs = {
   [key: string]: unknown
 }
 
-function requireEnv(name: string): string {
-  const value = process.env[name]
-  if (!value) {
-    throw new Error(`Falta variable de entorno: ${name}`)
-  }
-  return value
-}
-
+/**
+ * Usar cada variable de forma LITERAL para que Next.js las reemplace en el bundle del cliente.
+ * process.env[key] con key dinámico NO se reemplaza y queda undefined en el browser.
+ */
 function getFirebaseApp(): FirebaseApp {
   const existing = getApps()
   if (existing.length > 0) return existing[0]!
+  const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY
+  const authDomain = process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
+  const storageBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+  const messagingSenderId = process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+  const appId = process.env.NEXT_PUBLIC_FIREBASE_APP_ID
+  if (!apiKey || !authDomain || !projectId || !storageBucket || !messagingSenderId || !appId) {
+    const missing: string[] = []
+    if (!apiKey) missing.push("NEXT_PUBLIC_FIREBASE_API_KEY")
+    if (!authDomain) missing.push("NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN")
+    if (!projectId) missing.push("NEXT_PUBLIC_FIREBASE_PROJECT_ID")
+    if (!storageBucket) missing.push("NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET")
+    if (!messagingSenderId) missing.push("NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID")
+    if (!appId) missing.push("NEXT_PUBLIC_FIREBASE_APP_ID")
+    throw new Error(
+      `Faltan variables de Firebase (${missing.join(", ")}). En .env.local usá nombres literales y reiniciá pnpm dev.`,
+    )
+  }
   return initializeApp({
-    apiKey: requireEnv("NEXT_PUBLIC_FIREBASE_API_KEY"),
-    authDomain: requireEnv("NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN"),
-    projectId: requireEnv("NEXT_PUBLIC_FIREBASE_PROJECT_ID"),
-    storageBucket: requireEnv("NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET"),
-    messagingSenderId: requireEnv("NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID"),
-    appId: requireEnv("NEXT_PUBLIC_FIREBASE_APP_ID"),
+    apiKey,
+    authDomain,
+    projectId,
+    storageBucket,
+    messagingSenderId,
+    appId,
   })
 }
 
