@@ -20,26 +20,13 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { AppButton } from "@/components/app-button"
+import { StatusBadge } from "@/components/status-badge"
 import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import type { VehicleEvent } from "@/lib/data"
 import { eventTypeLabels, eventStatusLabels } from "@/lib/data"
-
-function getStatusColor(estado: string) {
-  switch (estado) {
-    case "critico":
-      return "bg-destructive/15 text-destructive border-destructive/20"
-    case "pendiente":
-      return "bg-chart-3/15 text-chart-3 border-chart-3/20"
-    case "en_revision":
-      return "bg-chart-1/15 text-chart-1 border-chart-1/20"
-    case "resuelto":
-      return "bg-chart-2/15 text-chart-2 border-chart-2/20"
-    default:
-      return ""
-  }
-}
+import { getTypeBadgeVariant } from "@/lib/status-tokens"
 
 interface EventDetailPanelProps {
   event: VehicleEvent | null
@@ -67,25 +54,23 @@ export function EventDetailPanel({
                 Detalle del evento registrado
               </SheetDescription>
             </div>
-            <Button
+            <AppButton
               variant="ghost"
               size="icon"
-              className="h-7 w-7 -mt-1 -mr-1"
+              className="-mt-1 -mr-1"
               onClick={onClose}
+              aria-label="Cerrar"
             >
-              <X className="h-4 w-4" />
-              <span className="sr-only">Cerrar</span>
-            </Button>
+              <X className="h-5 w-5" />
+            </AppButton>
           </div>
           <div className="flex items-center gap-2 pt-1">
-            <Badge variant="secondary" className="text-xs">
+            <Badge variant={getTypeBadgeVariant(event.tipo)} className="text-sm">
               {eventTypeLabels[event.tipo]}
             </Badge>
-            <span
-              className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${getStatusColor(event.estado)}`}
-            >
+            <StatusBadge status={event.estado} variant="event">
               {eventStatusLabels[event.estado]}
-            </span>
+            </StatusBadge>
           </div>
         </SheetHeader>
 
@@ -96,35 +81,35 @@ export function EventDetailPanel({
             {/* Info grid */}
             <div className="grid grid-cols-2 gap-4">
               <InfoItem
-                icon={<Clock className="h-4 w-4" />}
+                icon={<Clock className="h-5 w-5" />}
                 label="Fecha y hora"
                 value={`${event.fecha} ${event.hora}`}
               />
               <InfoItem
-                icon={<Car className="h-4 w-4" />}
+                icon={<Car className="h-5 w-5" />}
                 label="Vehiculo"
                 value={event.vehiculo}
               />
               <InfoItem
-                icon={<User className="h-4 w-4" />}
+                icon={<User className="h-5 w-5" />}
                 label="Conductor"
                 value={event.conductor}
               />
               <InfoItem
-                icon={<MapPin className="h-4 w-4" />}
+                icon={<MapPin className="h-5 w-5" />}
                 label="Ubicacion"
                 value={event.ubicacion}
               />
               {event.velocidad && (
                 <>
                   <InfoItem
-                    icon={<Gauge className="h-4 w-4" />}
+                    icon={<Gauge className="h-5 w-5" />}
                     label="Velocidad registrada"
                     value={`${event.velocidad} km/h`}
                     highlight
                   />
                   <InfoItem
-                    icon={<Gauge className="h-4 w-4" />}
+                    icon={<Gauge className="h-5 w-5" />}
                     label="Limite permitido"
                     value={`${event.limiteVelocidad} km/h`}
                   />
@@ -137,10 +122,10 @@ export function EventDetailPanel({
             {/* Description */}
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-2">
-                <FileText className="h-4 w-4 text-muted-foreground" />
-                <span className="text-xs font-medium">Descripcion</span>
+                <FileText className="h-5 w-5 text-muted-foreground" />
+                <span className="text-sm font-medium">Descripcion</span>
               </div>
-              <p className="text-xs leading-relaxed text-muted-foreground">
+              <p className="text-sm leading-relaxed text-muted-foreground">
                 {event.descripcion}
               </p>
             </div>
@@ -151,8 +136,8 @@ export function EventDetailPanel({
                 <Separator />
                 <div className="flex flex-col gap-3">
                   <div className="flex items-center gap-2">
-                    <MessageSquare className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-xs font-medium">
+                    <MessageSquare className="h-5 w-5 text-muted-foreground" />
+                    <span className="text-sm font-medium">
                       Historial de notas ({event.notas.length})
                     </span>
                   </div>
@@ -162,7 +147,7 @@ export function EventDetailPanel({
                         key={`note-${event.id}-${index}`}
                         className="rounded-lg border bg-muted/50 p-3"
                       >
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-sm text-muted-foreground">
                           {nota}
                         </p>
                       </div>
@@ -176,8 +161,8 @@ export function EventDetailPanel({
             <Separator />
             <div className="rounded-lg border bg-muted/30 p-4">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">Patente</span>
-                <span className="font-mono text-sm font-bold">
+                <span className="text-sm text-muted-foreground">Patente</span>
+                <span className="font-mono text-base font-bold">
                   {event.patente}
                 </span>
               </div>
@@ -204,10 +189,10 @@ function InfoItem({
     <div className="flex flex-col gap-1">
       <div className="flex items-center gap-1.5 text-muted-foreground">
         {icon}
-        <span className="text-[10px]">{label}</span>
+        <span className="text-xs">{label}</span>
       </div>
       <span
-        className={`text-xs font-medium ${highlight ? "text-destructive" : ""}`}
+        className={`text-sm font-medium ${highlight ? "text-destructive" : ""}`}
       >
         {value}
       </span>

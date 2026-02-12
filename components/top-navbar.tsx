@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 const sectionTitles: Record<string, string> = {
   dashboard: "Dashboard",
@@ -31,31 +32,32 @@ export function TopNavbar({
   onNavigate,
 }: TopNavbarProps) {
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-30 flex min-h-[56px] items-center gap-3 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <SidebarTrigger />
       <Separator orientation="vertical" className="h-5" />
-      <h1 className="text-sm font-semibold">
+      <h1 className="text-base font-semibold">
         {sectionTitles[activeSection] || "Dashboard"}
       </h1>
       <div className="ml-auto flex items-center gap-3">
         <div className="relative hidden sm:block">
-          <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Buscar patente, evento..."
-            className="h-8 w-48 pl-8 text-xs lg:w-64"
+            className="h-11 min-h-[44px] w-48 pl-10 text-sm lg:w-64"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
           />
         </div>
+        <ThemeToggle />
         <Button
           variant="ghost"
           size="icon"
-          className="relative h-8 w-8"
+          className="relative h-11 w-11 min-h-[44px] min-w-[44px]"
           onClick={() => onNavigate("alertas")}
         >
-          <Bell className="h-4 w-4" />
+          <Bell className="h-5 w-5" />
           {unreadAlerts > 0 && (
-            <Badge className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive p-0 text-[10px] text-destructive-foreground">
+            <Badge className="absolute -right-1 -top-1 flex h-5 w-5 min-w-[20px] items-center justify-center rounded-full bg-destructive p-0 text-xs text-destructive-foreground">
               {unreadAlerts}
             </Badge>
           )}

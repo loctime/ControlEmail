@@ -3,8 +3,9 @@ import type { Metadata, Viewport } from "next"
 import { Inter } from "next/font/google"
 
 import "./globals.css"
+import { ThemeProvider } from "@/components/theme-provider"
 
-const _inter = Inter({ subsets: ["latin"] })
+const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
   title: "FleetGuard - Control Vehicular",
@@ -13,7 +14,10 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: "#1a1f2e",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#F8FAFC" },
+    { media: "(prefers-color-scheme: dark)", color: "#0F172A" },
+  ],
   width: "device-width",
   initialScale: 1,
 }
@@ -24,8 +28,18 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="es" className="dark">
-      <body className="font-sans antialiased">{children}</body>
+    <html lang="es" suppressHydrationWarning>
+      <body className={`${inter.className} antialiased`}>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          storageKey="fleetguard-theme"
+          disableTransitionOnChange={false}
+        >
+          {children}
+        </ThemeProvider>
+      </body>
     </html>
   )
 }

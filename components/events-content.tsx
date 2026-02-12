@@ -2,7 +2,10 @@
 
 import { useState, useMemo } from "react"
 import { Eye, Filter, Search } from "lucide-react"
-import { Card, CardContent } from "@/components/ui/card"
+import { AppCard } from "@/components/app-card"
+import { PageContainer } from "@/components/page-container"
+import { SectionHeader } from "@/components/section-header"
+import { FormInput } from "@/components/form-input"
 import {
   Table,
   TableBody,
@@ -19,42 +22,11 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { AppButton } from "@/components/app-button"
+import { StatusBadge } from "@/components/status-badge"
 import type { VehicleEvent, EventType, EventStatus } from "@/lib/data"
 import { eventTypeLabels, eventStatusLabels } from "@/lib/data"
-
-function getTypeBadgeVariant(tipo: string) {
-  switch (tipo) {
-    case "exceso_velocidad":
-      return "destructive"
-    case "vehiculo_no_identificado":
-      return "default"
-    case "desvio_ruta":
-      return "secondary"
-    case "parada_no_autorizada":
-      return "outline"
-    case "conduccion_nocturna":
-      return "secondary"
-    default:
-      return "default"
-  }
-}
-
-function getStatusColor(estado: string) {
-  switch (estado) {
-    case "critico":
-      return "bg-destructive/15 text-destructive border-destructive/20"
-    case "pendiente":
-      return "bg-chart-3/15 text-chart-3 border-chart-3/20"
-    case "en_revision":
-      return "bg-chart-1/15 text-chart-1 border-chart-1/20"
-    case "resuelto":
-      return "bg-chart-2/15 text-chart-2 border-chart-2/20"
-    default:
-      return ""
-  }
-}
+import { getTypeBadgeVariant } from "@/lib/status-tokens"
 
 interface EventsContentProps {
   events: VehicleEvent[]
@@ -98,31 +70,28 @@ export function EventsContent({
   }, [events, searchQuery, localSearch, typeFilter, statusFilter])
 
   return (
-    <div className="flex flex-col gap-4 p-4 lg:p-6">
-      <div>
-        <h2 className="text-lg font-semibold">Registro de eventos</h2>
-        <p className="text-xs text-muted-foreground">
-          {filteredEvents.length} eventos encontrados
-        </p>
-      </div>
+    <PageContainer>
+      <SectionHeader
+        title="Registro de eventos"
+        description={`${filteredEvents.length} eventos encontrados`}
+      />
 
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <div className="relative flex-1">
-              <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por patente, vehiculo o conductor..."
-                className="h-8 pl-8 text-xs"
-                value={localSearch}
-                onChange={(e) => setLocalSearch(e.target.value)}
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="h-8 w-[160px] text-xs">
-                  <SelectValue placeholder="Tipo" />
+      <AppCard>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+            <FormInput
+              placeholder="Buscar por patente, vehiculo o conductor..."
+              className="pl-10"
+              value={localSearch}
+              onChange={(e) => setLocalSearch(e.target.value)}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Filter className="h-5 w-5 shrink-0 text-muted-foreground" />
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="h-11 min-w-[160px] text-sm">
+                <SelectValue placeholder="Tipo" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todos">Todos los tipos</SelectItem>
@@ -136,7 +105,7 @@ export function EventsContent({
                 </SelectContent>
               </Select>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="h-8 w-[140px] text-xs">
+                <SelectTrigger className="h-11 min-w-[140px] text-sm">
                   <SelectValue placeholder="Estado" />
                 </SelectTrigger>
                 <SelectContent>
@@ -152,27 +121,27 @@ export function EventsContent({
               </Select>
             </div>
           </div>
-        </CardContent>
-      </Card>
+      </AppCard>
 
-      <Card>
-        <CardContent className="p-0">
+      <AppCard className="overflow-hidden p-0">
           <div className="overflow-x-auto">
             <Table>
-              <TableHeader>
+                <TableHeader>
                 <TableRow>
-                  <TableHead className="text-xs">ID</TableHead>
-                  <TableHead className="text-xs">Fecha/Hora</TableHead>
-                  <TableHead className="text-xs">Patente</TableHead>
-                  <TableHead className="text-xs hidden md:table-cell">
+                  <TableHead className="text-sm font-medium">ID</TableHead>
+                  <TableHead className="text-sm font-medium">Fecha/Hora</TableHead>
+                  <TableHead className="text-sm font-medium">Patente</TableHead>
+                  <TableHead className="hidden text-sm font-medium md:table-cell">
                     Vehiculo
                   </TableHead>
-                  <TableHead className="text-xs">Tipo</TableHead>
-                  <TableHead className="text-xs hidden lg:table-cell">
+                  <TableHead className="text-sm font-medium">Tipo</TableHead>
+                  <TableHead className="hidden text-sm font-medium lg:table-cell">
                     Velocidad
                   </TableHead>
-                  <TableHead className="text-xs">Estado</TableHead>
-                  <TableHead className="text-xs text-right">Accion</TableHead>
+                  <TableHead className="text-sm font-medium">Estado</TableHead>
+                  <TableHead className="text-right text-sm font-medium">
+                    Accion
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -180,7 +149,7 @@ export function EventsContent({
                   <TableRow>
                     <TableCell
                       colSpan={8}
-                      className="text-center text-sm text-muted-foreground py-8"
+                      className="py-8 text-center text-sm text-muted-foreground"
                     >
                       No se encontraron eventos
                     </TableCell>
@@ -192,10 +161,10 @@ export function EventsContent({
                       className="cursor-pointer hover:bg-muted/50"
                       onClick={() => onViewDetail(event)}
                     >
-                      <TableCell className="text-xs font-mono text-muted-foreground">
+                      <TableCell className="py-3 font-mono text-sm text-muted-foreground">
                         {event.id}
                       </TableCell>
-                      <TableCell className="text-xs">
+                      <TableCell className="py-3 text-sm">
                         <div className="flex flex-col">
                           <span>{event.fecha}</span>
                           <span className="text-muted-foreground">
@@ -203,51 +172,46 @@ export function EventsContent({
                           </span>
                         </div>
                       </TableCell>
-                      <TableCell className="text-xs font-medium">
+                      <TableCell className="py-3 text-sm font-medium">
                         {event.patente}
                       </TableCell>
-                      <TableCell className="text-xs hidden md:table-cell">
+                      <TableCell className="hidden py-3 text-sm md:table-cell">
                         {event.vehiculo}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="py-3">
                         <Badge
-                          variant={
-                            getTypeBadgeVariant(event.tipo) as
-                              | "default"
-                              | "secondary"
-                              | "destructive"
-                              | "outline"
-                          }
-                          className="text-[10px] whitespace-nowrap"
+                          variant={getTypeBadgeVariant(event.tipo)}
+                          className="whitespace-nowrap text-sm"
                         >
                           {eventTypeLabels[event.tipo]}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-xs hidden lg:table-cell font-mono">
+                      <TableCell className="hidden py-3 font-mono text-sm lg:table-cell">
                         {event.velocidad
                           ? `${event.velocidad} / ${event.limiteVelocidad} km/h`
                           : "-"}
                       </TableCell>
-                      <TableCell>
-                        <span
-                          className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium whitespace-nowrap ${getStatusColor(event.estado)}`}
+                      <TableCell className="py-3">
+                        <StatusBadge
+                          status={event.estado}
+                          variant="event"
+                          className="whitespace-nowrap"
                         >
                           {eventStatusLabels[event.estado]}
-                        </span>
+                        </StatusBadge>
                       </TableCell>
-                      <TableCell className="text-right">
-                        <Button
+                      <TableCell className="py-3 text-right">
+                        <AppButton
                           variant="ghost"
                           size="icon"
-                          className="h-7 w-7"
                           onClick={(e) => {
                             e.stopPropagation()
                             onViewDetail(event)
                           }}
+                          aria-label="Ver detalle"
                         >
-                          <Eye className="h-3.5 w-3.5" />
-                          <span className="sr-only">Ver detalle</span>
-                        </Button>
+                          <Eye className="h-5 w-5" />
+                        </AppButton>
                       </TableCell>
                     </TableRow>
                   ))
@@ -255,8 +219,7 @@ export function EventsContent({
               </TableBody>
             </Table>
           </div>
-        </CardContent>
-      </Card>
-    </div>
+      </AppCard>
+    </PageContainer>
   )
 }

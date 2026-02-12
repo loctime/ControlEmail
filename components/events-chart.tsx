@@ -1,6 +1,11 @@
 "use client"
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  AppCard,
+  AppCardHeader,
+  AppCardTitle,
+  AppCardContent,
+} from "@/components/app-card"
 import {
   BarChart,
   Bar,
@@ -25,13 +30,13 @@ interface EventsChartProps {
 
 export function EventsChart({ chartData }: EventsChartProps) {
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium">
+    <AppCard>
+      <AppCardHeader className="pb-3">
+        <AppCardTitle className="text-base font-medium">
           Eventos por hora - Hoy
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="pt-0">
+        </AppCardTitle>
+      </AppCardHeader>
+      <AppCardContent>
         <div className="h-[280px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
@@ -45,13 +50,13 @@ export function EventsChart({ chartData }: EventsChartProps) {
               />
               <XAxis
                 dataKey="hora"
-                tick={{ fontSize: 11 }}
+                tick={{ fontSize: 12 }}
                 className="fill-muted-foreground"
                 tickLine={false}
                 axisLine={false}
               />
               <YAxis
-                tick={{ fontSize: 11 }}
+                tick={{ fontSize: 12 }}
                 className="fill-muted-foreground"
                 tickLine={false}
                 axisLine={false}
@@ -61,13 +66,13 @@ export function EventsChart({ chartData }: EventsChartProps) {
                   backgroundColor: "hsl(var(--card))",
                   border: "1px solid hsl(var(--border))",
                   borderRadius: "var(--radius)",
-                  fontSize: 12,
+                  fontSize: 14,
                   color: "hsl(var(--foreground))",
                 }}
               />
               <Legend
-                iconSize={8}
-                wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
+                iconSize={10}
+                wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
               />
               <Bar
                 dataKey="excesos"
@@ -90,7 +95,7 @@ export function EventsChart({ chartData }: EventsChartProps) {
             </BarChart>
           </ResponsiveContainer>
         </div>
-      </CardContent>
-    </Card>
+      </AppCardContent>
+    </AppCard>
   )
 }

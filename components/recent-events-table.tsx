@@ -2,12 +2,12 @@
 
 import { Eye } from "lucide-react"
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card"
+  AppCard,
+  AppCardHeader,
+  AppCardTitle,
+  AppCardDescription,
+  AppCardContent,
+} from "@/components/app-card"
 import {
   Table,
   TableBody,
@@ -17,41 +17,11 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { AppButton } from "@/components/app-button"
+import { StatusBadge } from "@/components/status-badge"
 import type { VehicleEvent } from "@/lib/data"
 import { eventTypeLabels, eventStatusLabels } from "@/lib/data"
-
-function getTypeBadgeVariant(tipo: string) {
-  switch (tipo) {
-    case "exceso_velocidad":
-      return "destructive"
-    case "vehiculo_no_identificado":
-      return "default"
-    case "desvio_ruta":
-      return "secondary"
-    case "parada_no_autorizada":
-      return "outline"
-    case "conduccion_nocturna":
-      return "secondary"
-    default:
-      return "default"
-  }
-}
-
-function getStatusColor(estado: string) {
-  switch (estado) {
-    case "critico":
-      return "bg-destructive/15 text-destructive border-destructive/20"
-    case "pendiente":
-      return "bg-chart-3/15 text-chart-3 border-chart-3/20"
-    case "en_revision":
-      return "bg-chart-1/15 text-chart-1 border-chart-1/20"
-    case "resuelto":
-      return "bg-chart-2/15 text-chart-2 border-chart-2/20"
-    default:
-      return ""
-  }
-}
+import { getTypeBadgeVariant } from "@/lib/status-tokens"
 
 interface RecentEventsTableProps {
   events: VehicleEvent[]
@@ -65,70 +35,69 @@ export function RecentEventsTable({
   const recentEvents = events.slice(0, 5)
 
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium">
+    <AppCard className="flex flex-col p-0">
+      <AppCardHeader className="p-5 pb-3">
+        <AppCardTitle className="text-base font-medium">
           Ultimos eventos
-        </CardTitle>
-        <CardDescription className="text-xs">
+        </AppCardTitle>
+        <AppCardDescription className="text-sm">
           Eventos mas recientes registrados en el sistema
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="pt-0">
+        </AppCardDescription>
+      </AppCardHeader>
+      <AppCardContent className="flex-1 p-0 px-5 pb-5">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="text-xs">Hora</TableHead>
-                <TableHead className="text-xs">Patente</TableHead>
-                <TableHead className="text-xs hidden sm:table-cell">
+                <TableHead className="text-sm font-medium">Hora</TableHead>
+                <TableHead className="text-sm font-medium">Patente</TableHead>
+                <TableHead className="hidden text-sm font-medium sm:table-cell">
                   Tipo
                 </TableHead>
-                <TableHead className="text-xs">Estado</TableHead>
-                <TableHead className="text-xs text-right">Accion</TableHead>
+                <TableHead className="text-sm font-medium">Estado</TableHead>
+                <TableHead className="text-right text-sm font-medium">
+                  Accion
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {recentEvents.map((event) => (
-                <TableRow key={event.id}>
-                  <TableCell className="text-xs font-mono">
+                <TableRow key={event.id} className="min-h-[48px]">
+                  <TableCell className="py-3 font-mono text-sm">
                     {event.hora}
                   </TableCell>
-                  <TableCell className="text-xs font-medium">
+                  <TableCell className="py-3 text-sm font-medium">
                     {event.patente}
                   </TableCell>
-                  <TableCell className="hidden sm:table-cell">
+                  <TableCell className="hidden py-3 sm:table-cell">
                     <Badge
-                      variant={getTypeBadgeVariant(event.tipo) as "default" | "secondary" | "destructive" | "outline"}
-                      className="text-[10px]"
+                      variant={getTypeBadgeVariant(event.tipo)}
+                      className="text-sm"
                     >
                       {eventTypeLabels[event.tipo]}
                     </Badge>
                   </TableCell>
-                  <TableCell>
-                    <span
-                      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${getStatusColor(event.estado)}`}
-                    >
+                  <TableCell className="py-3">
+                    <StatusBadge status={event.estado} variant="event">
                       {eventStatusLabels[event.estado]}
-                    </span>
+                    </StatusBadge>
                   </TableCell>
-                  <TableCell className="text-right">
-                    <Button
+                  <TableCell className="py-3 text-right">
+                    <AppButton
                       variant="ghost"
                       size="icon"
-                      className="h-7 w-7"
                       onClick={() => onViewDetail(event)}
+                      aria-label="Ver detalle"
                     >
-                      <Eye className="h-3.5 w-3.5" />
-                      <span className="sr-only">Ver detalle</span>
-                    </Button>
+                      <Eye className="h-5 w-5" />
+                    </AppButton>
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </div>
-      </CardContent>
-    </Card>
+      </AppCardContent>
+    </AppCard>
   )
 }

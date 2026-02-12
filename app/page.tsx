@@ -10,6 +10,7 @@ import { EventDetailPanel } from "@/components/event-detail-panel"
 import { VehiclesContent } from "@/components/vehicles-content"
 import { AlertsContent } from "@/components/alerts-content"
 import { SettingsContent } from "@/components/settings-content"
+import { AppButton } from "@/components/app-button"
 import {
   type VehicleEvent,
   type Vehicle,
@@ -81,15 +82,11 @@ export default function Page() {
       <SidebarProvider>
         <AppSidebar activeSection={activeSection} onNavigate={handleNavigate} />
         <SidebarInset>
-          <div className="flex flex-1 items-center justify-center p-8">
+          <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8">
             <p className="text-destructive">{error}</p>
-            <button
-              type="button"
-              onClick={() => fetchData()}
-              className="ml-4 rounded bg-primary px-4 py-2 text-primary-foreground"
-            >
+            <AppButton onClick={() => fetchData()}>
               Reintentar
-            </button>
+            </AppButton>
           </div>
         </SidebarInset>
       </SidebarProvider>

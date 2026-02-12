@@ -6,7 +6,7 @@ import {
   ShieldAlert,
   CircleAlert,
 } from "lucide-react"
-import { Card, CardContent } from "@/components/ui/card"
+import { AppCard } from "@/components/app-card"
 import type { VehicleEvent } from "@/lib/data"
 
 interface KPICardsProps {
@@ -58,21 +58,19 @@ export function KPICards({ events }: KPICardsProps) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {kpis.map((kpi) => (
-        <Card key={kpi.label}>
-          <CardContent className="flex items-center gap-4 p-4">
-            <div
-              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${kpi.bgColor}`}
-            >
-              <kpi.icon className={`h-5 w-5 ${kpi.color}`} />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-2xl font-bold">{kpi.value}</span>
-              <span className="text-xs text-muted-foreground">
-                {kpi.label}
-              </span>
-            </div>
-          </CardContent>
-        </Card>
+        <AppCard key={kpi.label} className="flex flex-row items-center gap-4">
+          <div
+            className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg ${kpi.bgColor}`}
+          >
+            <kpi.icon className={`h-6 w-6 ${kpi.color}`} />
+          </div>
+          <div className="flex flex-col">
+            <span className="text-2xl font-bold">{kpi.value}</span>
+            <span className="text-sm text-muted-foreground">
+              {kpi.label}
+            </span>
+          </div>
+        </AppCard>
       ))}
     </div>
   )
