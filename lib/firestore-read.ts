@@ -178,6 +178,10 @@ export interface VehicleDoc {
   lastEventId?: string
   driver?: string | null
   updatedAt?: string
+  /** Responsables (emails) para alertas. Si no existe en el documento, se devuelve []. */
+  responsables: string[]
+  /** Si las alertas están habilitadas para este vehículo. */
+  alertEnabled: boolean
 }
 
 /**
@@ -246,15 +250,83 @@ export async function listVehicles(): Promise<VehicleDoc[]> {
   console.log("[firestore-read] listVehicles: leyendo desde", path)
   const items = await listCollection(path)
   console.log("[firestore-read] listVehicles: leídos", items.length, "vehículos")
-  return items.map(({ id, data }) => ({
-    id,
-    plate: String(data.plate ?? id),
-    brand: String(data.brand ?? ""),
-    model: String(data.model ?? ""),
-    lastLocation: data.lastLocation != null ? String(data.lastLocation) : null,
-    lastEventAt: data.lastEventAt != null ? String(data.lastEventAt) : undefined,
-    lastEventId: data.lastEventId != null ? String(data.lastEventId) : undefined,
-    driver: data.driver != null ? String(data.driver) : null,
-    updatedAt: data.updatedAt != null ? String(data.updatedAt) : undefined,
-  }))
+  return items.map(({ id, data }) => {
+    const rawResponsables = data.responsables
+    const responsables = Array.isArray(rawResponsables)
+      ? (rawResponsables as unknown[]).map((v) => String(v))
+      : []
+    return {
+      id,
+      plate: String(data.plate ?? id),
+      brand: String(data.brand ?? ""),
+      model: String(data.model ?? ""),
+      lastLocation: data.lastLocation != null ? String(data.lastLocation) : null,
+      lastEventAt: data.lastEventAt != null ? String(data.lastEventAt) : undefined,
+      lastEventId: data.lastEventId != null ? String(data.lastEventId) : undefined,
+      driver: data.driver != null ? String(data.driver) : null,
+      updatedAt: data.updatedAt != null ? String(data.updatedAt) : undefined,
+      responsables,
+      alertEnabled: Boolean(data.alertEnabled),
+    }
+  })
+}
+
+/** Convierte valores a formato de campos Firestore REST API. */
+function toFirestoreFields(fields: Record<string, unknown>): Record<string, Record<string, unknown>> {
+  const out: Record<string, Record<string, unknown>> = {}
+  for (const [k, v] of Object.entries(fields)) {
+    if (Array.isArray(v)) {
+      out[k] = {
+        arrayValue: {
+          values: v.map((item) => ({ stringValue: String(item) })),
+        },
+      }
+    } else if (typeof v === "boolean") {
+      out[k] = { booleanValue: v }
+    } else if (typeof v === "string") {
+      out[k] = { stringValue: v }
+    } else if (typeof v === "number") {
+      out[k] = Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v }
+    }
+  }
+  return out
+}
+
+export interface VehicleAlertsUpdate {
+  responsables: string[]
+  alertEnabled: boolean
+}
+
+/**
+ * Actualiza responsables y alertEnabled de un vehículo en apps/emails/vehicles/{plate}.
+ * Si el documento no tiene responsables, se escriben los enviados (no se inicializa en lectura).
+ */
+export async function updateVehicleAlerts(
+  plate: string,
+  payload: VehicleAlertsUpdate,
+): Promise<void> {
+  const docPath = `apps/emails/vehicles/${encodeURIComponent(plate)}`
+  const path = `documents/${docPath}?updateMask.fieldPaths=responsables&updateMask.fieldPaths=alertEnabled`
+  const projectId = getEnvOrThrow(
+    "FIREBASE_PROJECT_ID",
+    "NEXT_PUBLIC_FIREBASE_PROJECT_ID",
+  )
+  const documentName = `projects/${projectId}/databases/(default)/documents/${docPath}`
+  const body = {
+    name: documentName,
+    fields: toFirestoreFields({
+      responsables: payload.responsables,
+      alertEnabled: payload.alertEnabled,
+    }),
+  }
+  const res = await firestoreRequest(path, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const text = await res.text()
+    console.error("[firestore-read] updateVehicleAlerts failed:", res.status, text)
+    throw new Error(`Firestore update failed: ${res.status}`)
+  }
+  console.log("[firestore-read] updateVehicleAlerts OK:", plate)
 }
