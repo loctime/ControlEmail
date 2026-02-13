@@ -28,14 +28,14 @@ export function ThemeToggle() {
             size="icon"
             onClick={toggleTheme}
             className="h-11 w-11 min-h-[44px] min-w-[44px]"
-            aria-label={isDark ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+            aria-label="Alternar tema claro u oscuro"
           >
             <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
             <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
           </Button>
         </TooltipTrigger>
         <TooltipContent>
-          <p>{isDark ? "Modo claro" : "Modo oscuro"}</p>
+          <p>Alternar tema</p>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
