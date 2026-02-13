@@ -1,7 +1,14 @@
 import { NextResponse } from "next/server"
 import { listVehicles, updateVehicleAlerts } from "@/lib/firestore-read"
+import { hasValidAdminSession, unauthorizedResponse } from "@/lib/admin-session"
 
-export async function GET() {
+function checkAdmin(request: Request) {
+  if (!hasValidAdminSession(request)) return null
+  return true
+}
+
+export async function GET(request: Request) {
+  if (!checkAdmin(request)) return unauthorizedResponse()
   try {
     const vehicles = await listVehicles()
     return NextResponse.json(vehicles)
@@ -15,6 +22,7 @@ export async function GET() {
 }
 
 export async function PATCH(request: Request) {
+  if (!checkAdmin(request)) return unauthorizedResponse()
   try {
     const body = await request.json()
     const plate = typeof body?.plate === "string" ? body.plate.trim() : ""
