@@ -1,11 +1,16 @@
 "use client"
 
 import { KPICards } from "@/components/kpi-cards"
-import { EventsChart } from "@/components/events-chart"
+import { VehiclesWarningsWeeklyChart } from "@/components/vehicles-warnings-weekly-chart"
+import { HoursWarningsChart } from "@/components/hours-warnings-chart"
 import { RecentEventsTable } from "@/components/recent-events-table"
 import { PageContainer } from "@/components/page-container"
 import { SectionHeader } from "@/components/section-header"
-import { chartDataFromEvents, type VehicleEvent } from "@/lib/data"
+import {
+  getWeeklyVehicleWarnings,
+  getHourlyWarnings,
+  type VehicleEvent,
+} from "@/lib/data"
 
 interface DashboardContentProps {
   events: VehicleEvent[]
@@ -21,7 +26,12 @@ export function DashboardContent({
     month: "long",
     year: "numeric",
   })
-  const chartData = chartDataFromEvents(events)
+  const eventsList = Array.isArray(events) ? events : []
+  if (typeof console !== "undefined" && console.log) {
+    console.log("[DashboardContent] events:", eventsList.length, eventsList)
+  }
+  const weeklyData = getWeeklyVehicleWarnings(eventsList)
+  const hoursData = getHourlyWarnings(eventsList)
 
   return (
     <PageContainer>
@@ -31,7 +41,10 @@ export function DashboardContent({
       />
       <KPICards events={events} />
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <EventsChart chartData={chartData} />
+        <VehiclesWarningsWeeklyChart data={weeklyData} />
+        <HoursWarningsChart data={hoursData} />
+      </div>
+      <div className="grid grid-cols-1 gap-6">
         <RecentEventsTable events={events} onViewDetail={onViewEventDetail} />
       </div>
     </PageContainer>

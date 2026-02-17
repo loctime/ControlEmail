@@ -37,6 +37,11 @@ export async function GET() {
     const docs = await listVehicleEvents()
     console.log("[api/vehicle-events] GET: recibidos", docs.length, "documentos de Firestore")
     const events: VehicleEvent[] = docs.map(eventDocToVehicleEvent)
+    console.log("[api/vehicle-events] sample event (fecha, hora, patente):", events[0] ? {
+      fecha: events[0].fecha,
+      hora: events[0].hora,
+      patente: events[0].patente,
+    } : "sin eventos")
     events.sort((a, b) => {
       const da = `${a.fecha}T${a.hora}`
       const db = `${b.fecha}T${b.hora}`

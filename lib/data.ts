@@ -114,3 +114,99 @@ export function chartDataFromEvents(events: VehicleEvent[]): Array<{
     ...(byHour[hora] ?? { excesos: 0, desvios: 0, otros: 0 }),
   }))
 }
+
+function toLocalDateKey(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${y}-${m}-${day}`
+}
+
+/**
+ * Obtiene el lunes y domingo de la semana actual (lunes = inicio).
+ * Retorna fechas YYYY-MM-DD en hora local.
+ */
+function getCurrentWeekBounds(): { start: string; end: string } {
+  const now = new Date()
+  const day = now.getDay()
+  const mondayOffset = day === 0 ? -6 : 1 - day
+  const monday = new Date(now)
+  monday.setDate(now.getDate() + mondayOffset)
+  const sunday = new Date(monday)
+  sunday.setDate(monday.getDate() + 6)
+  return {
+    start: toLocalDateKey(monday),
+    end: toLocalDateKey(sunday),
+  }
+}
+
+/**
+ * PATENTE → cantidad total de advertencias en la semana actual.
+ * Agrupa por patente, no por día.
+ * Ordena descendente por cantidad.
+ */
+export function getWeeklyVehicleWarnings(
+  events: VehicleEvent[]
+): Array<{ patente: string; advertencias: number }> {
+  const input = Array.isArray(events) ? events : []
+  const { start, end } = getCurrentWeekBounds()
+
+  const byPatente: Record<string, number> = {}
+
+  for (const ev of input) {
+    const fecha = ev.fecha?.slice?.(0, 10)
+    if (!fecha || fecha < start || fecha > end) continue
+
+    const patente = String(ev.patente ?? "").trim()
+    if (!patente) continue
+
+    byPatente[patente] = (byPatente[patente] ?? 0) + 1
+  }
+
+  const result = Object.entries(byPatente).map(([patente, advertencias]) => ({
+    patente,
+    advertencias,
+  }))
+  result.sort((a, b) => b.advertencias - a.advertencias)
+
+  if (typeof console !== "undefined" && console.log) {
+    console.log("[getWeeklyVehicleWarnings] events:", input.length, "weeklyData:", result)
+  }
+  return result
+}
+
+/**
+ * HORA (00–23) → cantidad total de advertencias.
+ * Siempre devuelve las 24 horas aunque no haya datos.
+ */
+export function getHourlyWarnings(
+  events: VehicleEvent[]
+): Array<{ hora: string; advertencias: number }> {
+  const input = Array.isArray(events) ? events : []
+
+  const hours = Array.from({ length: 24 }, (_, i) =>
+    `${String(i).padStart(2, "0")}:00`
+  )
+  const byHour: Record<string, number> = {}
+  hours.forEach((h) => {
+    byHour[h] = 0
+  })
+
+  for (const ev of input) {
+    const horaStr = ev.hora ?? ""
+    const hourNum = parseInt(String(horaStr).slice(0, 2), 10)
+    if (Number.isNaN(hourNum) || hourNum < 0 || hourNum > 23) continue
+    const h = `${String(hourNum).padStart(2, "0")}:00`
+    byHour[h] = (byHour[h] ?? 0) + 1
+  }
+
+  const result = hours.map((hora) => ({
+    hora,
+    advertencias: byHour[hora] ?? 0,
+  }))
+
+  if (typeof console !== "undefined" && console.log) {
+    console.log("[getHourlyWarnings] events:", input.length, "hourlyData:", result)
+  }
+  return result
+}
