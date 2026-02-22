@@ -2,17 +2,20 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
-import { AlertTriangle, CheckCircle, Key, Clock, TrendingUp, AlertCircle } from "lucide-react"
-import type { VehicleKpis } from "./useVehicleData"
+import { AlertTriangle, CheckCircle, Key, Clock, TrendingUp, TrendingDown, AlertCircle, Award, Target } from "lucide-react"
+import type { VehicleKpis, TrendData, RankingData } from "./useVehicleData"
 import { format } from "date-fns"
+import { cn } from "@/lib/utils"
 
 interface VehicleKpisProps {
   kpis: VehicleKpis
   score: number
+  trend: TrendData
+  ranking: RankingData
   loading: boolean
 }
 
-export function VehicleKpis({ kpis, score, loading }: VehicleKpisProps) {
+export function VehicleKpis({ kpis, score, trend, ranking, loading }: VehicleKpisProps) {
   if (loading) {
     return (
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -38,6 +41,43 @@ export function VehicleKpis({ kpis, score, loading }: VehicleKpisProps) {
     }
   }
 
+  // Determinar color de tendencia
+  const trendColor = trend.trendDirection === "down" 
+    ? "text-green-600 dark:text-green-400" 
+    : trend.trendDirection === "up"
+    ? "text-red-600 dark:text-red-400"
+    : "text-muted-foreground"
+
+  const trendIcon = trend.trendDirection === "down" 
+    ? TrendingDown 
+    : trend.trendDirection === "up"
+    ? TrendingUp
+    : null
+
+  // Determinar color de cumplimiento
+  const cumplimientoColor = kpis.porcentajeSinLlave < 5
+    ? "text-green-600 dark:text-green-400"
+    : kpis.porcentajeSinLlave <= 15
+    ? "text-orange-600 dark:text-orange-400"
+    : "text-red-600 dark:text-red-400"
+
+  const cumplimientoBg = kpis.porcentajeSinLlave < 5
+    ? "bg-green-50 dark:bg-green-900/10"
+    : kpis.porcentajeSinLlave <= 15
+    ? "bg-orange-50 dark:bg-orange-900/10"
+    : "bg-red-50 dark:bg-red-900/10"
+
+  // Determinar color de días sin eventos
+  const diasSinEventosBg = kpis.diasSinEventos > 30
+    ? "bg-green-50 dark:bg-green-900/10"
+    : kpis.diasSinEventos === 0
+    ? "bg-red-50 dark:bg-red-900/10"
+    : ""
+
+  // Determinar si está en top 20% peor del ranking
+  const isTop20PercentWorst = ranking.totalVehicles > 0 
+    && ranking.position > Math.floor(ranking.totalVehicles * 0.8)
+
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       <Card>
@@ -48,6 +88,14 @@ export function VehicleKpis({ kpis, score, loading }: VehicleKpisProps) {
         <CardContent>
           <div className="text-2xl font-bold">{kpis.totalEventos}</div>
           <p className="text-xs text-muted-foreground">En el período seleccionado</p>
+          {trendIcon && (
+            <div className={cn("flex items-center gap-1 mt-2 text-xs font-medium", trendColor)}>
+              <trendIcon className="h-3 w-3" />
+              <span>
+                {trend.trendPercentage > 0 ? "+" : ""}{trend.trendPercentage}% vs período anterior
+              </span>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -140,6 +188,65 @@ export function VehicleKpis({ kpis, score, loading }: VehicleKpisProps) {
               </p>
             </>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Ranking en Flota */}
+      <Card className={cn(isTop20PercentWorst && "border-red-300 dark:border-red-800")}>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Ranking en Flota</CardTitle>
+          <Award className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">
+            {ranking.position > 0 ? `${ranking.position} / ${ranking.totalVehicles}` : "-"}
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            {ranking.position > 0 
+              ? `Más eventos = peor posición`
+              : "Sin datos de ranking"}
+          </p>
+          {isTop20PercentWorst && (
+            <p className="text-xs text-red-600 dark:text-red-400 mt-1 font-medium">
+              Top 20% con más eventos
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Indicador de Cumplimiento */}
+      <Card className={cn(cumplimientoBg)}>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Eventos sin identificación</CardTitle>
+          <Target className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className={cn("text-2xl font-bold", cumplimientoColor)}>
+            {kpis.porcentajeSinLlave}%
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            {kpis.totalSinLlave} de {kpis.totalEventos} eventos
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Días Sin Eventos */}
+      <Card className={cn(diasSinEventosBg)}>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Días Sin Eventos</CardTitle>
+          <Clock className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">
+            {kpis.diasSinEventos}
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            {kpis.diasSinEventos === 0
+              ? "Eventos hoy"
+              : kpis.diasSinEventos === 1
+                ? "día sin eventos"
+                : "días sin eventos"}
+          </p>
         </CardContent>
       </Card>
     </div>

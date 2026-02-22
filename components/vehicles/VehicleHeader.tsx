@@ -46,13 +46,48 @@ export function VehicleHeader({ vehicle, riskLevel, loading }: VehicleHeaderProp
   }
 
   const riskLabels = {
-    bajo: "Riesgo Bajo",
-    medio: "Riesgo Medio",
-    alto: "Riesgo Alto",
+    bajo: "RIESGO BAJO",
+    medio: "RIESGO MEDIO",
+    alto: "RIESGO ALTO",
+  }
+
+  const riskBarColors = {
+    bajo: "bg-green-500/20 border-green-500/50",
+    medio: "bg-orange-500/20 border-orange-500/50",
+    alto: "bg-red-500/20 border-red-500/50",
+  }
+
+  const riskTextColors = {
+    bajo: "text-green-700 dark:text-green-400",
+    medio: "text-orange-700 dark:text-orange-400",
+    alto: "text-red-700 dark:text-red-400",
   }
 
   return (
-    <Card>
+    <Card className="overflow-hidden">
+      {/* Semáforo visual grande */}
+      <div className={cn(
+        "w-full px-6 py-3 border-b",
+        riskBarColors[riskLevel]
+      )}>
+        <div className="flex items-center justify-between">
+          <span className={cn(
+            "text-sm font-semibold uppercase tracking-wide",
+            riskTextColors[riskLevel]
+          )}>
+            {riskLabels[riskLevel]}
+          </span>
+          <div className="flex items-center gap-2">
+            <div className={cn(
+              "h-3 w-3 rounded-full",
+              riskLevel === "bajo" && "bg-green-500",
+              riskLevel === "medio" && "bg-orange-500",
+              riskLevel === "alto" && "bg-red-500"
+            )} />
+          </div>
+        </div>
+      </div>
+      
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -72,7 +107,7 @@ export function VehicleHeader({ vehicle, riskLevel, loading }: VehicleHeaderProp
             variant="outline"
             className={cn("text-sm font-semibold px-3 py-1", riskColors[riskLevel])}
           >
-            {riskLabels[riskLevel]}
+            {riskLabels[riskLevel].replace("RIESGO ", "")}
           </Badge>
         </div>
       </CardHeader>

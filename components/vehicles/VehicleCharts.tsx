@@ -20,13 +20,15 @@ import {
 import { useMemo } from "react"
 import { format, subDays, startOfDay, parseISO } from "date-fns"
 import type { VehicleEventDashboard } from "@/lib/firestore-read"
+import type { MonthlyScore } from "./useVehicleData"
 
 interface VehicleChartsProps {
   events: VehicleEventDashboard[]
+  monthlyScores: MonthlyScore[]
   loading: boolean
 }
 
-export function VehicleCharts({ events, loading }: VehicleChartsProps) {
+export function VehicleCharts({ events, monthlyScores, loading }: VehicleChartsProps) {
   // Datos para eventos por día (últimos 30 días)
   const dailyEventsData = useMemo(() => {
     const days = Array.from({ length: 30 }, (_, i) => {
@@ -276,6 +278,63 @@ export function VehicleCharts({ events, loading }: VehicleChartsProps) {
                   stroke="#f97316"
                   strokeWidth={2}
                   dot={{ r: 4 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Score Mensual Histórico */}
+      <Card className="md:col-span-2">
+        <CardHeader>
+          <CardTitle className="text-base font-medium">
+            Score de Riesgo Mensual (Últimos 6 meses)
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[280px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart
+                data={monthlyScores}
+                margin={{ top: 8, right: 8, left: -16, bottom: 0 }}
+              >
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  className="stroke-border"
+                  vertical={false}
+                />
+                <XAxis
+                  dataKey="month"
+                  tick={{ fontSize: 12 }}
+                  className="fill-muted-foreground"
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <YAxis
+                  label={{ value: "Score", angle: -90, position: "insideLeft", fontSize: 12 }}
+                  tick={{ fontSize: 12 }}
+                  className="fill-muted-foreground"
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "hsl(var(--card))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: "var(--radius)",
+                    fontSize: 12,
+                  }}
+                  formatter={(value: number) => [`Score: ${value}`, ""]}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="score"
+                  name="Score"
+                  stroke="hsl(var(--primary))"
+                  strokeWidth={3}
+                  dot={{ r: 5, fill: "hsl(var(--primary))" }}
+                  activeDot={{ r: 7 }}
                 />
               </LineChart>
             </ResponsiveContainer>

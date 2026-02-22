@@ -10,6 +10,24 @@ export interface VehicleKpis {
   totalSinLlave: number
   ultimoEvento: VehicleEventDashboard | null
   diasSinEventos: number
+  porcentajeSinLlave: number
+}
+
+export interface TrendData {
+  currentPeriodEvents: number
+  previousPeriodEvents: number
+  trendPercentage: number
+  trendDirection: "up" | "down" | "equal"
+}
+
+export interface RankingData {
+  position: number
+  totalVehicles: number
+}
+
+export interface MonthlyScore {
+  month: string
+  score: number
 }
 
 export interface VehicleDataResult {
@@ -19,6 +37,9 @@ export interface VehicleDataResult {
   kpis: VehicleKpis
   score: number
   riskLevel: "bajo" | "medio" | "alto"
+  trend: TrendData
+  ranking: RankingData
+  monthlyScores: MonthlyScore[]
   loading: boolean
   error: string | null
 }
@@ -26,6 +47,8 @@ export interface VehicleDataResult {
 export function useVehicleData(plate: string, daysFilter: 7 | 30 | 90 = 30): VehicleDataResult {
   const [vehicle, setVehicle] = useState<VehicleDoc | null>(null)
   const [events, setEvents] = useState<VehicleEventDashboard[]>([])
+  const [previousEvents, setPreviousEvents] = useState<VehicleEventDashboard[]>([])
+  const [ranking, setRanking] = useState<RankingData>({ position: 0, totalVehicles: 0 })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -56,6 +79,8 @@ export function useVehicleData(plate: string, daysFilter: 7 | 30 | 90 = 30): Veh
         const data = await response.json()
         setVehicle(data.vehicle)
         setEvents(data.events || [])
+        setPreviousEvents(data.previousEvents || [])
+        setRanking(data.ranking || { position: 0, totalVehicles: 0 })
       } catch (err) {
         console.error("[useVehicleData] Error:", err)
         setError(err instanceof Error ? err.message : "Error desconocido")
@@ -108,6 +133,11 @@ export function useVehicleData(plate: string, daysFilter: 7 | 30 | 90 = 30): Veh
       diasSinEventos = daysFilter // Si no hay eventos, usar el rango completo
     }
 
+    // Calcular porcentaje sin llave
+    const porcentajeSinLlave = totalEventos > 0
+      ? Math.round((totalSinLlave / totalEventos) * 100)
+      : 0
+
     return {
       totalEventos,
       totalCriticos,
@@ -115,6 +145,7 @@ export function useVehicleData(plate: string, daysFilter: 7 | 30 | 90 = 30): Veh
       totalSinLlave,
       ultimoEvento,
       diasSinEventos,
+      porcentajeSinLlave,
     }
   }, [filteredEvents, daysFilter])
 
@@ -134,6 +165,85 @@ export function useVehicleData(plate: string, daysFilter: 7 | 30 | 90 = 30): Veh
     return "alto"
   }, [score])
 
+  // Calcular tendencia vs período anterior
+  const trend = useMemo((): TrendData => {
+    const currentPeriodEvents = filteredEvents.length
+    const previousPeriodEvents = previousEvents.length
+
+    let trendPercentage = 0
+    let trendDirection: "up" | "down" | "equal" = "equal"
+
+    if (previousPeriodEvents === 0) {
+      if (currentPeriodEvents > 0) {
+        trendPercentage = 100
+        trendDirection = "up"
+      } else {
+        trendPercentage = 0
+        trendDirection = "equal"
+      }
+    } else {
+      trendPercentage = Math.round(((currentPeriodEvents - previousPeriodEvents) / previousPeriodEvents) * 100)
+      if (trendPercentage > 0) {
+        trendDirection = "up"
+      } else if (trendPercentage < 0) {
+        trendDirection = "down"
+      } else {
+        trendDirection = "equal"
+      }
+    }
+
+    return {
+      currentPeriodEvents,
+      previousPeriodEvents,
+      trendPercentage,
+      trendDirection,
+    }
+  }, [filteredEvents, previousEvents])
+
+  // Calcular score mensual (últimos 6 meses)
+  const monthlyScores = useMemo((): MonthlyScore[] => {
+    const months: Record<string, VehicleEventDashboard[]> = {}
+    
+    // Inicializar últimos 6 meses
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date()
+      date.setMonth(date.getMonth() - i)
+      const monthKey = date.toLocaleDateString("es-AR", { month: "short", year: "numeric" })
+      months[monthKey] = []
+    }
+
+    // Agrupar eventos por mes
+    events.forEach((event) => {
+      try {
+        const eventDate = new Date(event.eventTimestamp)
+        const monthKey = eventDate.toLocaleDateString("es-AR", { month: "short", year: "numeric" })
+        if (months[monthKey]) {
+          months[monthKey].push(event)
+        }
+      } catch {
+        // Ignorar eventos con fecha inválida
+      }
+    })
+
+    // Calcular score por mes
+    return Object.entries(months).map(([month, monthEvents]) => {
+      const criticos = monthEvents.filter((e) => e.severity === "critico").length
+      const advertencias = monthEvents.filter((e) => e.severity === "advertencia").length
+      const sinLlave = monthEvents.filter((e) => 
+        e.type === "sin_llave" || 
+        e.type?.toLowerCase().includes("sin_llave") ||
+        e.type?.toLowerCase().includes("sin llave")
+      ).length
+      
+      const monthScore = criticos * 5 + advertencias * 2 + sinLlave * 3
+      
+      return {
+        month,
+        score: monthScore,
+      }
+    })
+  }, [events])
+
   return {
     vehicle,
     events,
@@ -141,6 +251,9 @@ export function useVehicleData(plate: string, daysFilter: 7 | 30 | 90 = 30): Veh
     kpis,
     score,
     riskLevel,
+    trend,
+    ranking,
+    monthlyScores,
     loading,
     error,
   }

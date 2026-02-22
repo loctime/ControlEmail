@@ -23,7 +23,7 @@ export default function VehicleDashboardPage() {
   const plate = params?.plate as string
   const [daysFilter, setDaysFilter] = useState<7 | 30 | 90>(30)
 
-  const { vehicle, filteredEvents, kpis, score, riskLevel, loading, error } =
+  const { vehicle, filteredEvents, kpis, score, riskLevel, trend, ranking, monthlyScores, loading, error } =
     useVehicleData(plate, daysFilter)
 
   if (!plate) {
@@ -80,10 +80,10 @@ export default function VehicleDashboardPage() {
         {/* KPIs */}
         {!error && (
           <>
-            <VehicleKpis kpis={kpis} score={score} loading={loading} />
+            <VehicleKpis kpis={kpis} score={score} trend={trend} ranking={ranking} loading={loading} />
 
             {/* Gráficos */}
-            <VehicleCharts events={filteredEvents} loading={loading} />
+            <VehicleCharts events={filteredEvents} monthlyScores={monthlyScores} loading={loading} />
 
             {/* Tabla de eventos */}
             <VehicleEventsTable events={filteredEvents} loading={loading} />
