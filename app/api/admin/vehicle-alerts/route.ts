@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { listVehicles, updateVehicleAlerts } from "@/lib/firestore-read"
 import { hasValidAdminSession, unauthorizedResponse } from "@/lib/admin-session"
+import { normalizePlate } from "@/lib/utils"
 
 function checkAdmin(request: Request) {
   if (!hasValidAdminSession(request)) return null
@@ -25,18 +26,19 @@ export async function PATCH(request: Request) {
   if (!checkAdmin(request)) return unauthorizedResponse()
   try {
     const body = await request.json()
-    const plate = typeof body?.plate === "string" ? body.plate.trim() : ""
+    const rawPlate = typeof body?.plate === "string" ? body.plate : ""
+    // Normalizar la patente: eliminar caracteres especiales y convertir a uppercase
+    const plate = normalizePlate(rawPlate)
     const rawResponsables = body?.responsables
     const responsables = Array.isArray(rawResponsables)
       ? (rawResponsables as unknown[]).map((v) => String(v).trim()).filter(Boolean)
       : []
-    const alertEnabled = Boolean(body?.alertEnabled)
 
     if (!plate) {
       return NextResponse.json({ error: "plate_required" }, { status: 400 })
     }
 
-    await updateVehicleAlerts(plate, { responsables, alertEnabled })
+    await updateVehicleAlerts(plate, { responsables })
     return NextResponse.json({ ok: true })
   } catch (error) {
     console.error("[api/admin/vehicle-alerts] PATCH error:", error instanceof Error ? error.message : error)

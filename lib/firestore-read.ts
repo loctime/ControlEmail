@@ -180,8 +180,6 @@ export interface VehicleDoc {
   updatedAt?: string
   /** Responsables (emails) para alertas. Si no existe en el documento, se devuelve []. */
   responsables: string[]
-  /** Si las alertas están habilitadas para este vehículo. */
-  alertEnabled: boolean
 }
 
 /**
@@ -266,7 +264,6 @@ export async function listVehicles(): Promise<VehicleDoc[]> {
       driver: data.driver != null ? String(data.driver) : null,
       updatedAt: data.updatedAt != null ? String(data.updatedAt) : undefined,
       responsables,
-      alertEnabled: Boolean(data.alertEnabled),
     }
   })
 }
@@ -304,7 +301,6 @@ export async function getVehicleByPlate(plate: string): Promise<VehicleDoc | nul
     driver: data.driver != null ? String(data.driver) : null,
     updatedAt: data.updatedAt != null ? String(data.updatedAt) : undefined,
     responsables,
-    alertEnabled: Boolean(data.alertEnabled),
   }
 }
 
@@ -529,11 +525,10 @@ function toFirestoreFields(fields: Record<string, unknown>): Record<string, Reco
 
 export interface VehicleAlertsUpdate {
   responsables: string[]
-  alertEnabled: boolean
 }
 
 /**
- * Actualiza responsables y alertEnabled de un vehículo en apps/emails/vehicles/{plate}.
+ * Actualiza responsables de un vehículo en apps/emails/vehicles/{plate}.
  * Si el documento no tiene responsables, se escriben los enviados (no se inicializa en lectura).
  */
 export async function updateVehicleAlerts(
@@ -541,7 +536,7 @@ export async function updateVehicleAlerts(
   payload: VehicleAlertsUpdate,
 ): Promise<void> {
   const docPath = `apps/emails/vehicles/${encodeURIComponent(plate)}`
-  const path = `documents/${docPath}?updateMask.fieldPaths=responsables&updateMask.fieldPaths=alertEnabled`
+  const path = `documents/${docPath}?updateMask.fieldPaths=responsables`
   const projectId = getEnvOrThrow(
     "FIREBASE_PROJECT_ID",
     "NEXT_PUBLIC_FIREBASE_PROJECT_ID",
@@ -551,7 +546,6 @@ export async function updateVehicleAlerts(
     name: documentName,
     fields: toFirestoreFields({
       responsables: payload.responsables,
-      alertEnabled: payload.alertEnabled,
     }),
   }
   const res = await firestoreRequest(path, {

@@ -1,18 +1,17 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { VehicleAlertsTable } from "@/components/vehicle-alerts-table"
-import { VehicleAlertEditModal, type VehicleAlertRow } from "@/components/vehicle-alert-edit-modal"
+import { VehicleAlertsTable, type VehicleAlertRow } from "@/components/vehicle-alerts-table"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { normalizePlate } from "@/lib/utils"
 
 export default function VehicleAlertsPage() {
   const [loading, setLoading] = useState(true)
   const [needsLogin, setNeedsLogin] = useState(false)
   const [vehicles, setVehicles] = useState<VehicleAlertRow[]>([])
   const [fetchError, setFetchError] = useState<string | null>(null)
-  const [editingVehicle, setEditingVehicle] = useState<VehicleAlertRow | null>(null)
 
   // Login form state
   const [password, setPassword] = useState("")
@@ -74,25 +73,44 @@ export default function VehicleAlertsPage() {
 
   const handleSave = async (
     plate: string,
-    payload: { responsables: string[]; alertEnabled: boolean },
+    payload: { responsables: string[] },
   ) => {
+    // Normalizar la patente antes de enviarla al backend
+    const normalizedPlate = normalizePlate(plate)
+    if (!normalizedPlate) {
+      throw new Error("La patente no puede estar vacía")
+    }
+
     const res = await fetch("/api/admin/vehicle-alerts", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ plate, ...payload }),
+      body: JSON.stringify({ plate: normalizedPlate, ...payload }),
     })
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
       throw new Error(data?.error ?? "Error al guardar")
     }
-    setVehicles((prev) =>
-      prev.map((v) =>
-        (v.plate || v.id) === plate
-          ? { ...v, responsables: payload.responsables, alertEnabled: payload.alertEnabled }
-          : v,
-      ),
-    )
+    
+    // Actualizar el estado local usando la patente normalizada como clave
+    setVehicles((prev) => {
+      const existing = prev.find((v) => {
+        const vPlate = normalizePlate(v.plate || v.id)
+        return vPlate === normalizedPlate
+      })
+      if (existing) {
+        return prev.map((v) => {
+          const vPlate = normalizePlate(v.plate || v.id)
+          return vPlate === normalizedPlate
+            ? { ...v, plate: normalizedPlate, responsables: payload.responsables }
+            : v
+        })
+      } else {
+        // Si no existe, agregarlo (nueva patente)
+        // Usar la patente normalizada como id y plate (no ID random)
+        return [...prev, { id: normalizedPlate, plate: normalizedPlate, responsables: payload.responsables }]
+      }
+    })
   }
 
   if (loading) {
@@ -141,7 +159,7 @@ export default function VehicleAlertsPage() {
           Alertas por vehículo
         </h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          Asignar responsables y habilitar alertas por patente.
+          Asignar responsables por patente.
         </p>
       </div>
 
@@ -151,14 +169,7 @@ export default function VehicleAlertsPage() {
         </div>
       )}
 
-      <VehicleAlertsTable vehicles={vehicles} onEdit={setEditingVehicle} />
-
-      <VehicleAlertEditModal
-        open={editingVehicle != null}
-        vehicle={editingVehicle}
-        onClose={() => setEditingVehicle(null)}
-        onSave={handleSave}
-      />
+      <VehicleAlertsTable vehicles={vehicles} onSave={handleSave} />
     </div>
   )
 }
