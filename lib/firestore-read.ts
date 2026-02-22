@@ -271,6 +271,158 @@ export async function listVehicles(): Promise<VehicleDoc[]> {
   })
 }
 
+/**
+ * Obtiene un vehículo específico por patente.
+ */
+export async function getVehicleByPlate(plate: string): Promise<VehicleDoc | null> {
+  const docPath = `apps/emails/vehicles/${encodeURIComponent(plate)}`
+  const path = `documents/${docPath}`
+  const res = await firestoreRequest(path, { method: "GET" })
+  if (!res.ok) {
+    if (res.status === 404) return null
+    throw new Error(`Firestore get failed: ${res.status}`)
+  }
+  const json = (await res.json()) as {
+    name?: string
+    fields?: Record<string, Record<string, unknown>>
+  }
+  if (!json.fields) return null
+  const id = json.name?.split("/").pop() ?? plate
+  const data = parseFields(json.fields)
+  const rawResponsables = data.responsables
+  const responsables = Array.isArray(rawResponsables)
+    ? (rawResponsables as unknown[]).map((v) => String(v))
+    : []
+  return {
+    id,
+    plate: String(data.plate ?? plate),
+    brand: String(data.brand ?? ""),
+    model: String(data.model ?? ""),
+    lastLocation: data.lastLocation != null ? String(data.lastLocation) : null,
+    lastEventAt: data.lastEventAt != null ? String(data.lastEventAt) : undefined,
+    lastEventId: data.lastEventId != null ? String(data.lastEventId) : undefined,
+    driver: data.driver != null ? String(data.driver) : null,
+    updatedAt: data.updatedAt != null ? String(data.updatedAt) : undefined,
+    responsables,
+    alertEnabled: Boolean(data.alertEnabled),
+  }
+}
+
+/**
+ * Obtiene eventos de un vehículo específico, filtrados por rango de fechas.
+ * La estructura esperada es según la especificación del usuario:
+ * - type: string
+ * - severity: "critico" | "advertencia"
+ * - eventTimestamp: string (ISO)
+ * - speed?: number
+ * - location?: string
+ * - reason?: string
+ */
+export interface VehicleEventDashboard {
+  id: string
+  plate: string
+  type: string
+  severity: "critico" | "advertencia"
+  eventTimestamp: string
+  speed?: number
+  location?: string
+  reason?: string
+}
+
+// Re-export para uso en componentes
+export type { VehicleDoc }
+
+export async function getVehicleEventsByPlate(
+  plate: string,
+  daysBack?: number,
+): Promise<VehicleEventDashboard[]> {
+  const path = "apps/emails/vehicleEvents"
+  console.log("[firestore-read] getVehicleEventsByPlate: leyendo desde", path, "plate:", plate)
+  const items = await listCollection(path, 1000) // Obtener más eventos para filtrar
+  
+  const now = new Date()
+  const cutoffDate = daysBack
+    ? new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000)
+    : null
+  
+  const filtered = items
+    .filter(({ data }) => {
+      const itemPlate = String(data.plate ?? "").toUpperCase()
+      return itemPlate === plate.toUpperCase()
+    })
+    .map(({ id, data }) => {
+      // Intentar obtener eventTimestamp (puede ser eventTimestamp, eventDate, o createdAt)
+      let eventTimestamp = ""
+      if (data.eventTimestamp && typeof data.eventTimestamp === "string") {
+        eventTimestamp = data.eventTimestamp
+      } else if (data.eventDate) {
+        const rawDate = data.eventDate
+        if (typeof rawDate === "string") {
+          eventTimestamp = rawDate
+        } else if (rawDate && typeof rawDate === "object" && "timestampValue" in (rawDate as Record<string, unknown>)) {
+          eventTimestamp = (rawDate as { timestampValue: string }).timestampValue
+        }
+      } else if (data.createdAt) {
+        const rawCreated = data.createdAt
+        if (typeof rawCreated === "string") {
+          eventTimestamp = rawCreated
+        } else if (rawCreated && typeof rawCreated === "object" && "timestampValue" in (rawCreated as Record<string, unknown>)) {
+          eventTimestamp = (rawCreated as { timestampValue: string }).timestampValue
+        }
+      }
+      
+      // Si no hay timestamp, usar fecha actual
+      if (!eventTimestamp) {
+        eventTimestamp = new Date().toISOString()
+      }
+      
+      // Filtrar por fecha si se especifica
+      if (cutoffDate && eventTimestamp) {
+        const eventDate = new Date(eventTimestamp)
+        if (eventDate < cutoffDate) {
+          return null
+        }
+      }
+      
+      // Obtener type (puede ser type, eventCategory, o formatType)
+      const type = String(
+        data.type ?? data.eventCategory ?? data.formatType ?? "desconocido"
+      )
+      
+      // Obtener severity (puede ser severity o calcularse desde speed)
+      let severity: "critico" | "advertencia" = "advertencia"
+      if (data.severity && typeof data.severity === "string") {
+        const sev = String(data.severity).toLowerCase()
+        if (sev === "critico" || sev === "crítico") {
+          severity = "critico"
+        }
+      } else if (data.speed != null) {
+        // Calcular severity desde velocidad si no existe
+        const speedNum = Number(data.speed)
+        severity = speedNum >= 100 ? "critico" : "advertencia"
+      }
+      
+      return {
+        id,
+        plate: String(data.plate ?? "").toUpperCase(),
+        type,
+        severity,
+        eventTimestamp,
+        speed: data.speed != null ? Number(data.speed) : undefined,
+        location: data.location != null ? String(data.location) : undefined,
+        reason: data.reason != null ? String(data.reason) : undefined,
+      }
+    })
+    .filter((item): item is VehicleEventDashboard => item !== null)
+    .sort((a, b) => {
+      // Ordenar descendente por eventTimestamp
+      return b.eventTimestamp.localeCompare(a.eventTimestamp)
+    })
+  
+  console.log("[firestore-read] getVehicleEventsByPlate: filtrados", filtered.length, "eventos para", plate)
+  return filtered
+}
+
 /** Convierte valores a formato de campos Firestore REST API. */
 function toFirestoreFields(fields: Record<string, unknown>): Record<string, Record<string, unknown>> {
   const out: Record<string, Record<string, unknown>> = {}
