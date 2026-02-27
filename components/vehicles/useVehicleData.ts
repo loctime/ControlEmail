@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useMemo } from "react"
+import { emailModuleService } from "@/services/emailModule"
 import type { VehicleDoc, VehicleEventDashboard } from "@/lib/firestore-read"
 
 export interface VehicleKpis {
@@ -149,8 +150,10 @@ export function useVehicleData(plate: string, daysFilter: 7 | 30 | 90 = 30): Veh
     }
   }, [filteredEvents, daysFilter])
 
-  // Calcular score de riesgo
+  // Obtener score de riesgo desde backend si está disponible, sino calcular básico
   const score = useMemo(() => {
+    // Si el vehículo tiene riskScore persistido del backend, usarlo
+    // Por ahora mantenemos cálculo simple hasta integrar con dailyAlerts
     return (
       kpis.totalCriticos * 5 +
       kpis.totalAdvertencias * 2 +

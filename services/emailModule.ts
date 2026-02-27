@@ -1,0 +1,55 @@
+import type { 
+  DailyAlertVehicle, 
+  DailyAlertMeta, 
+  DailyAlertsResponse,
+  DailyConsistency 
+} from "@/lib/firestore-read"
+
+export interface EmailModuleService {
+  getDailyMetrics(date: string): Promise<DailyAlertsResponse>
+  getPendingAlerts(): Promise<DailyAlertVehicle[]>
+  markAlertSent(alertIds: string[]): Promise<void>
+  getDailyConsistency(date: string): Promise<DailyConsistency>
+}
+
+class EmailModuleServiceImpl implements EmailModuleService {
+  async getDailyMetrics(date: string): Promise<DailyAlertsResponse> {
+    const response = await fetch(`/api/email/daily-metrics?date=${date}`)
+    if (!response.ok) {
+      throw new Error(`Error ${response.status}: ${response.statusText}`)
+    }
+    return response.json()
+  }
+
+  async getPendingAlerts(): Promise<DailyAlertVehicle[]> {
+    const response = await fetch("/api/email/get-pending-daily-alerts")
+    if (!response.ok) {
+      throw new Error(`Error ${response.status}: ${response.statusText}`)
+    }
+    return response.json()
+  }
+
+  async markAlertSent(alertIds: string[]): Promise<void> {
+    const response = await fetch("/api/email/mark-alert-sent", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ alertIds }),
+    })
+    if (!response.ok) {
+      throw new Error(`Error ${response.status}: ${response.statusText}`)
+    }
+  }
+
+  async getDailyConsistency(date: string): Promise<DailyConsistency> {
+    const response = await fetch(`/api/email/daily-consistency?date=${date}`)
+    if (!response.ok) {
+      throw new Error(`Error ${response.status}: ${response.statusText}`)
+    }
+    return response.json()
+  }
+}
+
+export const emailModuleService = new EmailModuleServiceImpl()
+
+// Types para uso en componentes
+export type { DailyAlertVehicle, DailyAlertMeta, DailyAlertsResponse, DailyConsistency }

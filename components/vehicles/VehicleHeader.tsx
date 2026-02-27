@@ -9,10 +9,11 @@ import { cn } from "@/lib/utils"
 interface VehicleHeaderProps {
   vehicle: VehicleDoc | null
   riskLevel: "bajo" | "medio" | "alto"
+  score?: number
   loading: boolean
 }
 
-export function VehicleHeader({ vehicle, riskLevel, loading }: VehicleHeaderProps) {
+export function VehicleHeader({ vehicle, riskLevel, score, loading }: VehicleHeaderProps) {
   if (loading) {
     return (
       <Card>
@@ -101,6 +102,11 @@ export function VehicleHeader({ vehicle, riskLevel, loading }: VehicleHeaderProp
                   ? `${vehicle.brand} ${vehicle.model}`
                   : "Sin información del vehículo"}
               </p>
+              {score !== undefined && (
+                <p className="text-sm font-medium text-muted-foreground mt-1">
+                  Risk Score: <span className="text-lg font-bold">{score}</span>
+                </p>
+              )}
             </div>
           </div>
           <Badge

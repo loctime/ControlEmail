@@ -559,3 +559,193 @@ export async function updateVehicleAlerts(
   }
   console.log("[firestore-read] updateVehicleAlerts OK:", plate)
 }
+
+// Daily Alerts structure for new email module
+export interface DailyAlertVehicle {
+  plate: string
+  summary: {
+    totalEvents: number
+    criticalEvents: number
+    warningEvents: number
+    noKeyEvents: number
+  }
+  riskScore: number
+  alertSent: boolean
+  sentAt?: string
+  events: string[]
+  lastEventAt: string
+}
+
+export interface DailyAlertMeta {
+  totalEvents: number
+  totalVehicles: number
+  totalCriticos: number
+  totalAdvertencias: number
+  vehiclesWithCritical: number
+  generatedAt: string
+}
+
+export interface DailyAlertsResponse {
+  meta: DailyAlertMeta
+  vehicles: DailyAlertVehicle[]
+}
+
+export async function getDailyMetrics(date: string): Promise<DailyAlertsResponse> {
+  const dateKey = date.replace(/-/g, "")
+  const basePath = `apps/emails/dailyAlerts/${dateKey}`
+  
+  // Get meta
+  const metaPath = `documents/${basePath}/meta/meta`
+  const metaRes = await firestoreRequest(metaPath, { method: "GET" })
+  let meta: DailyAlertMeta = {
+    totalEvents: 0,
+    totalVehicles: 0,
+    totalCriticos: 0,
+    totalAdvertencias: 0,
+    vehiclesWithCritical: 0,
+    generatedAt: new Date().toISOString()
+  }
+  
+  if (metaRes.ok) {
+    const metaJson = await metaRes.json()
+    if (metaJson.fields) {
+      const data = parseFields(metaJson.fields)
+      meta = {
+        totalEvents: Number(data.totalEvents ?? 0),
+        totalVehicles: Number(data.totalVehicles ?? 0),
+        totalCriticos: Number(data.totalCriticos ?? 0),
+        totalAdvertencias: Number(data.totalAdvertencias ?? 0),
+        vehiclesWithCritical: Number(data.vehiclesWithCritical ?? 0),
+        generatedAt: String(data.generatedAt ?? new Date().toISOString())
+      }
+    }
+  }
+  
+  // Get vehicles
+  const vehiclesPath = `documents/${basePath}/vehicles`
+  const vehiclesRes = await firestoreRequest(vehiclesPath, { method: "GET" })
+  const vehicles: DailyAlertVehicle[] = []
+  
+  if (vehiclesRes.ok) {
+    const vehiclesJson = await vehiclesRes.json()
+    if (vehiclesJson.documents) {
+      for (const doc of vehiclesJson.documents) {
+        const plate = doc.name.split("/").pop() ?? ""
+        const data = parseFields(doc.fields ?? {})
+        
+        const summary = data.summary ?? {}
+        const events = Array.isArray(data.events) ? data.events : []
+        
+        vehicles.push({
+          plate,
+          summary: {
+            totalEvents: Number(summary.totalEvents ?? 0),
+            criticalEvents: Number(summary.criticalEvents ?? 0),
+            warningEvents: Number(summary.warningEvents ?? 0),
+            noKeyEvents: Number(summary.noKeyEvents ?? 0)
+          },
+          riskScore: Number(data.riskScore ?? 0),
+          alertSent: Boolean(data.alertSent ?? false),
+          sentAt: data.sentAt ? String(data.sentAt) : undefined,
+          events,
+          lastEventAt: String(data.lastEventAt ?? "")
+        })
+      }
+    }
+  }
+  
+  return { meta, vehicles }
+}
+
+export async function getPendingDailyAlerts(): Promise<DailyAlertVehicle[]> {
+  const today = new Date().toISOString().split("T")[0]
+  const metrics = await getDailyMetrics(today)
+  return metrics.vehicles.filter(v => !v.alertSent)
+}
+
+export async function markAlertSent(alertIds: string[]): Promise<void> {
+  const today = new Date().toISOString().split("T")[0]
+  const dateKey = today.replace(/-/g, "")
+  
+  for (const plate of alertIds) {
+    const docPath = `apps/emails/dailyAlerts/${dateKey}/vehicles/${encodeURIComponent(plate)}`
+    const path = `documents/${docPath}?updateMask.fieldPaths=alertSent&updateMask.fieldPaths=sentAt`
+    
+    const projectId = getEnvOrThrow(
+      "FIREBASE_PROJECT_ID",
+      "NEXT_PUBLIC_FIREBASE_PROJECT_ID",
+    )
+    const documentName = `projects/${projectId}/databases/(default)/documents/${docPath}`
+    const body = {
+      name: documentName,
+      fields: toFirestoreFields({
+        alertSent: true,
+        sentAt: new Date().toISOString()
+      }),
+    }
+    
+    const res = await firestoreRequest(path, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    })
+    
+    if (!res.ok) {
+      console.error(`[firestore-read] markAlertSent failed for ${plate}:`, res.status)
+      // Continue with other alerts even if one fails
+    }
+  }
+}
+
+export interface DailyConsistency {
+  expectedTotal: number
+  actualTotal: number
+  isConsistent: boolean
+  lastChecked: string
+  discrepancies?: Array<{
+    plate: string
+    expected: number
+    actual: number
+  }>
+}
+
+export async function getDailyConsistency(date: string): Promise<DailyConsistency> {
+  const dateKey = date.replace(/-/g, "")
+  const docPath = `apps/emails/dailyAlerts/${dateKey}/consistency/check`
+  const path = `documents/${docPath}`
+  
+  const res = await firestoreRequest(path, { method: "GET" })
+  
+  if (!res.ok) {
+    if (res.status === 404) {
+      // If no consistency check exists, return default
+      return {
+        expectedTotal: 0,
+        actualTotal: 0,
+        isConsistent: true,
+        lastChecked: new Date().toISOString()
+      }
+    }
+    throw new Error(`Firestore get failed: ${res.status}`)
+  }
+  
+  const json = await res.json()
+  if (!json.fields) {
+    return {
+      expectedTotal: 0,
+      actualTotal: 0,
+      isConsistent: true,
+      lastChecked: new Date().toISOString()
+    }
+  }
+  
+  const data = parseFields(json.fields)
+  const discrepancies = Array.isArray(data.discrepancies) ? data.discrepancies : []
+  
+  return {
+    expectedTotal: Number(data.expectedTotal ?? 0),
+    actualTotal: Number(data.actualTotal ?? 0),
+    isConsistent: Boolean(data.isConsistent ?? true),
+    lastChecked: String(data.lastChecked ?? new Date().toISOString()),
+    discrepancies
+  }
+}
