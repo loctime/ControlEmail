@@ -54,6 +54,13 @@ export default function DashboardPage() {
       )}
 
       <div className="space-y-6">
+        {data?.meta.lastUpdatedAt && (
+          <p className="text-xs text-muted-foreground text-right">
+            Última actualización:{" "}
+            {new Date(data.meta.lastUpdatedAt).toLocaleString("es-AR")}
+          </p>
+        )}
+
         <DashboardKpis data={data} loading={loading} />
         
         <div className="grid gap-6 lg:grid-cols-2">

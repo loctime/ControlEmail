@@ -583,6 +583,7 @@ export interface DailyAlertMeta {
   totalAdvertencias: number
   vehiclesWithCritical: number
   generatedAt: string
+  lastUpdatedAt?: string
 }
 
 export interface DailyAlertsResponse {
@@ -620,7 +621,8 @@ export async function getDailyMetrics(date: string): Promise<DailyAlertsResponse
         totalCriticos: Number(data.totalCriticos ?? 0),
         totalAdvertencias: Number(data.totalAdvertencias ?? 0),
         vehiclesWithCritical: Number(data.vehiclesWithCritical ?? 0),
-        generatedAt: String(data.generatedAt ?? new Date().toISOString())
+        generatedAt: String(data.generatedAt ?? new Date().toISOString()),
+        lastUpdatedAt: data.lastUpdatedAt ? String(data.lastUpdatedAt) : undefined,
       }
     }
   }
