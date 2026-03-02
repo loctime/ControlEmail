@@ -1,3 +1,5 @@
+import { normalizeBusinessDate } from "@/lib/domain/date"
+
 export type EventType =
   | "exceso_velocidad"
   | "vehiculo_no_identificado"
@@ -99,7 +101,7 @@ export function chartDataFromEvents(events: VehicleEvent[]): Array<{
   hours.forEach((h) => {
     byHour[h] = { excesos: 0, desvios: 0, otros: 0 }
   })
-  const today = new Date().toISOString().slice(0, 10)
+  const today = normalizeBusinessDate(new Date())
   for (const ev of events) {
     if (ev.fecha !== today) continue
     const hourNum = parseInt(ev.hora.slice(0, 2), 10)
@@ -116,10 +118,8 @@ export function chartDataFromEvents(events: VehicleEvent[]): Array<{
 }
 
 function toLocalDateKey(d: Date): string {
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, "0")
-  const day = String(d.getDate()).padStart(2, "0")
-  return `${y}-${m}-${day}`
+  // Usa la misma semántica de fecha de negocio (YYYY-MM-DD).
+  return normalizeBusinessDate(d)
 }
 
 /**

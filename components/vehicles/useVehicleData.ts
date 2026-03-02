@@ -150,15 +150,15 @@ export function useVehicleData(plate: string, daysFilter: 7 | 30 | 90 = 30): Veh
     }
   }, [filteredEvents, daysFilter])
 
-  // Obtener score de riesgo de negocio si existe, y si no, usar un score de soporte solo para UI.
+  // Obtener score de riesgo de negocio si existe. Si no existe, no calculamos uno nuevo en frontend.
   const score = useMemo(() => {
     if (vehicle && typeof (vehicle as any).riskScore === "number") {
       return (vehicle as any).riskScore as number
     }
 
-    // Fallback legacy: score de soporte para la UI, no de negocio.
-    return kpis.totalCriticos * 5 + kpis.totalAdvertencias * 2 + kpis.totalSinLlave * 3
-  }, [kpis])
+    // Sin riskScore de backend, mostramos 0 en la UI.
+    return 0
+  }, [vehicle])
 
   // Determinar nivel de riesgo
   const riskLevel = useMemo<"bajo" | "medio" | "alto">(() => {

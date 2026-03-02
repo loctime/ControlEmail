@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -9,11 +9,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Search, Eye, AlertTriangle } from "lucide-react"
 import Link from "next/link"
 import { emailModuleService } from "@/services/emailModule"
-import type { DailyAlertsResponse } from "@/services/emailModule"
+import type { DailyMetricsDTO } from "@/services/dto"
+import { normalizeBusinessDate } from "@/lib/domain/date"
 
 export default function VehiclesPage() {
   const [searchTerm, setSearchTerm] = useState("")
-  const [data, setData] = useState<DailyAlertsResponse | null>(null)
+  const [data, setData] = useState<DailyMetricsDTO | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -21,7 +22,7 @@ export default function VehiclesPage() {
     setLoading(true)
     setError(null)
     try {
-      const today = new Date().toISOString().split("T")[0]
+      const today = normalizeBusinessDate(new Date())
       const metrics = await emailModuleService.getDailyMetrics(today)
       setData(metrics)
     } catch (err) {
@@ -31,9 +32,9 @@ export default function VehiclesPage() {
     }
   }
 
-  useState(() => {
-    loadData()
-  })
+  useEffect(() => {
+    void loadData()
+  }, [])
 
   const filteredVehicles = data?.vehicles.filter(vehicle =>
     vehicle.plate.toLowerCase().includes(searchTerm.toLowerCase())

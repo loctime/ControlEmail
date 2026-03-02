@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { listVehicleEvents, listVehicles } from "@/lib/firestore-read"
+import { normalizeBusinessDate } from "@/lib/domain/date"
 import type { Vehicle } from "@/lib/data"
 
 function vehicleDocToVehicle(
@@ -27,11 +28,10 @@ export async function GET() {
       listVehicleEvents(),
     ])
     console.log("[api/vehicles] GET: Firestore devolvió", vehicleDocs.length, "vehículos y", eventDocs.length, "eventos")
-    const today = new Date().toISOString().slice(0, 10)
+    const today = normalizeBusinessDate(new Date())
     const eventosHoyByPlate: Record<string, number> = {}
     for (const e of eventDocs) {
-      const ed = e.eventDate
-      const fecha = ed.slice(0, 10)
+      const fecha = normalizeBusinessDate(e.eventDate)
       if (fecha === today) {
         eventosHoyByPlate[e.plate] = (eventosHoyByPlate[e.plate] ?? 0) + 1
       }

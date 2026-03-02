@@ -8,13 +8,14 @@ import {
 } from "lucide-react"
 import { AppCard } from "@/components/app-card"
 import type { VehicleEvent } from "@/lib/data"
+import { normalizeBusinessDate } from "@/lib/domain/date"
 
 interface KPICardsProps {
   events: VehicleEvent[]
 }
 
 export function KPICards({ events }: KPICardsProps) {
-  const today = new Date().toISOString().slice(0, 10)
+  const today = normalizeBusinessDate(new Date())
   const todayEvents = events.filter((e) => e.fecha === today)
   const speedEvents = todayEvents.filter(
     (e) => e.tipo === "exceso_velocidad"

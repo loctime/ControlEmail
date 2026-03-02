@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getVehicleByPlate, getVehicleEventsByPlate } from "@/lib/firestore-read"
+import { getVehicleByPlate, getVehicleEventsByPlate, getDailyAlertForVehicle } from "@/lib/firestore-read"
+import { normalizeBusinessDate } from "@/lib/domain/date"
+import { getSeverityFromRiskScore } from "@/lib/domain/severity"
 import type { VehicleDetailDTO, VehicleEventSummaryDTO, Severity } from "@/services/dto"
 
-function mapSeverityToDomain(severity: "critico" | "advertencia"): Severity {
-  // Mapeo simple inicial; se puede refinar cuando el backend exponga severidades ricas.
-  if (severity === "critico") return "HIGH"
-  return "MEDIUM"
+function mapEventSeverityToDomain(severity: "critico" | "advertencia"): Severity {
+  return severity === "critico" ? "HIGH" : "MEDIUM"
 }
 
 export async function GET(
@@ -21,17 +21,38 @@ export async function GET(
       return NextResponse.json({ error: "Vehículo no encontrado" }, { status: 404 })
     }
 
+    // Fecha de negocio: hoy en formato YYYY-MM-DD, única fuente de verdad.
+    const businessDate = normalizeBusinessDate(new Date())
+
+    // Alerta diaria y meta real desde Firestore (apps/emails/dailyAlerts/{date}/vehicles/{plate}).
+    const { alert, meta } = await getDailyAlertForVehicle(businessDate, plateUpper)
+
+    // Eventos recientes del vehículo (hasta 90 días hacia atrás).
     const eventsDocs = await getVehicleEventsByPlate(plateUpper, 90)
 
     const events: VehicleEventSummaryDTO[] = eventsDocs.slice(0, 200).map((event) => ({
       id: event.id,
       timestamp: event.eventTimestamp,
-      severity: mapSeverityToDomain(event.severity),
+      severity: mapEventSeverityToDomain(event.severity),
       eventType: event.type,
-      driverName: null,
+      // driverName se toma del evento si existe, si no del vehículo, si no null.
+      driverName: event.driver ?? vehicle.driver ?? null,
+      // Hoy no tenemos inboxId ni tipo de email real para cada evento; marcamos el origen lógico.
       sourceEmailType: "vehicle_event",
       inboxId: undefined,
     }))
+
+    // pendingAlertsCount / lastAlertDate / riskScore / severity provienen de dailyAlerts.
+    const pendingAlertsCount = alert && !alert.alertSent ? 1 : 0
+    const lastAlertDate = alert ? businessDate : undefined
+    const riskScore = alert ? alert.riskScore : undefined
+    const severity = typeof riskScore === "number" ? getSeverityFromRiskScore(riskScore) : undefined
+
+    const lastUpdatedAt =
+      meta?.lastUpdatedAt ??
+      meta?.generatedAt ??
+      vehicle.updatedAt ??
+      undefined
 
     const detail: VehicleDetailDTO = {
       id: vehicle.id,
@@ -39,18 +60,19 @@ export async function GET(
       externalId: undefined,
       isActive: true,
       lastEventAt: vehicle.lastEventAt ?? null,
-      riskScore: undefined,
-      severity: undefined,
+      // riskScore y severity de negocio vienen exclusivamente de dailyAlerts.
+      riskScore,
+      severity,
       driverName: vehicle.driver ?? null,
       driverId: undefined,
       sourceEmailType: "vehicle_event",
       createdAt: undefined,
       updatedAt: vehicle.updatedAt,
-      lastAlertSentAt: undefined,
+      lastAlertSentAt: alert?.sentAt,
       events,
-      pendingAlertsCount: 0,
-      lastAlertDate: undefined,
-      lastUpdatedAt: new Date().toISOString(),
+      pendingAlertsCount,
+      lastAlertDate,
+      lastUpdatedAt,
     }
 
     return NextResponse.json(detail)

@@ -87,7 +87,7 @@ export interface VehicleDetailDTO extends VehicleDTO {
   events: VehicleEventSummaryDTO[]
   pendingAlertsCount: number
   lastAlertDate?: string
-  lastUpdatedAt: string
+  lastUpdatedAt?: string
 }
 
 // ==== DTO para debug de alertas pendientes ====

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getVehicleByPlate, getVehicleEventsByPlate, getAllEventsByPeriod } from "@/lib/firestore-read"
+import { getVehicleByPlate, getAllEventsByPeriod } from "@/lib/firestore-read"
 
 export async function GET(
   request: NextRequest,
@@ -16,10 +16,14 @@ export async function GET(
     
     console.log("[api/vehicles/[plate]] GET:", { plate: plateUpper, daysBack })
     
-    const [vehicle, currentEvents, allCurrentEvents] = await Promise.all([
+    // Única lectura de eventos para el período solicitado (daysBack * 2).
+    // A partir de esta colección se derivan:
+    // - Eventos actuales del vehículo.
+    // - Eventos del período anterior.
+    // - Ranking por cantidad de eventos.
+    const [vehicle, allEvents] = await Promise.all([
       getVehicleByPlate(plateUpper),
-      getVehicleEventsByPlate(plateUpper, daysBack),
-      getAllEventsByPeriod(daysBack),
+      getAllEventsByPeriod(daysBack * 2),
     ])
     
     if (!vehicle) {
@@ -29,10 +33,25 @@ export async function GET(
       )
     }
     
+    // Calcular límites de período actual y anterior
+    const now = new Date()
+    const periodStart = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000)
+    const previousPeriodStart = new Date(now.getTime() - daysBack * 2 * 24 * 60 * 60 * 1000)
+    const previousPeriodEnd = periodStart
+
+    // Eventos actuales del vehículo en el período
+    const currentEvents = allEvents.filter((event) => {
+      const eventDate = new Date(event.eventTimestamp)
+      return eventDate >= periodStart && event.plate === plateUpper
+    })
+
     // Calcular ranking: contar eventos por patente en período actual
     const eventsByPlate: Record<string, number> = {}
-    allCurrentEvents.forEach((event) => {
-      eventsByPlate[event.plate] = (eventsByPlate[event.plate] || 0) + 1
+    allEvents.forEach((event) => {
+      const eventDate = new Date(event.eventTimestamp)
+      if (eventDate >= periodStart) {
+        eventsByPlate[event.plate] = (eventsByPlate[event.plate] || 0) + 1
+      }
     })
     
     // Ordenar por cantidad de eventos (descendente)
@@ -43,16 +62,8 @@ export async function GET(
     const rankPosition = sortedPlates.indexOf(plateUpper) + 1
     const totalVehiclesInPeriod = sortedPlates.length
     
-    // Obtener eventos del período anterior
-    const now = new Date()
-    const previousPeriodStart = new Date(now.getTime() - daysBack * 2 * 24 * 60 * 60 * 1000)
-    const previousPeriodEnd = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000)
-    
-    // Obtener todos los eventos del período anterior completo
-    const allPreviousPeriodEvents = await getAllEventsByPeriod(daysBack * 2)
-    
     // Filtrar eventos del período anterior específico y solo del vehículo
-    const previousEvents = allPreviousPeriodEvents.filter((event) => {
+    const previousEvents = allEvents.filter((event) => {
       const eventDate = new Date(event.eventTimestamp)
       return eventDate >= previousPeriodStart && eventDate < previousPeriodEnd && event.plate === plateUpper
     })

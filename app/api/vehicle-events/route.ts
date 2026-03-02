@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server"
 import { listVehicleEvents } from "@/lib/firestore-read"
+import { normalizeBusinessDate } from "@/lib/domain/date"
 import type { VehicleEvent, EventType, EventStatus } from "@/lib/data"
 
 function eventDocToVehicleEvent(doc: Awaited<ReturnType<typeof listVehicleEvents>>[0]): VehicleEvent {
   const d = doc.eventDate
   const iso = d.includes("T") ? d : `${d}T00:00:00.000Z`
   const date = new Date(iso)
-  const fecha = iso.slice(0, 10)
+  const fecha = normalizeBusinessDate(iso)
   const hora = `${String(date.getUTCHours()).padStart(2, "0")}:${String(date.getUTCMinutes()).padStart(2, "0")}`
   const vehiculo = [doc.brand, doc.model].filter(Boolean).join(" ") || "Sin datos"
   const tipo: EventType = (doc.eventCategory === "exceso_velocidad" ? "exceso_velocidad" : "exceso_velocidad") as EventType

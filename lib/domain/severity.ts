@@ -29,3 +29,15 @@ export function getSeverityBadgeVariant(severity: Severity): "default" | "second
   }
 }
 
+/**
+ * Única función de negocio para mapear un riskScore agregado a una severidad de dominio.
+ * Cualquier cambio en la fórmula de clasificación debe hacerse aquí.
+ */
+export function getSeverityFromRiskScore(score: number): Severity {
+  if (score >= 80) return "CRITICAL"
+  if (score >= 50) return "HIGH"
+  if (score >= 20) return "MEDIUM"
+  return "LOW"
+}
+
+

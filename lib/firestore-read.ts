@@ -323,6 +323,7 @@ export interface VehicleEventDashboard {
   speed?: number
   location?: string
   reason?: string
+  driver?: string | null
 }
 
 // Re-export para uso en componentes
@@ -407,6 +408,7 @@ export async function getVehicleEventsByPlate(
         speed: data.speed != null ? Number(data.speed) : undefined,
         location: data.location != null ? String(data.location) : undefined,
         reason: data.reason != null ? String(data.reason) : undefined,
+        driver: data.driver != null ? String(data.driver) : null,
       }
     })
     .filter((item): item is VehicleEventDashboard => item !== null)
@@ -491,6 +493,7 @@ export async function getAllEventsByPeriod(
         speed: data.speed != null ? Number(data.speed) : undefined,
         location: data.location != null ? String(data.location) : undefined,
         reason: data.reason != null ? String(data.reason) : undefined,
+        driver: data.driver != null ? String(data.driver) : null,
       }
     })
     .filter((item): item is VehicleEventDashboard => item !== null)
@@ -664,13 +667,15 @@ export async function getDailyMetrics(date: string): Promise<DailyAlertsResponse
 }
 
 export async function getPendingDailyAlerts(): Promise<DailyAlertVehicle[]> {
-  const today = new Date().toISOString().split("T")[0]
+  const { normalizeBusinessDate } = await import("@/lib/domain/date")
+  const today = normalizeBusinessDate(new Date())
   const metrics = await getDailyMetrics(today)
   return metrics.vehicles.filter(v => !v.alertSent)
 }
 
 export async function markAlertSent(alertIds: string[]): Promise<void> {
-  const today = new Date().toISOString().split("T")[0]
+  const { normalizeBusinessDate } = await import("@/lib/domain/date")
+  const today = normalizeBusinessDate(new Date())
   const dateKey = toDailyKey(today)
   
   for (const plate of alertIds) {
@@ -754,4 +759,71 @@ export async function getDailyConsistency(date: string): Promise<DailyConsistenc
     lastChecked: String(data.lastChecked ?? new Date().toISOString()),
     discrepancies
   }
+}
+
+/**
+ * Devuelve la alerta diaria y meta asociada para un vehículo y fecha de negocio dada.
+ * Única función de acceso a dailyAlerts por vehículo; otras capas no deben leer directamente Firestore.
+ */
+export async function getDailyAlertForVehicle(
+  date: string,
+  plate: string,
+): Promise<{ alert: DailyAlertVehicle | null; meta: DailyAlertMeta | null }> {
+  const dateKey = toDailyKey(date)
+  const basePath = `apps/emails/dailyAlerts/${dateKey}`
+
+  // Meta del día
+  const metaPath = `documents/${basePath}/meta/meta`
+  const metaRes = await firestoreRequest(metaPath, { method: "GET" })
+  let meta: DailyAlertMeta | null = null
+  if (metaRes.ok) {
+    const metaJson = await metaRes.json()
+    if (metaJson.fields) {
+      const data = parseFields(metaJson.fields)
+      meta = {
+        totalEvents: Number(data.totalEvents ?? 0),
+        totalVehicles: Number(data.totalVehicles ?? 0),
+        totalCriticos: Number(data.totalCriticos ?? 0),
+        totalAdvertencias: Number(data.totalAdvertencias ?? 0),
+        vehiclesWithCritical: Number(data.vehiclesWithCritical ?? 0),
+        generatedAt: String(data.generatedAt ?? new Date().toISOString()),
+        lastUpdatedAt: data.lastUpdatedAt ? String(data.lastUpdatedAt) : undefined,
+      }
+    }
+  }
+
+  // Alerta diaria específica del vehículo
+  const vehicleDocPath = `documents/${basePath}/vehicles/${encodeURIComponent(plate)}`
+  const vehicleRes = await firestoreRequest(vehicleDocPath, { method: "GET" })
+  if (!vehicleRes.ok) {
+    if (vehicleRes.status === 404) {
+      return { alert: null, meta }
+    }
+    throw new Error(`Firestore get failed for daily alert vehicle: ${vehicleRes.status}`)
+  }
+
+  const vehicleJson = await vehicleRes.json()
+  if (!vehicleJson.fields) {
+    return { alert: null, meta }
+  }
+  const data = parseFields(vehicleJson.fields)
+  const summary = data.summary ?? {}
+  const events = Array.isArray(data.events) ? data.events : []
+
+  const alert: DailyAlertVehicle = {
+    plate,
+    summary: {
+      totalEvents: Number(summary.totalEvents ?? 0),
+      criticalEvents: Number(summary.criticalEvents ?? 0),
+      warningEvents: Number(summary.warningEvents ?? 0),
+      noKeyEvents: Number(summary.noKeyEvents ?? 0),
+    },
+    riskScore: Number(data.riskScore ?? 0),
+    alertSent: Boolean(data.alertSent ?? false),
+    sentAt: data.sentAt ? String(data.sentAt) : undefined,
+    events,
+    lastEventAt: String(data.lastEventAt ?? ""),
+  }
+
+  return { alert, meta }
 }
