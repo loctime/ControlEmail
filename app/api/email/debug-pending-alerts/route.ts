@@ -26,7 +26,7 @@ export async function GET() {
         v.summary.criticalEvents > 0
           ? "Alerta diaria con eventos críticos pendientes de envío"
           : "Alerta diaria pendiente de envío",
-      lastUpdatedAt: metrics.meta.lastUpdatedAt ?? metrics.meta.generatedAt,
+      lastUpdatedAt: metrics.meta.lastUpdatedAt,
     }))
 
     return NextResponse.json(result)

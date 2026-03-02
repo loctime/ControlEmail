@@ -104,3 +104,48 @@ export interface DebugPendingAlertDTO {
   lastUpdatedAt?: string
 }
 
+// ==== DTOs explícitos para endpoints legacy usados por UI ====
+
+export interface VehicleListItemDTO {
+  id: string
+  patente: string
+  modelo: string
+  marca: string
+  anio: number
+  conductor: string | null
+  estado: "activo" | "inactivo" | "mantenimiento"
+  ultimaUbicacion: string | null
+  eventosHoy: number
+}
+
+export interface VehicleEventLegacyDTO {
+  id: string
+  fecha: string
+  hora: string
+  patente: string
+  vehiculo: string | null
+  conductor: string | null
+  tipo: string
+  velocidad?: number
+  limiteVelocidad?: number
+  ubicacion: string | null
+  estado: "pendiente" | "en_revision" | "resuelto" | "critico"
+  descripcion: string
+  notas: string[]
+}
+
+export interface VehiclePlateDetailDTO {
+  vehicle: VehicleDoc
+  events: import("@/lib/firestore-read").VehicleEventDashboard[]
+  previousEvents: import("@/lib/firestore-read").VehicleEventDashboard[]
+  ranking: {
+    position: number
+    totalVehicles: number
+  }
+}
+
+export interface MarkAlertSentResultDTO {
+  requested: number
+  updated: string[]
+  failed: Array<{ plate: string; error: string }>
+}
