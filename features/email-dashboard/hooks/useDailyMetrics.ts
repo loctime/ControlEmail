@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react"
 import { emailModuleService } from "@/services/emailModule"
-import type { DailyAlertsResponse } from "@/services/emailModule"
+import type { DailyMetricsDTO } from "@/services/dto"
 
 export function useDailyMetrics(date: string) {
-  const [data, setData] = useState<DailyAlertsResponse | null>(null)
+  const [data, setData] = useState<DailyMetricsDTO | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 

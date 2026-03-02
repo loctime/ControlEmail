@@ -3,10 +3,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { TrendingUp, TrendingDown, Minus, AlertTriangle, Users, Activity } from "lucide-react"
-import type { DailyAlertsResponse } from "@/services/emailModule"
+import type { DailyMetricsDTO } from "@/services/dto"
 
 interface DashboardKpisProps {
-  data: DailyAlertsResponse | null
+  data: DailyMetricsDTO | null
   loading: boolean
 }
 
@@ -96,7 +96,7 @@ export function DashboardKpis({ data, loading }: DashboardKpisProps) {
 }
 
 interface TopVehiclesProps {
-  data: DailyAlertsResponse | null
+  data: DailyMetricsDTO | null
   loading: boolean
 }
 
@@ -125,7 +125,7 @@ export function TopVehicles({ data, loading }: TopVehiclesProps) {
     return null
   }
 
-  const topVehicles = data.vehicles
+  const topVehicles = [...data.vehicles]
     .sort((a, b) => b.riskScore - a.riskScore)
     .slice(0, 5)
 

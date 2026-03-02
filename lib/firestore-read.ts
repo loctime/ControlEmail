@@ -590,8 +590,12 @@ export interface DailyAlertsResponse {
   vehicles: DailyAlertVehicle[]
 }
 
+function toDailyKey(date: string): string {
+  return date.replace(/-/g, "")
+}
+
 export async function getDailyMetrics(date: string): Promise<DailyAlertsResponse> {
-  const dateKey = date.replace(/-/g, "")
+  const dateKey = toDailyKey(date)
   const basePath = `apps/emails/dailyAlerts/${dateKey}`
   
   // Get meta
@@ -665,7 +669,7 @@ export async function getPendingDailyAlerts(): Promise<DailyAlertVehicle[]> {
 
 export async function markAlertSent(alertIds: string[]): Promise<void> {
   const today = new Date().toISOString().split("T")[0]
-  const dateKey = today.replace(/-/g, "")
+  const dateKey = toDailyKey(today)
   
   for (const plate of alertIds) {
     const docPath = `apps/emails/dailyAlerts/${dateKey}/vehicles/${encodeURIComponent(plate)}`
@@ -709,7 +713,7 @@ export interface DailyConsistency {
 }
 
 export async function getDailyConsistency(date: string): Promise<DailyConsistency> {
-  const dateKey = date.replace(/-/g, "")
+  const dateKey = toDailyKey(date)
   const docPath = `apps/emails/dailyAlerts/${dateKey}/consistency/check`
   const path = `documents/${docPath}`
   

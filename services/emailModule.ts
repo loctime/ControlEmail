@@ -1,19 +1,19 @@
-import type { 
-  DailyAlertVehicle, 
-  DailyAlertMeta, 
-  DailyAlertsResponse,
-  DailyConsistency 
-} from "@/lib/firestore-read"
+import type {
+  DailyAlertDTO,
+  DailyAlertMetaDTO,
+  DailyMetricsDTO,
+  DailyConsistencyDTO,
+} from "@/services/dto"
 
 export interface EmailModuleService {
-  getDailyMetrics(date: string): Promise<DailyAlertsResponse>
-  getPendingAlerts(): Promise<DailyAlertVehicle[]>
+  getDailyMetrics(date: string): Promise<DailyMetricsDTO>
+  getPendingAlerts(): Promise<DailyAlertDTO[]>
   markAlertSent(alertIds: string[]): Promise<void>
-  getDailyConsistency(date: string): Promise<DailyConsistency>
+  getDailyConsistency(date: string): Promise<DailyConsistencyDTO>
 }
 
 class EmailModuleServiceImpl implements EmailModuleService {
-  async getDailyMetrics(date: string): Promise<DailyAlertsResponse> {
+  async getDailyMetrics(date: string): Promise<DailyMetricsDTO> {
     const response = await fetch(`/api/email/daily-metrics?date=${date}`)
     if (!response.ok) {
       throw new Error(`Error ${response.status}: ${response.statusText}`)
@@ -21,7 +21,7 @@ class EmailModuleServiceImpl implements EmailModuleService {
     return response.json()
   }
 
-  async getPendingAlerts(): Promise<DailyAlertVehicle[]> {
+  async getPendingAlerts(): Promise<DailyAlertDTO[]> {
     const response = await fetch("/api/email/get-pending-daily-alerts")
     if (!response.ok) {
       throw new Error(`Error ${response.status}: ${response.statusText}`)
@@ -40,7 +40,7 @@ class EmailModuleServiceImpl implements EmailModuleService {
     }
   }
 
-  async getDailyConsistency(date: string): Promise<DailyConsistency> {
+  async getDailyConsistency(date: string): Promise<DailyConsistencyDTO> {
     const response = await fetch(`/api/email/daily-consistency?date=${date}`)
     if (!response.ok) {
       throw new Error(`Error ${response.status}: ${response.statusText}`)
@@ -51,5 +51,10 @@ class EmailModuleServiceImpl implements EmailModuleService {
 
 export const emailModuleService = new EmailModuleServiceImpl()
 
-// Types para uso en componentes
-export type { DailyAlertVehicle, DailyAlertMeta, DailyAlertsResponse, DailyConsistency }
+// Types para uso en componentes (reexportados desde DTOs de dominio)
+export type {
+  DailyAlertDTO,
+  DailyAlertMetaDTO,
+  DailyMetricsDTO,
+  DailyConsistencyDTO,
+}

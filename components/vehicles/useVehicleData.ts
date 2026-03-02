@@ -110,7 +110,7 @@ export function useVehicleData(plate: string, daysFilter: 7 | 30 | 90 = 30): Veh
     })
   }, [events, daysFilter])
 
-  // Calcular KPIs
+  // Calcular KPIs (uso de negocio/UI a partir de eventos ya filtrados)
   const kpis = useMemo((): VehicleKpis => {
     const totalEventos = filteredEvents.length
     const totalCriticos = filteredEvents.filter((e) => e.severity === "critico").length
@@ -150,15 +150,14 @@ export function useVehicleData(plate: string, daysFilter: 7 | 30 | 90 = 30): Veh
     }
   }, [filteredEvents, daysFilter])
 
-  // Obtener score de riesgo desde backend si está disponible, sino calcular básico
+  // Obtener score de riesgo de negocio si existe, y si no, usar un score de soporte solo para UI.
   const score = useMemo(() => {
-    // Si el vehículo tiene riskScore persistido del backend, usarlo
-    // Por ahora mantenemos cálculo simple hasta integrar con dailyAlerts
-    return (
-      kpis.totalCriticos * 5 +
-      kpis.totalAdvertencias * 2 +
-      kpis.totalSinLlave * 3
-    )
+    if (vehicle && typeof (vehicle as any).riskScore === "number") {
+      return (vehicle as any).riskScore as number
+    }
+
+    // Fallback legacy: score de soporte para la UI, no de negocio.
+    return kpis.totalCriticos * 5 + kpis.totalAdvertencias * 2 + kpis.totalSinLlave * 3
   }, [kpis])
 
   // Determinar nivel de riesgo
