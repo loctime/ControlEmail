@@ -152,6 +152,155 @@ async function firestoreRequest(path: string, init: RequestInit): Promise<Respon
   return res
 }
 
+/** Resultado tipado de una llamada a documents:runQuery. */
+interface FirestoreRunQueryDocument {
+  name: string
+  fields?: Record<string, Record<string, unknown>>
+}
+
+interface FirestoreRunQueryResponse {
+  document?: FirestoreRunQueryDocument
+  readTime?: string
+  skippedResults?: number
+}
+
+export interface StructuredQueryOrder {
+  field: string
+  direction: "ASCENDING" | "DESCENDING"
+}
+
+export interface StructuredQueryFilter {
+  field: string
+  op:
+    | "EQUAL"
+    | "GREATER_THAN_OR_EQUAL"
+    | "LESS_THAN"
+    | "LESS_THAN_OR_EQUAL"
+  value: string | number
+}
+
+export interface RunStructuredQueryParams {
+  parent: string
+  collectionId: string
+  filters: StructuredQueryFilter[]
+  orderBy: StructuredQueryOrder[]
+  limit: number
+  startAfter?: string
+}
+
+export interface RunStructuredQueryResult {
+  documents: Array<{ id: string; data: Record<string, unknown> }>
+  nextCursor?: string
+}
+
+/**
+ * Helper reutilizable para ejecutar consultas estructuradas (documents:runQuery) sobre Firestore.
+ * IMPORTANTE: requiere índices compuestos adecuados según los filtros/orden usados.
+ */
+async function runStructuredQuery(params: RunStructuredQueryParams): Promise<RunStructuredQueryResult> {
+  const projectId = getEnvOrThrow(
+    "FIREBASE_PROJECT_ID",
+    "NEXT_PUBLIC_FIREBASE_PROJECT_ID",
+  )
+
+  const structuredQuery: Record<string, unknown> = {
+    from: [{ collectionId: params.collectionId }],
+    where: {
+      compositeFilter: {
+        op: "AND",
+        filters: params.filters.map((f) => ({
+          fieldFilter: {
+            field: { fieldPath: f.field },
+            op: f.op,
+            value:
+              typeof f.value === "number"
+                ? { doubleValue: f.value }
+                : { stringValue: f.value },
+          },
+        })),
+      },
+    },
+    orderBy: params.orderBy.map((o) => ({
+      field: { fieldPath: o.field },
+      direction: o.direction,
+    })),
+    limit: params.limit,
+  }
+
+  if (params.startAfter) {
+    structuredQuery.startAt = {
+      values: [{ stringValue: params.startAfter }],
+      before: false,
+    }
+  }
+
+  const path = `documents:runQuery`
+  const urlPath = `${path}`
+
+  console.log("[firestore-read] runStructuredQuery request:", {
+    projectId,
+    parent: params.parent,
+    collectionId: params.collectionId,
+    filters: params.filters,
+    orderBy: params.orderBy,
+    limit: params.limit,
+    startAfter: params.startAfter ?? null,
+  })
+
+  const token = await getGoogleAccessToken()
+  const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/${urlPath}`
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      parent: params.parent,
+      structuredQuery,
+    }),
+  })
+
+  if (!res.ok) {
+    const body = await res.clone().text()
+    console.error("[firestore-read] runStructuredQuery failed:", {
+      status: res.status,
+      body: body.slice(0, 300),
+    })
+    throw new Error(`Firestore runQuery failed: ${res.status}`)
+  }
+
+  const json = (await res.json()) as FirestoreRunQueryResponse[]
+
+  const documents: Array<{ id: string; data: Record<string, unknown> }> = []
+  let lastTimestamp: string | undefined
+
+  for (const entry of json) {
+    if (!entry.document || !entry.document.name) continue
+    const doc = entry.document
+    const id = doc.name.split("/").pop() ?? ""
+    const data = doc.fields ? parseFields(doc.fields) : {}
+    documents.push({ id, data })
+
+    const tsCandidate = (data as Record<string, unknown>).eventTimestamp
+    if (typeof tsCandidate === "string") {
+      lastTimestamp = tsCandidate
+    }
+  }
+
+  const nextCursor = documents.length === params.limit && lastTimestamp
+    ? lastTimestamp
+    : undefined
+
+  console.log("[firestore-read] runStructuredQuery OK:", {
+    count: documents.length,
+    nextCursor: nextCursor ?? null,
+  })
+
+  return { documents, nextCursor }
+}
+
 export interface VehicleEventDoc {
   id: string
   plate: string
@@ -326,76 +475,83 @@ export interface VehicleEventDashboard {
   driver?: string | null
 }
 
+/**
+ * Obtiene eventos de un vehículo específico usando documents:runQuery con:
+ * - where plate == y eventTimestamp >= cutoff
+ * - orderBy eventTimestamp DESC
+ * - paginación por cursor basado en eventTimestamp.
+ *
+ * Índice requerido:
+ * - collectionId: apps/emails/vehicleEvents
+ *   fields: [plate ASC, eventTimestamp DESC]
+ */
 export async function getVehicleEventsByPlate(
   plate: string,
   daysBack?: number,
+  cursor?: string,
+  limit = 50,
 ): Promise<VehicleEventDashboard[]> {
-  const path = "apps/emails/vehicleEvents"
-  console.log("[firestore-read] getVehicleEventsByPlate: leyendo desde", path, "plate:", plate)
-  const items = await listCollection(path, 200) // Mitigación mínima de overfetch
-  
+  const upperPlate = plate.toUpperCase()
   const now = new Date()
   const cutoffDate = daysBack
     ? new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000)
-    : null
-  
-  const filtered = items
-    .filter(({ data }) => {
-      const itemPlate = String(data.plate ?? "").toUpperCase()
-      return itemPlate === plate.toUpperCase()
-    })
+    : new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
+
+  const cutoffIso = cutoffDate.toISOString()
+
+  console.log("[firestore-read] getVehicleEventsByPlate (runQuery):", {
+    plate: upperPlate,
+    daysBack,
+    cutoffIso,
+    cursor: cursor ?? null,
+    limit,
+  })
+
+  const { documents } = await runStructuredQuery({
+    parent: `projects/${getEnvOrThrow("FIREBASE_PROJECT_ID", "NEXT_PUBLIC_FIREBASE_PROJECT_ID")}/databases/(default)/documents/apps/emails`,
+    collectionId: "vehicleEvents",
+    filters: [
+      { field: "plate", op: "EQUAL", value: upperPlate },
+      { field: "eventTimestamp", op: "GREATER_THAN_OR_EQUAL", value: cutoffIso },
+    ],
+    orderBy: [{ field: "eventTimestamp", direction: "DESCENDING" }],
+    limit,
+    startAfter: cursor,
+  })
+
+  const mapped: VehicleEventDashboard[] = documents
     .map(({ id, data }) => {
-      // Intentar obtener eventTimestamp (puede ser eventTimestamp, eventDate, o createdAt)
-      let eventTimestamp = ""
-      if (data.eventTimestamp && typeof data.eventTimestamp === "string") {
-        eventTimestamp = data.eventTimestamp
-      } else if (data.eventDate) {
-        const rawDate = data.eventDate
-        if (typeof rawDate === "string") {
-          eventTimestamp = rawDate
-        } else if (rawDate && typeof rawDate === "object" && "timestampValue" in (rawDate as Record<string, unknown>)) {
-          eventTimestamp = (rawDate as { timestampValue: string }).timestampValue
-        }
-      } else if (data.createdAt) {
-        const rawCreated = data.createdAt
-        if (typeof rawCreated === "string") {
-          eventTimestamp = rawCreated
-        } else if (rawCreated && typeof rawCreated === "object" && "timestampValue" in (rawCreated as Record<string, unknown>)) {
-          eventTimestamp = (rawCreated as { timestampValue: string }).timestampValue
-        }
-      }
-      
-      // Si no hay timestamp real en origen, se descarta para evitar datos inventados.
+      const eventTimestamp =
+        typeof data.eventTimestamp === "string"
+          ? (data.eventTimestamp as string)
+          : typeof data.eventDate === "string"
+            ? (data.eventDate as string)
+            : typeof data.createdAt === "string"
+              ? (data.createdAt as string)
+              : ""
+
       if (!eventTimestamp) {
         return null
       }
 
-      // Filtrar por fecha si se especifica
-      if (cutoffDate && eventTimestamp) {
-        const eventDate = new Date(eventTimestamp)
-        if (eventDate < cutoffDate) {
-          return null
-        }
-      }
-      
-      // Obtener type (puede ser type, eventCategory, o formatType)
       const type = String(
-        data.type ?? data.eventCategory ?? data.formatType ?? ""
+        (data.type ??
+          data.eventCategory ??
+          data.formatType ??
+          "") as string,
       )
-      
-      // Obtener severity (puede ser severity o calcularse desde speed)
+
       let severity: "critico" | "advertencia" = "advertencia"
-      if (data.severity && typeof data.severity === "string") {
-        const sev = String(data.severity).toLowerCase()
+      if (typeof data.severity === "string") {
+        const sev = (data.severity as string).toLowerCase()
         if (sev === "critico" || sev === "crítico") {
           severity = "critico"
         }
       } else if (data.speed != null) {
-        // Calcular severity desde velocidad si no existe
         const speedNum = Number(data.speed)
         severity = speedNum >= 100 ? "critico" : "advertencia"
       }
-      
+
       return {
         id,
         plate: String(data.plate ?? "").toUpperCase(),
@@ -409,70 +565,77 @@ export async function getVehicleEventsByPlate(
       } as VehicleEventDashboard
     })
     .filter((item): item is VehicleEventDashboard => item !== null)
-    .sort((a, b) => {
-      // Ordenar descendente por eventTimestamp
-      return b.eventTimestamp.localeCompare(a.eventTimestamp)
-    })
-  
-  console.log("[firestore-read] getVehicleEventsByPlate: filtrados", filtered.length, "eventos para", plate)
-  return filtered
+
+  console.log("[firestore-read] getVehicleEventsByPlate: fetched", mapped.length, "eventos para", upperPlate)
+  return mapped
 }
 
 /**
  * Obtiene todos los eventos de un período específico (sin filtrar por patente).
  * Usado para calcular rankings y comparaciones.
  */
+/**
+ * Obtiene todos los eventos de un período específico usando documents:runQuery con:
+ * - where eventTimestamp >= cutoff
+ * - orderBy eventTimestamp DESC
+ * - paginación por cursor basado en eventTimestamp.
+ *
+ * Índice requerido:
+ * - collectionId: apps/emails/vehicleEvents
+ *   fields: [eventTimestamp DESC]
+ */
 export async function getAllEventsByPeriod(
   daysBack: number,
+  cursor?: string,
+  limit = 200,
 ): Promise<VehicleEventDashboard[]> {
-  const path = "apps/emails/vehicleEvents"
-  console.log("[firestore-read] getAllEventsByPeriod: leyendo desde", path, "daysBack:", daysBack)
-  const items = await listCollection(path, 200)
-  
   const now = new Date()
   const cutoffDate = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000)
-  
-  const filtered = items
+  const cutoffIso = cutoffDate.toISOString()
+
+  console.log("[firestore-read] getAllEventsByPeriod (runQuery):", {
+    daysBack,
+    cutoffIso,
+    cursor: cursor ?? null,
+    limit,
+  })
+
+  const { documents } = await runStructuredQuery({
+    parent: `projects/${getEnvOrThrow("FIREBASE_PROJECT_ID", "NEXT_PUBLIC_FIREBASE_PROJECT_ID")}/databases/(default)/documents/apps/emails`,
+    collectionId: "vehicleEvents",
+    filters: [
+      { field: "eventTimestamp", op: "GREATER_THAN_OR_EQUAL", value: cutoffIso },
+    ],
+    orderBy: [{ field: "eventTimestamp", direction: "DESCENDING" }],
+    limit,
+    startAfter: cursor,
+  })
+
+  const mapped: VehicleEventDashboard[] = documents
     .map(({ id, data }) => {
-      // Intentar obtener eventTimestamp
-      let eventTimestamp = ""
-      if (data.eventTimestamp && typeof data.eventTimestamp === "string") {
-        eventTimestamp = data.eventTimestamp
-      } else if (data.eventDate) {
-        const rawDate = data.eventDate
-        if (typeof rawDate === "string") {
-          eventTimestamp = rawDate
-        } else if (rawDate && typeof rawDate === "object" && "timestampValue" in (rawDate as Record<string, unknown>)) {
-          eventTimestamp = (rawDate as { timestampValue: string }).timestampValue
-        }
-      } else if (data.createdAt) {
-        const rawCreated = data.createdAt
-        if (typeof rawCreated === "string") {
-          eventTimestamp = rawCreated
-        } else if (rawCreated && typeof rawCreated === "object" && "timestampValue" in (rawCreated as Record<string, unknown>)) {
-          eventTimestamp = (rawCreated as { timestampValue: string }).timestampValue
-        }
-      }
-      
+      const eventTimestamp =
+        typeof data.eventTimestamp === "string"
+          ? (data.eventTimestamp as string)
+          : typeof data.eventDate === "string"
+            ? (data.eventDate as string)
+            : typeof data.createdAt === "string"
+              ? (data.createdAt as string)
+              : ""
+
       if (!eventTimestamp) {
         return null
       }
 
-      // Filtrar por fecha
-      const eventDate = new Date(eventTimestamp)
-      if (eventDate < cutoffDate) {
-        return null
-      }
-      
-      // Obtener type
       const type = String(
-        data.type ?? data.eventCategory ?? data.formatType ?? ""
+        (data.type ??
+          data.eventCategory ??
+          data.formatType ??
+          "") as string,
       )
-      
-      // Obtener severity
+
       let severity: "critico" | "advertencia" = "advertencia"
-      if (data.severity && typeof data.severity === "string") {
-        const sev = String(data.severity).toLowerCase()
+      if (typeof data.severity === "string") {
+        const sev = (data.severity as string).toLowerCase()
         if (sev === "critico" || sev === "crítico") {
           severity = "critico"
         }
@@ -480,7 +643,7 @@ export async function getAllEventsByPeriod(
         const speedNum = Number(data.speed)
         severity = speedNum >= 100 ? "critico" : "advertencia"
       }
-      
+
       return {
         id,
         plate: String(data.plate ?? "").toUpperCase(),
@@ -494,12 +657,9 @@ export async function getAllEventsByPeriod(
       } as VehicleEventDashboard
     })
     .filter((item): item is VehicleEventDashboard => item !== null)
-    .sort((a, b) => {
-      return b.eventTimestamp.localeCompare(a.eventTimestamp)
-    })
-  
-  console.log("[firestore-read] getAllEventsByPeriod: filtrados", filtered.length, "eventos")
-  return filtered
+
+  console.log("[firestore-read] getAllEventsByPeriod: fetched", mapped.length, "eventos")
+  return mapped
 }
 
 /** Convierte valores a formato de campos Firestore REST API. */
