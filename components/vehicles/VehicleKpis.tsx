@@ -4,8 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { AlertTriangle, CheckCircle, Key, Clock, TrendingUp, TrendingDown, AlertCircle, Award, Target } from "lucide-react"
 import type { VehicleKpis, TrendData, RankingData } from "./useVehicleData"
-import { format } from "date-fns"
 import { cn } from "@/lib/utils"
+import { formatEventDateTime } from "@/lib/ui/datetime"
 
 interface VehicleKpisProps {
   kpis: VehicleKpis
@@ -31,14 +31,6 @@ export function VehicleKpis({ kpis, score, trend, ranking, loading }: VehicleKpi
         ))}
       </div>
     )
-  }
-
-  const formatDate = (dateString: string) => {
-    try {
-      return format(new Date(dateString), "dd/MM/yyyy HH:mm")
-    } catch {
-      return dateString
-    }
   }
 
   // Determinar color de tendencia
@@ -168,7 +160,7 @@ export function VehicleKpis({ kpis, score, trend, ranking, loading }: VehicleKpi
           {kpis.ultimoEvento ? (
             <>
               <div className="text-lg font-semibold">
-                {formatDate(kpis.ultimoEvento.eventTimestamp)}
+                {formatEventDateTime(kpis.ultimoEvento.eventTimestamp)}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
                 {kpis.diasSinEventos === 0

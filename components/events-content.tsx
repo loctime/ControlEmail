@@ -187,9 +187,11 @@ export function EventsContent({
                         </Badge>
                       </TableCell>
                       <TableCell className="hidden py-3 font-mono text-sm lg:table-cell">
-                        {event.velocidad
+                        {event.velocidad != null && event.limiteVelocidad != null
                           ? `${event.velocidad} / ${event.limiteVelocidad} km/h`
-                          : "-"}
+                          : event.velocidad != null
+                            ? `${event.velocidad} km/h`
+                            : "-"}
                       </TableCell>
                       <TableCell className="py-3">
                         <StatusBadge

@@ -19,6 +19,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { AlertCircle, ArrowLeft, User, MapPin } from "lucide-react"
+import { formatEventDateTime } from "@/lib/ui/datetime"
 
 export default function VehicleDashboardPage() {
   const params = useParams()
@@ -98,7 +99,7 @@ export default function VehicleDashboardPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium">Último evento:</span>
-                  <span>{vehicle.lastEventAt ? new Date(vehicle.lastEventAt).toLocaleString("es-AR") : "N/A"}</span>
+                  <span>{formatEventDateTime(vehicle.lastEventAt)}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium">Responsables:</span>

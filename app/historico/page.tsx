@@ -13,6 +13,7 @@ import { es } from "date-fns/locale"
 import { cn } from "@/lib/utils"
 import { emailModuleService } from "@/services/emailModule"
 import type { DailyAlertsResponse } from "@/services/emailModule"
+import { formatEventDateTime, formatEventTime } from "@/lib/ui/datetime"
 
 export default function HistoricoPage() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
@@ -178,7 +179,7 @@ export default function HistoricoPage() {
                           </div>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
-                          {vehicle.lastEventAt ? new Date(vehicle.lastEventAt).toLocaleString("es-AR") : "N/A"}
+                          {formatEventDateTime(vehicle.lastEventAt)}
                         </TableCell>
                         <TableCell>
                           {vehicle.alertSent ? (
@@ -194,7 +195,7 @@ export default function HistoricoPage() {
                           )}
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
-                          {vehicle.sentAt ? new Date(vehicle.sentAt).toLocaleTimeString("es-AR") : "N/A"}
+                          {formatEventTime(vehicle.sentAt)}
                         </TableCell>
                       </TableRow>
                     ))}

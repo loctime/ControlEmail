@@ -104,7 +104,9 @@ export function chartDataFromEvents(events: VehicleEvent[]): Array<{
   const today = normalizeBusinessDate(new Date())
   for (const ev of events) {
     if (ev.fecha !== today) continue
-    const hourNum = parseInt(ev.hora.slice(0, 2), 10)
+    const horaStr = ev.hora ?? ""
+    const hourNum = parseInt(String(horaStr).slice(0, 2), 10)
+    if (Number.isNaN(hourNum) || hourNum < 0 || hourNum > 23) continue
     const h = `${String(hourNum).padStart(2, "0")}:00`
     if (!byHour[h]) byHour[h] = { excesos: 0, desvios: 0, otros: 0 }
     if (ev.tipo === "exceso_velocidad") byHour[h].excesos += 1

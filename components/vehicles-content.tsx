@@ -65,13 +65,13 @@ export function VehiclesContent({ vehicles }: VehiclesContentProps) {
 
             <div className="mt-4 flex items-center gap-2 rounded-lg bg-muted/50 p-3">
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-secondary text-sm font-bold text-secondary-foreground">
-                {vehicle.conductor
+                {(vehicle.conductor ?? "")
                   .split(" ")
                   .map((n) => n[0])
                   .join("")}
               </div>
               <span className="text-sm font-medium">
-                {vehicle.conductor}
+                {vehicle.conductor ?? "—"}
               </span>
             </div>
           </AppCard>

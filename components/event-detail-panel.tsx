@@ -100,7 +100,7 @@ export function EventDetailPanel({
                 label="Ubicacion"
                 value={event.ubicacion}
               />
-              {event.velocidad && (
+              {event.velocidad != null && (
                 <>
                   <InfoItem
                     icon={<Gauge className="h-5 w-5" />}
@@ -108,11 +108,13 @@ export function EventDetailPanel({
                     value={`${event.velocidad} km/h`}
                     highlight
                   />
-                  <InfoItem
-                    icon={<Gauge className="h-5 w-5" />}
-                    label="Limite permitido"
-                    value={`${event.limiteVelocidad} km/h`}
-                  />
+                  {event.limiteVelocidad != null && (
+                    <InfoItem
+                      icon={<Gauge className="h-5 w-5" />}
+                      label="Limite permitido"
+                      value={`${event.limiteVelocidad} km/h`}
+                    />
+                  )}
                 </>
               )}
             </div>

@@ -12,6 +12,7 @@ import { es } from "date-fns/locale"
 import { cn } from "@/lib/utils"
 import { emailModuleService } from "@/services/emailModule"
 import type { DailyConsistency } from "@/services/emailModule"
+import { formatEventDateTime } from "@/lib/ui/datetime"
 
 export default function CalidadPage() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
@@ -231,7 +232,7 @@ export default function CalidadPage() {
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Última verificación:</span>
-                  <span>{data.lastChecked ? new Date(data.lastChecked).toLocaleString("es-AR") : "N/A"}</span>
+                  <span>{formatEventDateTime(data.lastChecked)}</span>
                 </div>
               </div>
             </CardContent>

@@ -11,6 +11,7 @@ import Link from "next/link"
 import { emailModuleService } from "@/services/emailModule"
 import type { DailyMetricsDTO } from "@/services/dto"
 import { normalizeBusinessDate } from "@/lib/domain/date"
+import { formatEventDateTime, formatEventTime } from "@/lib/ui/datetime"
 
 export default function VehiclesPage() {
   const [searchTerm, setSearchTerm] = useState("")
@@ -137,13 +138,13 @@ export default function VehiclesPage() {
                         )}
                       </div>
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {vehicle.lastEventAt ? new Date(vehicle.lastEventAt).toLocaleString("es-AR") : "N/A"}
-                    </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {formatEventDateTime(vehicle.lastEventAt)}
+                  </TableCell>
                     <TableCell>
                       {vehicle.alertSent ? (
                         <Badge variant="default">
-                          Enviado {vehicle.sentAt ? new Date(vehicle.sentAt).toLocaleTimeString("es-AR") : ""}
+                          Enviado {formatEventTime(vehicle.sentAt)}
                         </Badge>
                       ) : (
                         <Badge variant="outline">Pendiente</Badge>

@@ -11,8 +11,8 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import { format } from "date-fns"
 import type { VehicleEventDashboard } from "@/lib/firestore-read"
+import { formatEventDateTime } from "@/lib/ui/datetime"
 
 interface VehicleEventsTableProps {
   events: VehicleEventDashboard[]
@@ -20,14 +20,6 @@ interface VehicleEventsTableProps {
 }
 
 export function VehicleEventsTable({ events, loading }: VehicleEventsTableProps) {
-  const formatDateTime = (dateString: string) => {
-    try {
-      return format(new Date(dateString), "dd/MM/yyyy HH:mm")
-    } catch {
-      return dateString
-    }
-  }
-
   const getSeverityBadge = (severity: "critico" | "advertencia") => {
     if (severity === "critico") {
       return (
@@ -102,7 +94,7 @@ export function VehicleEventsTable({ events, loading }: VehicleEventsTableProps)
               {events.map((event) => (
                 <TableRow key={event.id}>
                   <TableCell className="font-medium">
-                    {formatDateTime(event.eventTimestamp)}
+                    {formatEventDateTime(event.eventTimestamp)}
                   </TableCell>
                   <TableCell>
                     <span className="capitalize">{event.type.replace(/_/g, " ")}</span>

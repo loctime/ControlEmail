@@ -12,6 +12,7 @@ import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { cn } from "@/lib/utils"
 import { DashboardKpis, TopVehicles, useDailyMetrics } from "@/features/email-dashboard"
+import { formatEventDateTime } from "@/lib/ui/datetime"
 
 export default function DashboardPage() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
@@ -57,7 +58,7 @@ export default function DashboardPage() {
         {data?.meta.lastUpdatedAt && (
           <p className="text-xs text-muted-foreground text-right">
             Última actualización:{" "}
-            {new Date(data.meta.lastUpdatedAt).toLocaleString("es-AR")}
+            {formatEventDateTime(data.meta.lastUpdatedAt)}
           </p>
         )}
 
