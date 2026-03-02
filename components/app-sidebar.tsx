@@ -7,7 +7,11 @@ import {
   Bell,
   Settings,
   Shield,
+  BarChart3,
+  Send,
+  FileCheck,
 } from "lucide-react"
+import Link from "next/link"
 import {
   Sidebar,
   SidebarContent,
@@ -23,42 +27,22 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar"
 
-const navItems = [
-  {
-    label: "Dashboard",
-    icon: LayoutDashboard,
-    id: "dashboard",
-  },
-  {
-    label: "Eventos",
-    icon: AlertTriangle,
-    id: "eventos",
-    badge: 5,
-  },
-  {
-    label: "Vehiculos",
-    icon: Car,
-    id: "vehiculos",
-  },
-  {
-    label: "Alertas",
-    icon: Bell,
-    id: "alertas",
-    badge: 3,
-  },
-  {
-    label: "Configuracion",
-    icon: Settings,
-    id: "configuracion",
-  },
-]
+const inPageSections = [
+  { label: "Dashboard", icon: LayoutDashboard, id: "dashboard" },
+  { label: "Eventos", icon: AlertTriangle, id: "eventos" },
+  { label: "Vehículos", icon: Car, id: "vehiculos" },
+  { label: "Alertas", icon: Bell, id: "alertas" },
+  { label: "Configuración", icon: Settings, id: "configuracion" },
+] as const
 
 interface AppSidebarProps {
   activeSection: string
   onNavigate: (section: string) => void
+  /** Número de alertas pendientes de envío (badge en Alertas). */
+  pendingAlertsCount?: number
 }
 
-export function AppSidebar({ activeSection, onNavigate }: AppSidebarProps) {
+export function AppSidebar({ activeSection, onNavigate, pendingAlertsCount = 0 }: AppSidebarProps) {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="p-4">
@@ -79,10 +63,10 @@ export function AppSidebar({ activeSection, onNavigate }: AppSidebarProps) {
       <SidebarSeparator />
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Navegacion</SidebarGroupLabel>
+          <SidebarGroupLabel>Navegación</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item) => (
+              {inPageSections.map((item) => (
                 <SidebarMenuItem key={item.id}>
                   <SidebarMenuButton
                     isActive={activeSection === item.id}
@@ -92,11 +76,58 @@ export function AppSidebar({ activeSection, onNavigate }: AppSidebarProps) {
                     <item.icon className="h-4 w-4" />
                     <span>{item.label}</span>
                   </SidebarMenuButton>
-                  {item.badge && (
-                    <SidebarMenuBadge>{item.badge}</SidebarMenuBadge>
+                  {item.id === "alertas" && pendingAlertsCount > 0 && (
+                    <SidebarMenuBadge>{pendingAlertsCount}</SidebarMenuBadge>
                   )}
                 </SidebarMenuItem>
               ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel>Métricas y rutas</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <Link href="/dashboard" title="Dashboard de alertas">
+                    <BarChart3 className="h-4 w-4" />
+                    <span>Dashboard alertas</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <Link href="/pendientes" title="Alertas pendientes de envío">
+                    <Send className="h-4 w-4" />
+                    <span>Pendientes</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <Link href="/vehiculos" title="Vehículos con eventos hoy">
+                    <Car className="h-4 w-4" />
+                    <span>Vehículos (hoy)</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <Link href="/historico" title="Histórico de alertas">
+                    <BarChart3 className="h-4 w-4" />
+                    <span>Histórico</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <Link href="/calidad" title="Calidad de datos">
+                    <FileCheck className="h-4 w-4" />
+                    <span>Calidad</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

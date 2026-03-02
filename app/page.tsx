@@ -11,12 +11,9 @@ import { VehiclesContent } from "@/components/vehicles-content"
 import { AlertsContent } from "@/components/alerts-content"
 import { SettingsContent } from "@/components/settings-content"
 import { AppButton } from "@/components/app-button"
-import {
-  type VehicleEvent,
-  type Vehicle,
-  type Alert,
-  alertsFromEvents,
-} from "@/lib/data"
+import { emailModuleService } from "@/services/emailModule"
+import type { DailyAlertDTO } from "@/services/dto"
+import { type VehicleEvent, type Vehicle } from "@/lib/data"
 
 export default function Page() {
   const [activeSection, setActiveSection] = useState("dashboard")
@@ -25,7 +22,9 @@ export default function Page() {
   const [detailOpen, setDetailOpen] = useState(false)
   const [events, setEvents] = useState<VehicleEvent[]>([])
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
-  const [alerts, setAlerts] = useState<Alert[]>([])
+  const [pendingAlerts, setPendingAlerts] = useState<DailyAlertDTO[]>([])
+  const [loadingAlerts, setLoadingAlerts] = useState(true)
+  const [errorAlerts, setErrorAlerts] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -45,14 +44,26 @@ export default function Page() {
       ])
       setEvents(Array.isArray(eventsData) ? eventsData : [])
       setVehicles(Array.isArray(vehiclesData) ? vehiclesData : [])
-      setAlerts(alertsFromEvents(Array.isArray(eventsData) ? eventsData : []))
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error desconocido")
       setEvents([])
       setVehicles([])
-      setAlerts([])
     } finally {
       setLoading(false)
+    }
+  }, [])
+
+  const fetchPendingAlerts = useCallback(async () => {
+    setLoadingAlerts(true)
+    setErrorAlerts(null)
+    try {
+      const list = await emailModuleService.getPendingAlerts()
+      setPendingAlerts(Array.isArray(list) ? list : [])
+    } catch (e) {
+      setErrorAlerts(e instanceof Error ? e.message : "Error al cargar alertas")
+      setPendingAlerts([])
+    } finally {
+      setLoadingAlerts(false)
     }
   }, [])
 
@@ -60,7 +71,11 @@ export default function Page() {
     fetchData()
   }, [fetchData])
 
-  const unreadAlerts = alerts.filter((a) => !a.leida).length
+  useEffect(() => {
+    fetchPendingAlerts()
+  }, [fetchPendingAlerts])
+
+  const pendingAlertsCount = pendingAlerts.length
 
   const handleViewDetail = useCallback((event: VehicleEvent) => {
     setSelectedEvent(event)
@@ -80,7 +95,11 @@ export default function Page() {
   if (error) {
     return (
       <SidebarProvider>
-        <AppSidebar activeSection={activeSection} onNavigate={handleNavigate} />
+        <AppSidebar
+        activeSection={activeSection}
+        onNavigate={handleNavigate}
+        pendingAlertsCount={pendingAlertsCount}
+      />
         <SidebarInset>
           <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8">
             <p className="text-destructive">{error}</p>
@@ -95,13 +114,17 @@ export default function Page() {
 
   return (
     <SidebarProvider>
-      <AppSidebar activeSection={activeSection} onNavigate={handleNavigate} />
+      <AppSidebar
+        activeSection={activeSection}
+        onNavigate={handleNavigate}
+        pendingAlertsCount={pendingAlertsCount}
+      />
       <SidebarInset>
         <TopNavbar
           activeSection={activeSection}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
-          unreadAlerts={unreadAlerts}
+          pendingAlertsCount={pendingAlertsCount}
           onNavigate={handleNavigate}
         />
         <div className="flex-1 overflow-auto">
@@ -128,7 +151,12 @@ export default function Page() {
                 <VehiclesContent vehicles={vehicles} />
               )}
               {activeSection === "alertas" && (
-                <AlertsContent alerts={alerts} />
+                <AlertsContent
+                  pendingAlerts={pendingAlerts}
+                  loading={loadingAlerts}
+                  error={errorAlerts}
+                  onRefresh={fetchPendingAlerts}
+                />
               )}
               {activeSection === "configuracion" && <SettingsContent />}
             </>

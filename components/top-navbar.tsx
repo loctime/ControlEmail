@@ -20,7 +20,8 @@ interface TopNavbarProps {
   activeSection: string
   searchQuery: string
   onSearchChange: (query: string) => void
-  unreadAlerts: number
+  /** Número de alertas pendientes de envío (backend real). */
+  pendingAlertsCount: number
   onNavigate: (section: string) => void
 }
 
@@ -28,7 +29,7 @@ export function TopNavbar({
   activeSection,
   searchQuery,
   onSearchChange,
-  unreadAlerts,
+  pendingAlertsCount,
   onNavigate,
 }: TopNavbarProps) {
   return (
@@ -56,9 +57,9 @@ export function TopNavbar({
           onClick={() => onNavigate("alertas")}
         >
           <Bell className="h-5 w-5" />
-          {unreadAlerts > 0 && (
+          {pendingAlertsCount > 0 && (
             <Badge className="absolute -right-1 -top-1 flex h-5 w-5 min-w-[20px] items-center justify-center rounded-full bg-destructive p-0 text-xs text-destructive-foreground">
-              {unreadAlerts}
+              {pendingAlertsCount}
             </Badge>
           )}
           <span className="sr-only">Notificaciones</span>
