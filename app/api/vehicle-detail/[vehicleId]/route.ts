@@ -50,7 +50,6 @@ export async function GET(
 
     const lastUpdatedAt =
       meta?.lastUpdatedAt ??
-      meta?.generatedAt ??
       vehicle.updatedAt ??
       undefined
 

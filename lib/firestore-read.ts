@@ -221,7 +221,7 @@ export async function listVehicleEvents(): Promise<VehicleEventDoc[]> {
   console.log("[firestore-read] listVehicleEvents: leídos", items.length, "eventos")
   return items.map(({ id, data }) => {
     const rawDate = data.eventDate
-    let eventDate = new Date().toISOString()
+    let eventDate = ""
     if (typeof rawDate === "string") eventDate = rawDate
     else if (rawDate && typeof rawDate === "object" && "timestampValue" in (rawDate as Record<string, unknown>))
       eventDate = (rawDate as { timestampValue: string }).timestampValue
@@ -326,16 +326,13 @@ export interface VehicleEventDashboard {
   driver?: string | null
 }
 
-// Re-export para uso en componentes
-export type { VehicleDoc }
-
 export async function getVehicleEventsByPlate(
   plate: string,
   daysBack?: number,
 ): Promise<VehicleEventDashboard[]> {
   const path = "apps/emails/vehicleEvents"
   console.log("[firestore-read] getVehicleEventsByPlate: leyendo desde", path, "plate:", plate)
-  const items = await listCollection(path, 1000) // Obtener más eventos para filtrar
+  const items = await listCollection(path, 200) // Mitigación mínima de overfetch
   
   const now = new Date()
   const cutoffDate = daysBack
@@ -368,11 +365,11 @@ export async function getVehicleEventsByPlate(
         }
       }
       
-      // Si no hay timestamp, usar fecha actual
+      // Si no hay timestamp real en origen, se descarta para evitar datos inventados.
       if (!eventTimestamp) {
-        eventTimestamp = new Date().toISOString()
+        return null
       }
-      
+
       // Filtrar por fecha si se especifica
       if (cutoffDate && eventTimestamp) {
         const eventDate = new Date(eventTimestamp)
@@ -383,7 +380,7 @@ export async function getVehicleEventsByPlate(
       
       // Obtener type (puede ser type, eventCategory, o formatType)
       const type = String(
-        data.type ?? data.eventCategory ?? data.formatType ?? "desconocido"
+        data.type ?? data.eventCategory ?? data.formatType ?? ""
       )
       
       // Obtener severity (puede ser severity o calcularse desde speed)
@@ -409,7 +406,7 @@ export async function getVehicleEventsByPlate(
         location: data.location != null ? String(data.location) : undefined,
         reason: data.reason != null ? String(data.reason) : undefined,
         driver: data.driver != null ? String(data.driver) : null,
-      }
+      } as VehicleEventDashboard
     })
     .filter((item): item is VehicleEventDashboard => item !== null)
     .sort((a, b) => {
@@ -430,7 +427,7 @@ export async function getAllEventsByPeriod(
 ): Promise<VehicleEventDashboard[]> {
   const path = "apps/emails/vehicleEvents"
   console.log("[firestore-read] getAllEventsByPeriod: leyendo desde", path, "daysBack:", daysBack)
-  const items = await listCollection(path, 1000)
+  const items = await listCollection(path, 200)
   
   const now = new Date()
   const cutoffDate = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000)
@@ -458,9 +455,9 @@ export async function getAllEventsByPeriod(
       }
       
       if (!eventTimestamp) {
-        eventTimestamp = new Date().toISOString()
+        return null
       }
-      
+
       // Filtrar por fecha
       const eventDate = new Date(eventTimestamp)
       if (eventDate < cutoffDate) {
@@ -469,7 +466,7 @@ export async function getAllEventsByPeriod(
       
       // Obtener type
       const type = String(
-        data.type ?? data.eventCategory ?? data.formatType ?? "desconocido"
+        data.type ?? data.eventCategory ?? data.formatType ?? ""
       )
       
       // Obtener severity
@@ -494,7 +491,7 @@ export async function getAllEventsByPeriod(
         location: data.location != null ? String(data.location) : undefined,
         reason: data.reason != null ? String(data.reason) : undefined,
         driver: data.driver != null ? String(data.driver) : null,
-      }
+      } as VehicleEventDashboard
     })
     .filter((item): item is VehicleEventDashboard => item !== null)
     .sort((a, b) => {
@@ -611,7 +608,7 @@ export async function getDailyMetrics(date: string): Promise<DailyAlertsResponse
     totalCriticos: 0,
     totalAdvertencias: 0,
     vehiclesWithCritical: 0,
-    generatedAt: new Date().toISOString()
+    generatedAt: ""
   }
   
   if (metaRes.ok) {
@@ -624,7 +621,7 @@ export async function getDailyMetrics(date: string): Promise<DailyAlertsResponse
         totalCriticos: Number(data.totalCriticos ?? 0),
         totalAdvertencias: Number(data.totalAdvertencias ?? 0),
         vehiclesWithCritical: Number(data.vehiclesWithCritical ?? 0),
-        generatedAt: String(data.generatedAt ?? new Date().toISOString()),
+        generatedAt: data.generatedAt != null ? String(data.generatedAt) : "",
         lastUpdatedAt: data.lastUpdatedAt ? String(data.lastUpdatedAt) : undefined,
       }
     }
@@ -642,7 +639,7 @@ export async function getDailyMetrics(date: string): Promise<DailyAlertsResponse
         const plate = doc.name.split("/").pop() ?? ""
         const data = parseFields(doc.fields ?? {})
         
-        const summary = data.summary ?? {}
+        const summary = (data.summary ?? {}) as Record<string, unknown>
         const events = Array.isArray(data.events) ? data.events : []
         
         vehicles.push({
@@ -673,11 +670,19 @@ export async function getPendingDailyAlerts(): Promise<DailyAlertVehicle[]> {
   return metrics.vehicles.filter(v => !v.alertSent)
 }
 
-export async function markAlertSent(alertIds: string[]): Promise<void> {
+export interface MarkAlertSentResult {
+  requested: number
+  updated: string[]
+  failed: Array<{ plate: string; error: string }>
+}
+
+export async function markAlertSent(alertIds: string[]): Promise<MarkAlertSentResult> {
   const { normalizeBusinessDate } = await import("@/lib/domain/date")
   const today = normalizeBusinessDate(new Date())
   const dateKey = toDailyKey(today)
   
+  const result: MarkAlertSentResult = { requested: alertIds.length, updated: [], failed: [] }
+
   for (const plate of alertIds) {
     const docPath = `apps/emails/dailyAlerts/${dateKey}/vehicles/${encodeURIComponent(plate)}`
     const path = `documents/${docPath}?updateMask.fieldPaths=alertSent&updateMask.fieldPaths=sentAt`
@@ -702,9 +707,14 @@ export async function markAlertSent(alertIds: string[]): Promise<void> {
     
     if (!res.ok) {
       console.error(`[firestore-read] markAlertSent failed for ${plate}:`, res.status)
-      // Continue with other alerts even if one fails
+      result.failed.push({ plate, error: `status_${res.status}` })
+      continue
     }
+
+    result.updated.push(plate)
   }
+
+  return result
 }
 
 export interface DailyConsistency {
@@ -786,7 +796,7 @@ export async function getDailyAlertForVehicle(
         totalCriticos: Number(data.totalCriticos ?? 0),
         totalAdvertencias: Number(data.totalAdvertencias ?? 0),
         vehiclesWithCritical: Number(data.vehiclesWithCritical ?? 0),
-        generatedAt: String(data.generatedAt ?? new Date().toISOString()),
+        generatedAt: data.generatedAt != null ? String(data.generatedAt) : "",
         lastUpdatedAt: data.lastUpdatedAt ? String(data.lastUpdatedAt) : undefined,
       }
     }
@@ -807,7 +817,7 @@ export async function getDailyAlertForVehicle(
     return { alert: null, meta }
   }
   const data = parseFields(vehicleJson.fields)
-  const summary = data.summary ?? {}
+  const summary = (data.summary ?? {}) as Record<string, unknown>
   const events = Array.isArray(data.events) ? data.events : []
 
   const alert: DailyAlertVehicle = {

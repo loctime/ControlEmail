@@ -154,7 +154,7 @@ export function getWeeklyVehicleWarnings(
   const byPatente: Record<string, number> = {}
 
   for (const ev of input) {
-    const fecha = ev.fecha?.slice?.(0, 10)
+    const fecha = typeof ev.fecha === "string" ? normalizeBusinessDate(ev.fecha) : ""
     if (!fecha || fecha < start || fecha > end) continue
 
     const patente = String(ev.patente ?? "").trim()

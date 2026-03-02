@@ -3,12 +3,13 @@ import type {
   DailyAlertMetaDTO,
   DailyMetricsDTO,
   DailyConsistencyDTO,
+  MarkAlertSentResultDTO,
 } from "@/services/dto"
 
 export interface EmailModuleService {
   getDailyMetrics(date: string): Promise<DailyMetricsDTO>
   getPendingAlerts(): Promise<DailyAlertDTO[]>
-  markAlertSent(alertIds: string[]): Promise<void>
+  markAlertSent(alertIds: string[]): Promise<MarkAlertSentResultDTO>
   getDailyConsistency(date: string): Promise<DailyConsistencyDTO>
 }
 
@@ -29,15 +30,16 @@ class EmailModuleServiceImpl implements EmailModuleService {
     return response.json()
   }
 
-  async markAlertSent(alertIds: string[]): Promise<void> {
+  async markAlertSent(alertIds: string[]): Promise<MarkAlertSentResultDTO> {
     const response = await fetch("/api/email/mark-alert-sent", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ alertIds }),
     })
-    if (!response.ok) {
+    if (!response.ok && response.status !== 207) {
       throw new Error(`Error ${response.status}: ${response.statusText}`)
     }
+    return response.json()
   }
 
   async getDailyConsistency(date: string): Promise<DailyConsistencyDTO> {

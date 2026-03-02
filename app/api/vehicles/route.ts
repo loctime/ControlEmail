@@ -1,21 +1,21 @@
 import { NextResponse } from "next/server"
 import { listVehicleEvents, listVehicles } from "@/lib/firestore-read"
 import { normalizeBusinessDate } from "@/lib/domain/date"
-import type { Vehicle } from "@/lib/data"
+import type { VehicleListItemDTO } from "@/services/dto"
 
 function vehicleDocToVehicle(
   doc: Awaited<ReturnType<typeof listVehicles>>[0],
   eventosHoyByPlate: Record<string, number>,
-): Vehicle {
+): VehicleListItemDTO {
   return {
     id: doc.id,
     patente: doc.plate,
     modelo: doc.model,
     marca: doc.brand,
     anio: 0,
-    conductor: doc.driver ?? "",
+    conductor: doc.driver ?? null,
     estado: "activo",
-    ultimaUbicacion: doc.lastLocation ?? "",
+    ultimaUbicacion: doc.lastLocation ?? null,
     eventosHoy: eventosHoyByPlate[doc.plate] ?? 0,
   }
 }
@@ -36,7 +36,7 @@ export async function GET() {
         eventosHoyByPlate[e.plate] = (eventosHoyByPlate[e.plate] ?? 0) + 1
       }
     }
-    const vehicles: Vehicle[] = vehicleDocs.map((doc) =>
+    const vehicles: VehicleListItemDTO[] = vehicleDocs.map((doc) =>
       vehicleDocToVehicle(doc, eventosHoyByPlate),
     )
     console.log("[api/vehicles] GET: respondiendo", vehicles.length, "vehículos")
