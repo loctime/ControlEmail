@@ -33,7 +33,7 @@ export async function GET(
     const events: VehicleEventSummaryDTO[] = eventsDocs.slice(0, 200).map((event) => ({
       id: event.id,
       timestamp: event.eventTimestamp,
-      severity: mapEventSeverityToDomain(event.severity),
+    eventSeverity: mapEventSeverityToDomain(event.severity),
       eventType: event.type,
       // driverName se toma del evento si existe, si no del vehículo, si no null.
       driverName: event.driver ?? vehicle.driver ?? null,
@@ -46,7 +46,7 @@ export async function GET(
     const pendingAlertsCount = alert && !alert.alertSent ? 1 : 0
     const lastAlertDate = alert ? businessDate : undefined
     const riskScore = alert ? alert.riskScore : undefined
-    const severity = typeof riskScore === "number" ? getSeverityFromRiskScore(riskScore) : undefined
+  const aggregatedSeverity = typeof riskScore === "number" ? getSeverityFromRiskScore(riskScore) : undefined
 
     const lastUpdatedAt =
       meta?.lastUpdatedAt ??
@@ -59,9 +59,9 @@ export async function GET(
       externalId: undefined,
       isActive: true,
       lastEventAt: vehicle.lastEventAt ?? null,
-      // riskScore y severity de negocio vienen exclusivamente de dailyAlerts.
+    // riskScore y severidad agregada de negocio vienen exclusivamente de dailyAlerts.
       riskScore,
-      severity,
+    aggregatedSeverity,
       driverName: vehicle.driver ?? null,
       driverId: undefined,
       sourceEmailType: "vehicle_event",

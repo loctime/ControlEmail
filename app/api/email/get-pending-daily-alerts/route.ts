@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server"
 import { getPendingDailyAlerts } from "@/lib/firestore-read"
+import type { DailyAlertDTO } from "@/services/dto"
 
 export async function GET(request: Request) {
   try {
-    const alerts = await getPendingDailyAlerts()
+    const alerts: DailyAlertDTO[] = await getPendingDailyAlerts()
     return NextResponse.json(alerts)
   } catch (error) {
     console.error("[api/email/get-pending-daily-alerts] Error:", error)

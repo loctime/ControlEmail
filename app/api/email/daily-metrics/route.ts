@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { getDailyMetrics } from "@/lib/firestore-read"
+import type { DailyMetricsDTO } from "@/services/dto"
 
 export async function GET(request: Request) {
   try {
@@ -10,7 +11,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "date_required" }, { status: 400 })
     }
     
-    const metrics = await getDailyMetrics(date)
+    const metrics: DailyMetricsDTO = await getDailyMetrics(date)
     return NextResponse.json(metrics)
   } catch (error) {
     console.error("[api/email/daily-metrics] Error:", error)

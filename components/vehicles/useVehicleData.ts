@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from "react"
 import { emailModuleService } from "@/services/emailModule"
 import type { VehicleDoc, VehicleEventDashboard } from "@/lib/firestore-read"
+import type { VehiclePlateDetailDTO } from "@/services/dto"
 
 export interface VehicleKpis {
   totalEventos: number
@@ -50,6 +51,7 @@ export function useVehicleData(plate: string, daysFilter: 7 | 30 | 90 = 30): Veh
   const [events, setEvents] = useState<VehicleEventDashboard[]>([])
   const [previousEvents, setPreviousEvents] = useState<VehicleEventDashboard[]>([])
   const [ranking, setRanking] = useState<RankingData>({ position: 0, totalVehicles: 0 })
+  const [riskScoreFromApi, setRiskScoreFromApi] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -77,11 +79,12 @@ export function useVehicleData(plate: string, daysFilter: 7 | 30 | 90 = 30): Veh
           throw new Error(`Error ${response.status}: ${await response.text()}`)
         }
 
-        const data = await response.json()
+        const data: VehiclePlateDetailDTO = await response.json()
         setVehicle(data.vehicle)
         setEvents(data.events || [])
         setPreviousEvents(data.previousEvents || [])
         setRanking(data.ranking || { position: 0, totalVehicles: 0 })
+        setRiskScoreFromApi(typeof data.riskScore === "number" ? data.riskScore : null)
       } catch (err) {
         console.error("[useVehicleData] Error:", err)
         setError(err instanceof Error ? err.message : "Error desconocido")
@@ -150,15 +153,10 @@ export function useVehicleData(plate: string, daysFilter: 7 | 30 | 90 = 30): Veh
     }
   }, [filteredEvents, daysFilter])
 
-  // Obtener score de riesgo de negocio si existe. Si no existe, no calculamos uno nuevo en frontend.
+  // Obtener score de riesgo de negocio si existe desde el backend.
   const score = useMemo(() => {
-    if (vehicle && typeof (vehicle as any).riskScore === "number") {
-      return (vehicle as any).riskScore as number
-    }
-
-    // Sin riskScore de backend, mostramos 0 en la UI.
-    return 0
-  }, [vehicle])
+    return riskScoreFromApi ?? 0
+  }, [riskScoreFromApi])
 
   // Determinar nivel de riesgo
   const riskLevel = useMemo<"bajo" | "medio" | "alto">(() => {

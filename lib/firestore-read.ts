@@ -569,11 +569,13 @@ export interface DailyAlertVehicle {
     warningEvents: number
     noKeyEvents: number
   }
-  riskScore: number
+  /** Risk score agregado calculado en backend. Si falta en origen, se expone como null. */
+  riskScore: number | null
   alertSent: boolean
   sentAt?: string
   events: string[]
-  lastEventAt: string
+  /** Último evento conocido del día. Si falta en origen, se expone como null. */
+  lastEventAt: string | null
 }
 
 export interface DailyAlertMeta {
@@ -582,7 +584,8 @@ export interface DailyAlertMeta {
   totalCriticos: number
   totalAdvertencias: number
   vehiclesWithCritical: number
-  generatedAt: string
+  /** Timestamp ISO de generación de métricas; null si no existe en origen. */
+  generatedAt: string | null
   lastUpdatedAt?: string
 }
 
@@ -608,7 +611,8 @@ export async function getDailyMetrics(date: string): Promise<DailyAlertsResponse
     totalCriticos: 0,
     totalAdvertencias: 0,
     vehiclesWithCritical: 0,
-    generatedAt: ""
+    generatedAt: null,
+    lastUpdatedAt: undefined,
   }
   
   if (metaRes.ok) {
@@ -621,7 +625,7 @@ export async function getDailyMetrics(date: string): Promise<DailyAlertsResponse
         totalCriticos: Number(data.totalCriticos ?? 0),
         totalAdvertencias: Number(data.totalAdvertencias ?? 0),
         vehiclesWithCritical: Number(data.vehiclesWithCritical ?? 0),
-        generatedAt: data.generatedAt != null ? String(data.generatedAt) : "",
+        generatedAt: data.generatedAt != null ? String(data.generatedAt) : null,
         lastUpdatedAt: data.lastUpdatedAt ? String(data.lastUpdatedAt) : undefined,
       }
     }
@@ -648,13 +652,13 @@ export async function getDailyMetrics(date: string): Promise<DailyAlertsResponse
             totalEvents: Number(summary.totalEvents ?? 0),
             criticalEvents: Number(summary.criticalEvents ?? 0),
             warningEvents: Number(summary.warningEvents ?? 0),
-            noKeyEvents: Number(summary.noKeyEvents ?? 0)
+            noKeyEvents: Number(summary.noKeyEvents ?? 0),
           },
-          riskScore: Number(data.riskScore ?? 0),
+          riskScore: typeof data.riskScore === "number" ? (data.riskScore as number) : null,
           alertSent: Boolean(data.alertSent ?? false),
           sentAt: data.sentAt ? String(data.sentAt) : undefined,
           events,
-          lastEventAt: String(data.lastEventAt ?? "")
+          lastEventAt: typeof data.lastEventAt === "string" ? (data.lastEventAt as string) : null,
         })
       }
     }
@@ -720,8 +724,10 @@ export async function markAlertSent(alertIds: string[]): Promise<MarkAlertSentRe
 export interface DailyConsistency {
   expectedTotal: number
   actualTotal: number
+  /** Estado de consistencia reportado por el proceso batch. */
   isConsistent: boolean
-  lastChecked: string
+  /** Timestamp ISO de la última verificación; null si no existe en origen. */
+  lastChecked: string | null
   discrepancies?: Array<{
     plate: string
     expected: number
@@ -738,12 +744,12 @@ export async function getDailyConsistency(date: string): Promise<DailyConsistenc
   
   if (!res.ok) {
     if (res.status === 404) {
-      // If no consistency check exists, return default
+      // Si no existe documento de consistencia, devolvemos estructura vacía sin inventar timestamps.
       return {
         expectedTotal: 0,
         actualTotal: 0,
-        isConsistent: true,
-        lastChecked: new Date().toISOString()
+        isConsistent: false,
+        lastChecked: null,
       }
     }
     throw new Error(`Firestore get failed: ${res.status}`)
@@ -754,8 +760,8 @@ export async function getDailyConsistency(date: string): Promise<DailyConsistenc
     return {
       expectedTotal: 0,
       actualTotal: 0,
-      isConsistent: true,
-      lastChecked: new Date().toISOString()
+      isConsistent: false,
+      lastChecked: null,
     }
   }
   
@@ -765,8 +771,8 @@ export async function getDailyConsistency(date: string): Promise<DailyConsistenc
   return {
     expectedTotal: Number(data.expectedTotal ?? 0),
     actualTotal: Number(data.actualTotal ?? 0),
-    isConsistent: Boolean(data.isConsistent ?? true),
-    lastChecked: String(data.lastChecked ?? new Date().toISOString()),
+    isConsistent: typeof data.isConsistent === "boolean" ? (data.isConsistent as boolean) : false,
+    lastChecked: typeof data.lastChecked === "string" ? (data.lastChecked as string) : null,
     discrepancies
   }
 }
@@ -796,7 +802,7 @@ export async function getDailyAlertForVehicle(
         totalCriticos: Number(data.totalCriticos ?? 0),
         totalAdvertencias: Number(data.totalAdvertencias ?? 0),
         vehiclesWithCritical: Number(data.vehiclesWithCritical ?? 0),
-        generatedAt: data.generatedAt != null ? String(data.generatedAt) : "",
+        generatedAt: data.generatedAt != null ? String(data.generatedAt) : null,
         lastUpdatedAt: data.lastUpdatedAt ? String(data.lastUpdatedAt) : undefined,
       }
     }
@@ -828,11 +834,11 @@ export async function getDailyAlertForVehicle(
       warningEvents: Number(summary.warningEvents ?? 0),
       noKeyEvents: Number(summary.noKeyEvents ?? 0),
     },
-    riskScore: Number(data.riskScore ?? 0),
+    riskScore: typeof data.riskScore === "number" ? (data.riskScore as number) : null,
     alertSent: Boolean(data.alertSent ?? false),
     sentAt: data.sentAt ? String(data.sentAt) : undefined,
     events,
-    lastEventAt: String(data.lastEventAt ?? ""),
+    lastEventAt: typeof data.lastEventAt === "string" ? (data.lastEventAt as string) : null,
   }
 
   return { alert, meta }

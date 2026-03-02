@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getVehicleByPlate, getAllEventsByPeriod } from "@/lib/firestore-read"
-import type { VehiclePlateDetailDTO } from "@/services/dto"
+import { getVehicleByPlate, getAllEventsByPeriod, getDailyAlertForVehicle } from "@/lib/firestore-read"
+import { normalizeBusinessDate } from "@/lib/domain/date"
+import { getSeverityFromRiskScore } from "@/lib/domain/severity"
+import type { VehiclePlateDetailDTO, Severity } from "@/services/dto"
 
 export async function GET(
   request: NextRequest,
@@ -17,9 +19,13 @@ export async function GET(
 
     console.log("[api/vehicles/[plate]] GET:", { plate: plateUpper, daysBack })
 
-    const [vehicle, allEvents] = await Promise.all([
+    const [vehicle, allEvents, dailyAlert] = await Promise.all([
       getVehicleByPlate(plateUpper),
       getAllEventsByPeriod(daysBack * 2),
+      (async () => {
+        const businessDate = normalizeBusinessDate(new Date())
+        return getDailyAlertForVehicle(businessDate, plateUpper)
+      })(),
     ])
 
     if (!vehicle) {
@@ -59,6 +65,10 @@ export async function GET(
       return eventDate >= previousPeriodStart && eventDate < previousPeriodEnd && event.plate === plateUpper
     })
 
+    const riskScore = dailyAlert.alert ? dailyAlert.alert.riskScore : undefined
+    const aggregatedSeverity: Severity | undefined =
+      typeof riskScore === "number" ? getSeverityFromRiskScore(riskScore) : undefined
+
     const response: VehiclePlateDetailDTO = {
       vehicle,
       events: currentEvents,
@@ -67,6 +77,8 @@ export async function GET(
         position: rankPosition,
         totalVehicles: totalVehiclesInPeriod,
       },
+      riskScore,
+      aggregatedSeverity,
     }
 
     return NextResponse.json(response)

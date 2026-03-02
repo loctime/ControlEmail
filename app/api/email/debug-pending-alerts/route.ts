@@ -20,7 +20,7 @@ export async function GET() {
       plate: v.plate,
       date: businessDate,
       status: "PENDING",
-      severity: getSeverityFromRiskScore(v.riskScore),
+      aggregatedSeverity: getSeverityFromRiskScore(v.riskScore),
       driverName: null,
       reason:
         v.summary.criticalEvents > 0

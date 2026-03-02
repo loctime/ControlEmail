@@ -37,8 +37,8 @@ export interface VehicleDTO {
 
   /** Risk score agregado actual (solo backend). */
   riskScore?: number
-  /** Severidad agregada actual. */
-  severity?: Severity
+  /** Severidad agregada actual derivada de riskScore. */
+  aggregatedSeverity?: Severity
 
   /** Último conductor conocido. */
   driverName: string | null
@@ -76,7 +76,8 @@ export function mapVehicleDocToDTO(doc: VehicleDoc): VehicleDTO {
 export interface VehicleEventSummaryDTO {
   id: string
   timestamp: string
-  severity: Severity
+  /** Severidad de negocio del evento individual. */
+  eventSeverity: Severity
   eventType: string
   driverName: string | null
   sourceEmailType: string
@@ -99,7 +100,8 @@ export interface DebugPendingAlertDTO {
   date: string
   status: "PENDING" | "SENT" | "FAILED"
   reason?: string
-  severity?: Severity
+  /** Severidad agregada de negocio para la alerta diaria. */
+  aggregatedSeverity?: Severity
   driverName?: string | null
   lastUpdatedAt?: string
 }
@@ -142,6 +144,10 @@ export interface VehiclePlateDetailDTO {
     position: number
     totalVehicles: number
   }
+  /** Risk score agregado actual del vehículo (si existe). */
+  riskScore?: number
+  /** Severidad agregada actual derivada de riskScore. */
+  aggregatedSeverity?: Severity
 }
 
 export interface MarkAlertSentResultDTO {

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { getDailyConsistency } from "@/lib/firestore-read"
+import type { DailyConsistencyDTO } from "@/services/dto"
 
 export async function GET(request: Request) {
   try {
@@ -10,7 +11,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "date_required" }, { status: 400 })
     }
     
-    const consistency = await getDailyConsistency(date)
+    const consistency: DailyConsistencyDTO = await getDailyConsistency(date)
     return NextResponse.json(consistency)
   } catch (error) {
     console.error("[api/email/daily-consistency] Error:", error)
