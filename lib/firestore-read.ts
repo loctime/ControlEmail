@@ -306,15 +306,24 @@ export interface VehicleEventDoc {
   plate: string
   brand: string
   model: string
+  /** Fecha del evento en formato YYYY-MM-DD (día de referencia del sistema). */
+  dateKey?: string
+  /** Fecha/hora del evento, ej. "2026-03-03T13:13:46-03:00". */
+  eventTimestamp?: string
+  eventId?: string
   eventDate: string
   eventCategory: string
   formatType: string
   driver?: string
+  driverName?: string | null
   speed?: number
   location?: string
   rawLine?: string
   rawEmailId?: string
   createdAt?: string
+  /** Severidad: critico, etc. */
+  severity?: string
+  type?: string
 }
 
 export interface VehicleDoc {
@@ -374,21 +383,29 @@ export async function listVehicleEvents(): Promise<VehicleEventDoc[]> {
     if (typeof rawDate === "string") eventDate = rawDate
     else if (rawDate && typeof rawDate === "object" && "timestampValue" in (rawDate as Record<string, unknown>))
       eventDate = (rawDate as { timestampValue: string }).timestampValue
+    const dateKey = typeof data.dateKey === "string" ? data.dateKey : undefined
+    const eventTimestamp = typeof data.eventTimestamp === "string" ? data.eventTimestamp : undefined
     return {
-    id,
-    plate: String(data.plate ?? ""),
-    brand: String(data.brand ?? ""),
-    model: String(data.model ?? ""),
-    eventDate,
-    eventCategory: String(data.eventCategory ?? "exceso_velocidad"),
-    formatType: String(data.formatType ?? "exceso_velocidad"),
-    driver: data.driver != null ? String(data.driver) : undefined,
-    speed: data.speed != null ? Number(data.speed) : undefined,
-    location: data.location != null ? String(data.location) : undefined,
-    rawLine: data.rawLine != null ? String(data.rawLine) : undefined,
-    rawEmailId: data.rawEmailId != null ? String(data.rawEmailId) : undefined,
-    createdAt: data.createdAt != null ? String(data.createdAt) : undefined,
-  }
+      id,
+      plate: String(data.plate ?? data.plateNormalized ?? ""),
+      brand: String(data.brand ?? ""),
+      model: String(data.model ?? ""),
+      dateKey,
+      eventTimestamp,
+      eventId: data.eventId != null ? String(data.eventId) : undefined,
+      eventDate,
+      eventCategory: String(data.eventCategory ?? data.type ?? "exceso_velocidad"),
+      formatType: String(data.formatType ?? "exceso_velocidad"),
+      driver: data.driver != null ? String(data.driver) : undefined,
+      driverName: data.driverName != null ? String(data.driverName) : data.driver != null ? String(data.driver) : undefined,
+      speed: data.speed != null ? Number(data.speed) : undefined,
+      location: data.location != null ? String(data.location) : undefined,
+      rawLine: data.rawLine != null ? String(data.rawLine) : undefined,
+      rawEmailId: data.rawEmailId != null ? String(data.rawEmailId) : undefined,
+      createdAt: data.createdAt != null ? String(data.createdAt) : undefined,
+      severity: data.severity != null ? String(data.severity) : undefined,
+      type: data.type != null ? String(data.type) : undefined,
+    }
   })
 }
 
