@@ -8,27 +8,29 @@ import {
 } from "lucide-react"
 import { AppCard } from "@/components/app-card"
 import type { VehicleEvent } from "@/lib/data"
-import { normalizeBusinessDate } from "@/lib/domain/date"
+import { getYesterdayKey } from "@/lib/domain/date"
 
 interface KPICardsProps {
   events: VehicleEvent[]
+  /** Fecha de referencia (YYYY-MM-DD). Por defecto ayer, día del dashboard. */
+  referenceDateKey?: string
 }
 
-export function KPICards({ events }: KPICardsProps) {
-  const today = normalizeBusinessDate(new Date())
-  const todayEvents = events.filter((e) => e.fecha === today)
-  const speedEvents = todayEvents.filter(
+export function KPICards({ events, referenceDateKey }: KPICardsProps) {
+  const dateKey = referenceDateKey ?? getYesterdayKey()
+  const dayEvents = events.filter((e) => e.fecha === dateKey)
+  const speedEvents = dayEvents.filter(
     (e) => e.tipo === "exceso_velocidad"
   )
-  const unidentified = todayEvents.filter(
+  const unidentified = dayEvents.filter(
     (e) => e.tipo === "vehiculo_no_identificado"
   )
-  const critical = todayEvents.filter((e) => e.estado === "critico")
+  const critical = dayEvents.filter((e) => e.estado === "critico")
 
   const kpis = [
     {
-      label: "Eventos hoy",
-      value: todayEvents.length,
+      label: "Eventos del día",
+      value: dayEvents.length,
       icon: AlertTriangle,
       color: "text-chart-1" as const,
       bgColor: "bg-chart-1/10" as const,

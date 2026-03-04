@@ -1,4 +1,4 @@
-import { normalizeBusinessDate } from "@/lib/domain/date"
+import { normalizeBusinessDate, getYesterdayDate } from "@/lib/domain/date"
 
 export type EventType =
   | "exceso_velocidad"
@@ -35,6 +35,9 @@ export interface Vehicle {
   estado: "activo" | "inactivo" | "mantenimiento"
   ultimaUbicacion: string
   eventosHoy: number
+  ultimaVelocidad?: number
+  ultimaSenal?: string
+  responsableEmail?: string
 }
 
 export interface Alert {
@@ -125,11 +128,12 @@ function toLocalDateKey(d: Date): string {
 }
 
 /**
- * Obtiene el lunes y domingo de la semana actual (lunes = inicio).
+ * Obtiene el lunes y domingo de la semana que contiene la fecha dada (lunes = inicio).
+ * Si no se pasa refDate, usa ayer como día de referencia del dashboard.
  * Retorna fechas YYYY-MM-DD en hora local.
  */
-function getCurrentWeekBounds(): { start: string; end: string } {
-  const now = new Date()
+function getCurrentWeekBounds(refDate?: Date): { start: string; end: string } {
+  const now = refDate ?? getYesterdayDate()
   const day = now.getDay()
   const mondayOffset = day === 0 ? -6 : 1 - day
   const monday = new Date(now)
@@ -143,15 +147,16 @@ function getCurrentWeekBounds(): { start: string; end: string } {
 }
 
 /**
- * PATENTE → cantidad total de advertencias en la semana actual.
- * Agrupa por patente, no por día.
- * Ordena descendente por cantidad.
+ * PATENTE → cantidad total de advertencias en la semana del día de referencia.
+ * refDate: día de referencia (por defecto ayer, día del dashboard).
+ * Agrupa por patente, no por día. Ordena descendente por cantidad.
  */
 export function getWeeklyVehicleWarnings(
-  events: VehicleEvent[]
+  events: VehicleEvent[],
+  refDate?: Date
 ): Array<{ patente: string; advertencias: number }> {
   const input = Array.isArray(events) ? events : []
-  const { start, end } = getCurrentWeekBounds()
+  const { start, end } = getCurrentWeekBounds(refDate)
 
   const byPatente: Record<string, number> = {}
 

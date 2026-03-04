@@ -23,3 +23,18 @@ export function normalizeBusinessDate(input: Date | string): string {
   return input.slice(0, 10)
 }
 
+/**
+ * Fecha de ayer en hora local, normalizada YYYY-MM-DD.
+ * Se usa como "día de referencia" en el dashboard (las alertas son del día anterior).
+ */
+export function getYesterdayDate(): Date {
+  const d = new Date()
+  d.setDate(d.getDate() - 1)
+  return d
+}
+
+/** Clave de negocio (YYYY-MM-DD) para el día de ayer. */
+export function getYesterdayKey(): string {
+  return normalizeBusinessDate(getYesterdayDate())
+}
+

@@ -11,6 +11,7 @@ import {
   getHourlyWarnings,
   type VehicleEvent,
 } from "@/lib/data"
+import { getYesterdayKey, getYesterdayDate } from "@/lib/domain/date"
 
 interface DashboardContentProps {
   events: VehicleEvent[]
@@ -21,25 +22,29 @@ export function DashboardContent({
   events,
   onViewEventDetail,
 }: DashboardContentProps) {
-  const todayLabel = new Date().toLocaleDateString("es-AR", {
+  // Día de referencia del sistema: ayer (las alertas se envían del día anterior).
+  const referenceDate = getYesterdayDate()
+  const referenceDateKey = getYesterdayKey()
+  const yesterdayLabel = referenceDate.toLocaleDateString("es-AR", {
     day: "numeric",
     month: "long",
     year: "numeric",
   })
   const eventsList = Array.isArray(events) ? events : []
+  const eventsOfReferenceDay = eventsList.filter((e) => e.fecha === referenceDateKey)
   if (typeof console !== "undefined" && console.log) {
-    console.log("[DashboardContent] events:", eventsList.length, eventsList)
+    console.log("[DashboardContent] events:", eventsList.length, "del día ref:", eventsOfReferenceDay.length)
   }
-  const weeklyData = getWeeklyVehicleWarnings(eventsList)
-  const hoursData = getHourlyWarnings(eventsList)
+  const weeklyData = getWeeklyVehicleWarnings(eventsList, referenceDate)
+  const hoursData = getHourlyWarnings(eventsOfReferenceDay)
 
   return (
     <PageContainer>
       <SectionHeader
         title="Panel de control"
-        description={`Resumen de actividad del día — ${todayLabel}`}
+        description={`Resumen de actividad del día de ayer — ${yesterdayLabel}`}
       />
-      <KPICards events={events} />
+      <KPICards events={events} referenceDateKey={referenceDateKey} />
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <VehiclesWarningsWeeklyChart data={weeklyData} />
         <HoursWarningsChart data={hoursData} />
