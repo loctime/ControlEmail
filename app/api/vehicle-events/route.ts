@@ -59,7 +59,7 @@ function eventDocToVehicleEvent(doc: Awaited<ReturnType<typeof listVehicleEvents
   const vehiculo = [doc.brand, doc.model].filter(Boolean).join(" ") || null
   const descripcion = doc.speed != null
     ? `Vehículo registrado a ${doc.speed} km/h. ${doc.location ? `Ubicación: ${doc.location}.` : ""}`
-    : doc.rawLine ?? `Evento ${doc.eventCategory ?? "registrado"}. ${doc.location ?? ""}`.trim() || "Evento registrado."
+    : (doc.rawLine ?? (`Evento ${doc.eventCategory ?? "registrado"}. ${doc.location ?? ""}`.trim() || "Evento registrado."))
 
   return {
     id: doc.eventId ?? doc.id,
