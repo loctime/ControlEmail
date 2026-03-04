@@ -45,26 +45,34 @@ export function VehiclesWarningsWeeklyChart({ data }: VehiclesWarningsWeeklyChar
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={data}
-              margin={{ top: 8, right: 8, left: -16, bottom: 0 }}
+              layout="vertical"
+              margin={{ top: 8, right: 8, left: 8, bottom: 8 }}
             >
               <CartesianGrid
                 strokeDasharray="3 3"
                 className="stroke-border"
-                vertical={false}
+                horizontal={false}
               />
               <XAxis
-                dataKey="patente"
+                type="number"
+                dataKey="advertencias"
                 tick={{ fontSize: 12 }}
                 className="fill-muted-foreground"
                 tickLine={false}
                 axisLine={false}
+                domain={[0, (max: number) => Math.max(max, 10)]}
+                ticks={[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]}
+                tickFormatter={(v) => (v === 10 ? "+10" : String(v))}
+                allowDecimals={false}
               />
               <YAxis
+                type="category"
+                dataKey="patente"
+                width={70}
                 tick={{ fontSize: 12 }}
                 className="fill-muted-foreground"
                 tickLine={false}
                 axisLine={false}
-                domain={[0, (max: number) => Math.max(max, 1)]}
               />
               <Tooltip
                 contentStyle={{
@@ -79,7 +87,7 @@ export function VehiclesWarningsWeeklyChart({ data }: VehiclesWarningsWeeklyChar
                 dataKey="advertencias"
                 name="Advertencias"
                 fill="hsl(var(--chart-3))"
-                radius={[3, 3, 0, 0]}
+                radius={[0, 3, 3, 0]}
               />
             </BarChart>
           </ResponsiveContainer>

@@ -14,6 +14,7 @@ import { AppButton } from "@/components/app-button"
 import { emailModuleService } from "@/services/emailModule"
 import type { DailyAlertDTO } from "@/services/dto"
 import { type VehicleEvent, type Vehicle } from "@/lib/data"
+import { getYesterdayKey } from "@/lib/domain/date"
 
 export default function Page() {
   const [activeSection, setActiveSection] = useState("dashboard")
@@ -33,7 +34,7 @@ export default function Page() {
     setLoading(true)
     setError(null)
     try {
-      const yesterday = await import("@/lib/domain/date").then((m) => m.getYesterdayKey())
+      const yesterday = getYesterdayKey()
       const [eventsRes, vehiclesRes, metricsRes] = await Promise.all([
         fetch("/api/vehicle-events"),
         fetch("/api/vehicles"),
