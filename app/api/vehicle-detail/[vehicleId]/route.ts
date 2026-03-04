@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getVehicleByPlate, getVehicleEventsByPlate, getDailyAlertForVehicle } from "@/lib/firestore-read"
-import { normalizeBusinessDate } from "@/lib/domain/date"
+import { getYesterdayKey } from "@/lib/domain/date"
 import { getSeverityFromRiskScore } from "@/lib/domain/severity"
 import type { VehicleDetailDTO, VehicleEventSummaryDTO, Severity } from "@/services/dto"
 
@@ -21,8 +21,8 @@ export async function GET(
       return NextResponse.json({ error: "Vehículo no encontrado" }, { status: 404 })
     }
 
-    // Fecha de negocio: hoy en formato YYYY-MM-DD, única fuente de verdad.
-    const businessDate = normalizeBusinessDate(new Date())
+    // Día de referencia: ayer (las alertas diarias son del día anterior).
+    const businessDate = getYesterdayKey()
 
     // Alerta diaria y meta real desde Firestore (apps/emails/dailyAlerts/{date}/vehicles/{plate}).
     const { alert, meta } = await getDailyAlertForVehicle(businessDate, plateUpper)

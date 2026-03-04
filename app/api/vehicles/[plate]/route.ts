@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getVehicleByPlate, getAllEventsByPeriod, getDailyAlertForVehicle } from "@/lib/firestore-read"
-import { normalizeBusinessDate } from "@/lib/domain/date"
+import { getYesterdayKey } from "@/lib/domain/date"
 import { getSeverityFromRiskScore } from "@/lib/domain/severity"
 import type { VehiclePlateDetailDTO, Severity } from "@/services/dto"
 
@@ -23,7 +23,7 @@ export async function GET(
       getVehicleByPlate(plateUpper),
       getAllEventsByPeriod(daysBack * 2),
       (async () => {
-        const businessDate = normalizeBusinessDate(new Date())
+        const businessDate = getYesterdayKey()
         return getDailyAlertForVehicle(businessDate, plateUpper)
       })(),
     ])

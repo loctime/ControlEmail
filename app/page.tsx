@@ -22,6 +22,7 @@ export default function Page() {
   const [detailOpen, setDetailOpen] = useState(false)
   const [events, setEvents] = useState<VehicleEvent[]>([])
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
+  const [excesosFromDailyAlerts, setExcesosFromDailyAlerts] = useState<number | null>(null)
   const [pendingAlerts, setPendingAlerts] = useState<DailyAlertDTO[]>([])
   const [loadingAlerts, setLoadingAlerts] = useState(true)
   const [errorAlerts, setErrorAlerts] = useState<string | null>(null)
@@ -32,9 +33,11 @@ export default function Page() {
     setLoading(true)
     setError(null)
     try {
-      const [eventsRes, vehiclesRes] = await Promise.all([
+      const yesterday = await import("@/lib/domain/date").then((m) => m.getYesterdayKey())
+      const [eventsRes, vehiclesRes, metricsRes] = await Promise.all([
         fetch("/api/vehicle-events"),
         fetch("/api/vehicles"),
+        fetch(`/api/email/daily-metrics?date=${yesterday}`),
       ])
       if (!eventsRes.ok) throw new Error("Error al cargar eventos")
       if (!vehiclesRes.ok) throw new Error("Error al cargar vehículos")
@@ -44,10 +47,23 @@ export default function Page() {
       ])
       setEvents(Array.isArray(eventsData) ? eventsData : [])
       setVehicles(Array.isArray(vehiclesData) ? vehiclesData : [])
+
+      if (metricsRes.ok) {
+        const metrics = await metricsRes.json()
+        const vehiclesList = metrics?.vehicles ?? []
+        const total = vehiclesList.reduce(
+          (sum: number, v: { summary?: { excesos?: number } }) => sum + (v.summary?.excesos ?? 0),
+          0
+        )
+        setExcesosFromDailyAlerts(total)
+      } else {
+        setExcesosFromDailyAlerts(null)
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error desconocido")
       setEvents([])
       setVehicles([])
+      setExcesosFromDailyAlerts(null)
     } finally {
       setLoading(false)
     }
@@ -137,6 +153,7 @@ export default function Page() {
               {activeSection === "dashboard" && (
                 <DashboardContent
                   events={events}
+                  excesosFromDailyAlerts={excesosFromDailyAlerts}
                   onViewEventDetail={handleViewDetail}
                 />
               )}

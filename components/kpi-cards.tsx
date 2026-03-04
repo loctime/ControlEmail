@@ -14,14 +14,17 @@ interface KPICardsProps {
   events: VehicleEvent[]
   /** Fecha de referencia (YYYY-MM-DD). Por defecto ayer, día del dashboard. */
   referenceDateKey?: string
+  /** Total excesos del día desde dailyAlerts; si está definido, se usa para el KPI en lugar de contar por tipo. */
+  excesosFromDailyAlerts?: number | null
 }
 
-export function KPICards({ events, referenceDateKey }: KPICardsProps) {
+export function KPICards({ events, referenceDateKey, excesosFromDailyAlerts }: KPICardsProps) {
   const dateKey = referenceDateKey ?? getYesterdayKey()
   const dayEvents = events.filter((e) => e.fecha === dateKey)
   const speedEvents = dayEvents.filter(
     (e) => e.tipo === "exceso_velocidad"
   )
+  const excesosValue = excesosFromDailyAlerts != null ? excesosFromDailyAlerts : speedEvents.length
   const unidentified = dayEvents.filter(
     (e) => e.tipo === "vehiculo_no_identificado"
   )
@@ -37,7 +40,7 @@ export function KPICards({ events, referenceDateKey }: KPICardsProps) {
     },
     {
       label: "Excesos de velocidad",
-      value: speedEvents.length,
+      value: excesosValue,
       icon: Gauge,
       color: "text-chart-3" as const,
       bgColor: "bg-chart-3/10" as const,

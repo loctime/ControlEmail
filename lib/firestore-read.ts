@@ -124,7 +124,16 @@ function parseFields(fields: Record<string, Record<string, unknown>>): Record<st
   )
 }
 
-async function firestoreRequest(path: string, init: RequestInit): Promise<Response> {
+interface FirestoreRequestOptions {
+  /** Si true, 404 se loguea como info en lugar de error (ej. meta opcional). */
+  quiet404?: boolean
+}
+
+async function firestoreRequest(
+  path: string,
+  init: RequestInit,
+  options?: FirestoreRequestOptions
+): Promise<Response> {
   const projectId = getEnvOrThrow(
     "FIREBASE_PROJECT_ID",
     "NEXT_PUBLIC_FIREBASE_PROJECT_ID",
@@ -145,7 +154,11 @@ async function firestoreRequest(path: string, init: RequestInit): Promise<Respon
   )
   if (!res.ok) {
     const body = await res.clone().text()
-    console.error("[firestore-read] Firestore request failed:", { status: res.status, path, body: body.slice(0, 300) })
+    if (res.status === 404 && options?.quiet404) {
+      console.log("[firestore-read] Document not found (expected):", path)
+    } else {
+      console.error("[firestore-read] Firestore request failed:", { status: res.status, path, body: body.slice(0, 300) })
+    }
   } else {
     console.log("[firestore-read] Firestore request OK:", { path, status: res.status })
   }
@@ -324,6 +337,7 @@ export interface VehicleEventDoc {
   /** Severidad: critico, etc. */
   severity?: string
   type?: string
+  hasSpeed?: boolean
 }
 
 export interface VehicleDoc {
@@ -372,10 +386,13 @@ export async function listCollection(
   })
 }
 
+/** Máximo de eventos a leer para el dashboard/API (Firestore limita por página). */
+const VEHICLE_EVENTS_PAGE_SIZE = 500
+
 export async function listVehicleEvents(): Promise<VehicleEventDoc[]> {
   const path = "apps/emails/vehicleEvents"
   console.log("[firestore-read] listVehicleEvents: leyendo desde", path)
-  const items = await listCollection(path)
+  const items = await listCollection(path, VEHICLE_EVENTS_PAGE_SIZE)
   console.log("[firestore-read] listVehicleEvents: leídos", items.length, "eventos")
   return items.map(({ id, data }) => {
     const rawDate = data.eventDate
@@ -394,7 +411,9 @@ export async function listVehicleEvents(): Promise<VehicleEventDoc[]> {
       eventTimestamp,
       eventId: data.eventId != null ? String(data.eventId) : undefined,
       eventDate,
-      eventCategory: String(data.eventCategory ?? data.type ?? "exceso_velocidad"),
+      eventCategory: String(
+        data.eventCategory ?? data.event_category ?? data.type ?? "exceso_velocidad"
+      ),
       formatType: String(data.formatType ?? "exceso_velocidad"),
       driver: data.driver != null ? String(data.driver) : undefined,
       driverName: data.driverName != null ? String(data.driverName) : data.driver != null ? String(data.driver) : undefined,
@@ -405,6 +424,7 @@ export async function listVehicleEvents(): Promise<VehicleEventDoc[]> {
       createdAt: data.createdAt != null ? String(data.createdAt) : undefined,
       severity: data.severity != null ? String(data.severity) : undefined,
       type: data.type != null ? String(data.type) : undefined,
+      hasSpeed: data.hasSpeed === true,
     }
   })
 }
@@ -745,6 +765,8 @@ export interface DailyAlertVehicle {
     criticalEvents: number
     warningEvents: number
     noKeyEvents: number
+    /** Excesos de velocidad del día (desde dailyAlerts). */
+    excesos?: number
   }
   /** Risk score agregado calculado en backend. Si falta en origen, se expone como null. */
   riskScore: number | null
@@ -771,18 +793,48 @@ export interface DailyAlertsResponse {
   vehicles: DailyAlertVehicle[]
 }
 
-function toDailyKey(date: string): string {
-  return date.replace(/-/g, "")
+/** Formato del documento del día en Firestore: YYYY-MM-DD (ej. 2026-03-03). */
+function toDailyDocId(date: string): string {
+  const normalized = date.replace(/-/g, "").trim()
+  if (normalized.length >= 8) {
+    return `${normalized.slice(0, 4)}-${normalized.slice(4, 6)}-${normalized.slice(6, 8)}`
+  }
+  return date
+}
+
+function parseMetaFromFields(data: Record<string, unknown>): DailyAlertMeta {
+  return {
+    totalEvents: Number(data.totalEvents ?? 0),
+    totalVehicles: Number(data.totalVehicles ?? 0),
+    totalCriticos: Number(data.totalCriticos ?? 0),
+    totalAdvertencias: Number(data.totalAdvertencias ?? 0),
+    vehiclesWithCritical: Number(data.vehiclesWithCritical ?? 0),
+    generatedAt: data.generatedAt != null ? String(data.generatedAt) : null,
+    lastUpdatedAt: data.lastUpdatedAt ? String(data.lastUpdatedAt) : undefined,
+  }
+}
+
+/** Mapea summary del doc (excesos, no_identificados, contactos...) al formato esperado. */
+function parseVehicleSummary(summary: Record<string, unknown>): DailyAlertVehicle["summary"] {
+  const excesos = Number(summary.excesos ?? 0)
+  const noIdentificados = Number(summary.no_identificados ?? summary.noKeyEvents ?? 0)
+  const contactos = Number(summary.contactos ?? 0)
+  const totalFromFields = excesos + noIdentificados + contactos +
+    Number(summary.conductor_inactivo ?? 0) + Number(summary.llave_sin_cargar ?? 0)
+  return {
+    totalEvents: Number(summary.totalEvents ?? totalFromFields ?? 0),
+    criticalEvents: Number(summary.criticalEvents ?? excesos + noIdentificados ?? 0),
+    warningEvents: Number(summary.warningEvents ?? 0),
+    noKeyEvents: Number(summary.noKeyEvents ?? summary.llave_sin_cargar ?? 0),
+    excesos,
+  }
 }
 
 export async function getDailyMetrics(date: string): Promise<DailyAlertsResponse> {
-  const dateKey = toDailyKey(date)
-  const basePath = `apps/emails/dailyAlerts/${dateKey}`
+  const dateDocId = toDailyDocId(date)
+  const basePath = `apps/emails/dailyAlerts/${dateDocId}`
   
-  // Get meta
-  const metaPath = `documents/${basePath}/meta/meta`
-  const metaRes = await firestoreRequest(metaPath, { method: "GET" })
-  let meta: DailyAlertMeta = {
+  const defaultMeta: DailyAlertMeta = {
     totalEvents: 0,
     totalVehicles: 0,
     totalCriticos: 0,
@@ -791,46 +843,47 @@ export async function getDailyMetrics(date: string): Promise<DailyAlertsResponse
     generatedAt: null,
     lastUpdatedAt: undefined,
   }
+
+  // Get meta: primero meta/meta, si 404 intentar documento del día (meta en el doc)
+  const metaPath = `documents/${basePath}/meta/meta`
+  const metaRes = await firestoreRequest(metaPath, { method: "GET" }, { quiet404: true })
+  let meta: DailyAlertMeta = defaultMeta
   
   if (metaRes.ok) {
     const metaJson = await metaRes.json()
     if (metaJson.fields) {
-      const data = parseFields(metaJson.fields)
-      meta = {
-        totalEvents: Number(data.totalEvents ?? 0),
-        totalVehicles: Number(data.totalVehicles ?? 0),
-        totalCriticos: Number(data.totalCriticos ?? 0),
-        totalAdvertencias: Number(data.totalAdvertencias ?? 0),
-        vehiclesWithCritical: Number(data.vehiclesWithCritical ?? 0),
-        generatedAt: data.generatedAt != null ? String(data.generatedAt) : null,
-        lastUpdatedAt: data.lastUpdatedAt ? String(data.lastUpdatedAt) : undefined,
+      meta = parseMetaFromFields(parseFields(metaJson.fields))
+    }
+  } else if (metaRes.status === 404) {
+    const dateDocPath = `documents/${basePath}`
+    const dateDocRes = await firestoreRequest(dateDocPath, { method: "GET" }, { quiet404: true })
+    if (dateDocRes.ok) {
+      const dateDocJson = await dateDocRes.json()
+      if (dateDocJson.fields) {
+        meta = parseMetaFromFields(parseFields(dateDocJson.fields))
       }
     }
   }
   
-  // Get vehicles
+  // Get vehicles (subcolección dailyAlerts/{dateKey}/vehicles)
   const vehiclesPath = `documents/${basePath}/vehicles`
   const vehiclesRes = await firestoreRequest(vehiclesPath, { method: "GET" })
   const vehicles: DailyAlertVehicle[] = []
   
   if (vehiclesRes.ok) {
     const vehiclesJson = await vehiclesRes.json()
-    if (vehiclesJson.documents) {
-      for (const doc of vehiclesJson.documents) {
+    const docList = vehiclesJson.documents ?? []
+    if (docList.length === 0) {
+      console.log("[firestore-read] getDailyMetrics: sin documentos en", vehiclesPath, "(¿generaste alertas para esta fecha?)")
+    }
+    for (const doc of docList) {
         const plate = doc.name.split("/").pop() ?? ""
         const data = parseFields(doc.fields ?? {})
-        
         const summary = (data.summary ?? {}) as Record<string, unknown>
         const events = Array.isArray(data.events) ? data.events : []
-        
         vehicles.push({
           plate,
-          summary: {
-            totalEvents: Number(summary.totalEvents ?? 0),
-            criticalEvents: Number(summary.criticalEvents ?? 0),
-            warningEvents: Number(summary.warningEvents ?? 0),
-            noKeyEvents: Number(summary.noKeyEvents ?? 0),
-          },
+          summary: parseVehicleSummary(summary),
           riskScore: typeof data.riskScore === "number" ? (data.riskScore as number) : null,
           alertSent: Boolean(data.alertSent ?? false),
           sentAt: data.sentAt ? String(data.sentAt) : undefined,
@@ -838,17 +891,16 @@ export async function getDailyMetrics(date: string): Promise<DailyAlertsResponse
           lastEventAt: typeof data.lastEventAt === "string" ? (data.lastEventAt as string) : null,
         })
       }
-    }
   }
   
   return { meta, vehicles }
 }
 
 export async function getPendingDailyAlerts(): Promise<DailyAlertVehicle[]> {
-  const { normalizeBusinessDate } = await import("@/lib/domain/date")
-  const today = normalizeBusinessDate(new Date())
-  const metrics = await getDailyMetrics(today)
-  return metrics.vehicles.filter(v => !v.alertSent)
+  const { getYesterdayKey } = await import("@/lib/domain/date")
+  const dateKey = getYesterdayKey()
+  const metrics = await getDailyMetrics(dateKey)
+  return metrics.vehicles.filter((v) => !v.alertSent)
 }
 
 export interface MarkAlertSentResult {
@@ -858,14 +910,13 @@ export interface MarkAlertSentResult {
 }
 
 export async function markAlertSent(alertIds: string[]): Promise<MarkAlertSentResult> {
-  const { normalizeBusinessDate } = await import("@/lib/domain/date")
-  const today = normalizeBusinessDate(new Date())
-  const dateKey = toDailyKey(today)
+  const { getYesterdayKey } = await import("@/lib/domain/date")
+  const dateDocId = toDailyDocId(getYesterdayKey())
   
   const result: MarkAlertSentResult = { requested: alertIds.length, updated: [], failed: [] }
 
   for (const plate of alertIds) {
-    const docPath = `apps/emails/dailyAlerts/${dateKey}/vehicles/${encodeURIComponent(plate)}`
+    const docPath = `apps/emails/dailyAlerts/${dateDocId}/vehicles/${encodeURIComponent(plate)}`
     const path = `documents/${docPath}?updateMask.fieldPaths=alertSent&updateMask.fieldPaths=sentAt`
     
     const projectId = getEnvOrThrow(
@@ -913,8 +964,8 @@ export interface DailyConsistency {
 }
 
 export async function getDailyConsistency(date: string): Promise<DailyConsistency> {
-  const dateKey = toDailyKey(date)
-  const docPath = `apps/emails/dailyAlerts/${dateKey}/consistency/check`
+  const dateDocId = toDailyDocId(date)
+  const docPath = `apps/emails/dailyAlerts/${dateDocId}/consistency/check`
   const path = `documents/${docPath}`
   
   const res = await firestoreRequest(path, { method: "GET" })
@@ -962,32 +1013,23 @@ export async function getDailyAlertForVehicle(
   date: string,
   plate: string,
 ): Promise<{ alert: DailyAlertVehicle | null; meta: DailyAlertMeta | null }> {
-  const dateKey = toDailyKey(date)
-  const basePath = `apps/emails/dailyAlerts/${dateKey}`
+  const dateDocId = toDailyDocId(date)
+  const basePath = `apps/emails/dailyAlerts/${dateDocId}`
 
-  // Meta del día
+  // Meta del día (404 esperado si no existe el doc)
   const metaPath = `documents/${basePath}/meta/meta`
-  const metaRes = await firestoreRequest(metaPath, { method: "GET" })
+  const metaRes = await firestoreRequest(metaPath, { method: "GET" }, { quiet404: true })
   let meta: DailyAlertMeta | null = null
   if (metaRes.ok) {
     const metaJson = await metaRes.json()
     if (metaJson.fields) {
-      const data = parseFields(metaJson.fields)
-      meta = {
-        totalEvents: Number(data.totalEvents ?? 0),
-        totalVehicles: Number(data.totalVehicles ?? 0),
-        totalCriticos: Number(data.totalCriticos ?? 0),
-        totalAdvertencias: Number(data.totalAdvertencias ?? 0),
-        vehiclesWithCritical: Number(data.vehiclesWithCritical ?? 0),
-        generatedAt: data.generatedAt != null ? String(data.generatedAt) : null,
-        lastUpdatedAt: data.lastUpdatedAt ? String(data.lastUpdatedAt) : undefined,
-      }
+      meta = parseMetaFromFields(parseFields(metaJson.fields))
     }
   }
 
-  // Alerta diaria específica del vehículo
+  // Alerta diaria específica del vehículo (404 esperado si no hay alerta para esa patente)
   const vehicleDocPath = `documents/${basePath}/vehicles/${encodeURIComponent(plate)}`
-  const vehicleRes = await firestoreRequest(vehicleDocPath, { method: "GET" })
+  const vehicleRes = await firestoreRequest(vehicleDocPath, { method: "GET" }, { quiet404: true })
   if (!vehicleRes.ok) {
     if (vehicleRes.status === 404) {
       return { alert: null, meta }
@@ -1005,12 +1047,7 @@ export async function getDailyAlertForVehicle(
 
   const alert: DailyAlertVehicle = {
     plate,
-    summary: {
-      totalEvents: Number(summary.totalEvents ?? 0),
-      criticalEvents: Number(summary.criticalEvents ?? 0),
-      warningEvents: Number(summary.warningEvents ?? 0),
-      noKeyEvents: Number(summary.noKeyEvents ?? 0),
-    },
+    summary: parseVehicleSummary(summary),
     riskScore: typeof data.riskScore === "number" ? (data.riskScore as number) : null,
     alertSent: Boolean(data.alertSent ?? false),
     sentAt: data.sentAt ? String(data.sentAt) : undefined,

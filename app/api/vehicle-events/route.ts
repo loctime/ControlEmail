@@ -19,7 +19,11 @@ function horaFromEventTimestamp(ts: string | undefined): string {
 }
 
 /** Mapea eventCategory/type del doc al tipo esperado por el front. */
-function mapTipo(eventCategory: string, _doc: Awaited<ReturnType<typeof listVehicleEvents>>[0]): string {
+function mapTipo(
+  eventCategory: string,
+  doc: Awaited<ReturnType<typeof listVehicleEvents>>[0]
+): string {
+  if (doc.speed != null || doc.hasSpeed) return "exceso_velocidad"
   const cat = (eventCategory ?? "").toLowerCase()
   if (cat === "exceso_velocidad") return "exceso_velocidad"
   if (cat === "contacto" || cat === "contacto_sin_identificacion") return "vehiculo_no_identificado"

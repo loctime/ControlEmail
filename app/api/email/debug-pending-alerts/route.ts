@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server"
 import { getDailyMetrics } from "@/lib/firestore-read"
-import { normalizeBusinessDate } from "@/lib/domain/date"
+import { getYesterdayKey } from "@/lib/domain/date"
 import { getSeverityFromRiskScore } from "@/lib/domain/severity"
 import type { DebugPendingAlertDTO } from "@/services/dto"
 
 export async function GET() {
   try {
-    // Fecha de negocio única para el análisis de alertas pendientes.
-    const businessDate = normalizeBusinessDate(new Date())
+    // Día de referencia: ayer (las alertas diarias son del día anterior).
+    const businessDate = getYesterdayKey()
 
     // Datos reales desde Firestore: apps/emails/dailyAlerts/{date}/meta y /vehicles.
     const metrics = await getDailyMetrics(businessDate)

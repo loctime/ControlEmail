@@ -23,9 +23,28 @@ export function normalizeBusinessDate(input: Date | string): string {
   return input.slice(0, 10)
 }
 
+/** Zona horaria usada para dateKey en Firestore y para el día de referencia del dashboard. */
+const DASHBOARD_TIMEZONE = "America/Argentina/Buenos_Aires"
+
 /**
- * Fecha de ayer en hora local, normalizada YYYY-MM-DD.
- * Se usa como "día de referencia" en el dashboard (las alertas son del día anterior).
+ * Hoy en la zona del dashboard (Argentina), como YYYY-MM-DD.
+ */
+function getTodayKeyInTimezone(): string {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: DASHBOARD_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+  const parts = formatter.formatToParts(new Date())
+  const year = parts.find((p) => p.type === "year")?.value ?? ""
+  const month = parts.find((p) => p.type === "month")?.value ?? ""
+  const day = parts.find((p) => p.type === "day")?.value ?? ""
+  return `${year}-${month}-${day}`
+}
+
+/**
+ * Fecha de ayer en hora local del servidor (fallback).
  */
 export function getYesterdayDate(): Date {
   const d = new Date()
@@ -33,8 +52,14 @@ export function getYesterdayDate(): Date {
   return d
 }
 
-/** Clave de negocio (YYYY-MM-DD) para el día de ayer. */
+/**
+ * Clave de negocio (YYYY-MM-DD) para el día de ayer en la zona del dashboard.
+ * Debe coincidir con dateKey en Firestore (guardado en Argentina).
+ */
 export function getYesterdayKey(): string {
-  return normalizeBusinessDate(getYesterdayDate())
+  const today = getTodayKeyInTimezone()
+  const [y, m, d] = today.split("-").map(Number)
+  const yesterday = new Date(y, m - 1, d - 1)
+  return `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, "0")}-${String(yesterday.getDate()).padStart(2, "0")}`
 }
 

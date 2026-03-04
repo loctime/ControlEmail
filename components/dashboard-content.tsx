@@ -15,11 +15,14 @@ import { getYesterdayKey, getYesterdayDate } from "@/lib/domain/date"
 
 interface DashboardContentProps {
   events: VehicleEvent[]
+  /** Total excesos del día desde dailyAlerts (cuando está disponible). */
+  excesosFromDailyAlerts?: number | null
   onViewEventDetail: (event: VehicleEvent) => void
 }
 
 export function DashboardContent({
   events,
+  excesosFromDailyAlerts,
   onViewEventDetail,
 }: DashboardContentProps) {
   // Día de referencia del sistema: ayer (las alertas se envían del día anterior).
@@ -44,7 +47,11 @@ export function DashboardContent({
         title="Panel de control"
         description={`Resumen de actividad del día de ayer — ${yesterdayLabel}`}
       />
-      <KPICards events={events} referenceDateKey={referenceDateKey} />
+      <KPICards
+        events={events}
+        referenceDateKey={referenceDateKey}
+        excesosFromDailyAlerts={excesosFromDailyAlerts}
+      />
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <VehiclesWarningsWeeklyChart data={weeklyData} />
         <HoursWarningsChart data={hoursData} />
