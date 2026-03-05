@@ -40,7 +40,7 @@ export function VehicleKpis({ kpis, score, trend, ranking, loading }: VehicleKpi
     ? "text-red-600 dark:text-red-400"
     : "text-muted-foreground"
 
-  const trendIcon = trend.trendDirection === "down" 
+  const TrendIcon = trend.trendDirection === "down" 
     ? TrendingDown 
     : trend.trendDirection === "up"
     ? TrendingUp
@@ -80,9 +80,9 @@ export function VehicleKpis({ kpis, score, trend, ranking, loading }: VehicleKpi
         <CardContent>
           <div className="text-2xl font-bold">{kpis.totalEventos}</div>
           <p className="text-xs text-muted-foreground">En el período seleccionado</p>
-          {trendIcon && (
+          {TrendIcon && (
             <div className={cn("flex items-center gap-1 mt-2 text-xs font-medium", trendColor)}>
-              <trendIcon className="h-3 w-3" />
+              <TrendIcon className="h-3 w-3" />
               <span>
                 {trend.trendPercentage > 0 ? "+" : ""}{trend.trendPercentage}% vs período anterior
               </span>
@@ -244,3 +244,4 @@ export function VehicleKpis({ kpis, score, trend, ranking, loading }: VehicleKpi
     </div>
   )
 }
+

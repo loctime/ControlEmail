@@ -11,12 +11,12 @@ import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { cn } from "@/lib/utils"
 import { emailModuleService } from "@/services/emailModule"
-import type { DailyConsistency } from "@/services/emailModule"
+import type { DailyConsistencyDTO } from "@/services/dto"
 import { formatEventDateTime } from "@/lib/ui/datetime"
 
 export default function CalidadPage() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
-  const [data, setData] = useState<DailyConsistency | null>(null)
+  const [data, setData] = useState<DailyConsistencyDTO | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -250,3 +250,4 @@ export default function CalidadPage() {
     </div>
   )
 }
+

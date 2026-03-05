@@ -12,12 +12,12 @@ import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { cn } from "@/lib/utils"
 import { emailModuleService } from "@/services/emailModule"
-import type { DailyAlertsResponse } from "@/services/emailModule"
+import type { DailyMetricsDTO } from "@/services/dto"
 import { formatEventDateTime, formatEventTime } from "@/lib/ui/datetime"
 
 export default function HistoricoPage() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
-  const [data, setData] = useState<DailyAlertsResponse | null>(null)
+  const [data, setData] = useState<DailyMetricsDTO | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -163,7 +163,7 @@ export default function HistoricoPage() {
                   </TableHeader>
                   <TableBody>
                     {data.vehicles
-                      .sort((a, b) => b.riskScore - a.riskScore)
+                      .sort((a, b) => (b.riskScore ?? 0) - (a.riskScore ?? 0))
                       .map((vehicle) => (
                       <TableRow key={vehicle.plate}>
                         <TableCell className="font-mono font-bold">{vehicle.plate}</TableCell>
@@ -209,3 +209,4 @@ export default function HistoricoPage() {
     </div>
   )
 }
+

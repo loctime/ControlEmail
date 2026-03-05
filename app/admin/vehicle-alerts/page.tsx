@@ -85,7 +85,7 @@ export default function VehicleAlertsPage() {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ plate: normalizedPlate, ...payload }),
+      body: JSON.stringify({ vehicles: [{ plate: normalizedPlate, responsables: payload.responsables }] }),
     })
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
@@ -173,3 +173,4 @@ export default function VehicleAlertsPage() {
     </div>
   )
 }
+

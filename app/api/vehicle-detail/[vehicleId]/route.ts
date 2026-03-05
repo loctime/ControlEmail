@@ -56,7 +56,7 @@ export async function GET(
     // pendingAlertsCount / lastAlertDate / riskScore / severity provienen de dailyAlerts.
     const pendingAlertsCount = alert && !alert.alertSent ? 1 : 0
     const lastAlertDate = alert ? businessDate : undefined
-    const riskScore = alert ? alert.riskScore : undefined
+    const riskScore = alert && alert.riskScore != null ? alert.riskScore : undefined
   const aggregatedSeverity = typeof riskScore === "number" ? getSeverityFromRiskScore(riskScore) : undefined
 
     const lastUpdatedAt =
@@ -94,4 +94,5 @@ export async function GET(
     )
   }
 }
+
 

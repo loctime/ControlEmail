@@ -1,20 +1,19 @@
 "use client"
 
-import { AlertCircle, Clock, ExternalLink, Send } from "lucide-react"
+import { AlertCircle, Clock, ExternalLink } from "lucide-react"
 import Link from "next/link"
 import { AppCard } from "@/components/app-card"
 import { PageContainer } from "@/components/page-container"
 import { SectionHeader } from "@/components/section-header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import type { DailyAlertDTO } from "@/services/dto"
+import type { MyAlertItemDTO } from "@/services/dto"
 import { getSeverityFromRiskScore } from "@/lib/domain/severity"
 import { getSeverityLabel, getSeverityBadgeVariant } from "@/lib/domain/severity"
 import { formatEventDateTime } from "@/lib/ui/datetime"
 
 interface AlertsContentProps {
-  /** Alertas diarias pendientes de envío (backend real). */
-  pendingAlerts: DailyAlertDTO[]
+  pendingAlerts: MyAlertItemDTO[]
   loading: boolean
   error: string | null
   onRefresh?: () => void
@@ -34,8 +33,8 @@ export function AlertsContent({
         title="Centro de alertas"
         description={
           count > 0
-            ? `${count} alerta${count !== 1 ? "s" : ""} pendiente${count !== 1 ? "s" : ""} de envío`
-            : "Todas las alertas del día han sido enviadas o no hay alertas generadas."
+            ? `${count} alerta${count !== 1 ? "s" : ""} pendiente${count !== 1 ? "s" : ""}`
+            : "No hay alertas pendientes para tu usuario."
         }
       />
 
@@ -68,20 +67,14 @@ export function AlertsContent({
             <div className="flex flex-col gap-3">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm font-medium text-muted-foreground">
-                  Pendientes de envío
+                  Pendientes
                 </span>
                 <Badge variant="destructive">{count}</Badge>
               </div>
               {pendingAlerts.map((alert) => (
-                <DailyAlertCard key={alert.plate} alert={alert} />
+                <MyAlertCard key={alert.alertId} alert={alert} />
               ))}
               <div className="mt-4 flex flex-wrap gap-2">
-                <Link href="/pendientes">
-                  <Button>
-                    <Send className="mr-2 h-4 w-4" />
-                    Gestionar pendientes
-                  </Button>
-                </Link>
                 <Link href="/dashboard">
                   <Button variant="outline">
                     <ExternalLink className="mr-2 h-4 w-4" />
@@ -94,22 +87,7 @@ export function AlertsContent({
             <AppCard>
               <div className="flex flex-col items-center gap-2 py-8 text-center text-muted-foreground">
                 <AlertCircle className="h-12 w-12 text-green-500" />
-                <p className="font-medium">Sin alertas pendientes de envío</p>
-                <p className="text-sm">
-                  Las alertas diarias están al día o no hay eventos que generen alertas.
-                </p>
-                <div className="mt-2 flex gap-2">
-                  <Link href="/pendientes">
-                    <Button variant="outline" size="sm">
-                      Ver pendientes
-                    </Button>
-                  </Link>
-                  <Link href="/dashboard">
-                    <Button variant="outline" size="sm">
-                      Dashboard
-                    </Button>
-                  </Link>
-                </div>
+                <p className="font-medium">Sin alertas pendientes</p>
               </div>
             </AppCard>
           )}
@@ -119,7 +97,7 @@ export function AlertsContent({
   )
 }
 
-function DailyAlertCard({ alert }: { alert: DailyAlertDTO }) {
+function MyAlertCard({ alert }: { alert: MyAlertItemDTO }) {
   const severity = getSeverityFromRiskScore(alert.riskScore ?? 0)
   const label = getSeverityLabel(severity)
   const badgeVariant = getSeverityBadgeVariant(severity)
@@ -136,20 +114,11 @@ function DailyAlertCard({ alert }: { alert: DailyAlertDTO }) {
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-mono text-base font-bold">{alert.plate}</span>
             <Badge variant={badgeVariant}>{label}</Badge>
-            {alert.riskScore != null && (
-              <span className="text-sm text-muted-foreground">
-                Score: {alert.riskScore}
-              </span>
-            )}
+            <span className="text-sm text-muted-foreground">Score: {alert.riskScore}</span>
           </div>
           <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
-            <span>
-              Eventos: {alert.summary.totalEvents}
-              {alert.summary.criticalEvents > 0 && (
-                <> · Críticos: {alert.summary.criticalEvents}</>
-              )}
-            </span>
-            {alert.lastEventAt != null && alert.lastEventAt !== "" && (
+            <span>Fecha: {alert.dateKey}</span>
+            {alert.lastEventAt && (
               <span className="flex items-center gap-1">
                 <Clock className="h-3 w-3" />
                 {formatEventDateTime(alert.lastEventAt)}
@@ -160,7 +129,7 @@ function DailyAlertCard({ alert }: { alert: DailyAlertDTO }) {
         <Link href={`/vehiculos/${encodeURIComponent(alert.plate)}`}>
           <Button variant="outline" size="sm">
             <ExternalLink className="mr-2 h-4 w-4" />
-            Ver vehículo
+            Ver vehiculo
           </Button>
         </Link>
       </div>

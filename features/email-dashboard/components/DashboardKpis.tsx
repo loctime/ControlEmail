@@ -126,7 +126,7 @@ export function TopVehicles({ data, loading }: TopVehiclesProps) {
   }
 
   const topVehicles = [...data.vehicles]
-    .sort((a, b) => b.riskScore - a.riskScore)
+    .sort((a, b) => (b.riskScore ?? 0) - (a.riskScore ?? 0))
     .slice(0, 5)
 
   return (
@@ -160,3 +160,4 @@ export function TopVehicles({ data, loading }: TopVehiclesProps) {
     </Card>
   )
 }
+

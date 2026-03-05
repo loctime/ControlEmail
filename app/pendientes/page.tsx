@@ -7,10 +7,10 @@ import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Mail, CheckCircle, Clock, AlertTriangle, Send } from "lucide-react"
 import { emailModuleService } from "@/services/emailModule"
-import type { DailyAlertVehicle } from "@/services/emailModule"
+import type { DailyAlertDTO } from "@/services/dto"
 
 export default function PendientesPage() {
-  const [pendingAlerts, setPendingAlerts] = useState<DailyAlertVehicle[]>([])
+  const [pendingAlerts, setPendingAlerts] = useState<DailyAlertDTO[]>([])
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -143,7 +143,7 @@ export default function PendientesPage() {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <span className="font-bold">{vehicle.riskScore}</span>
-                        {vehicle.riskScore > 15 && (
+                        {(vehicle.riskScore ?? 0) > 15 && (
                           <AlertTriangle className="h-4 w-4 text-destructive" />
                         )}
                       </div>
@@ -174,3 +174,4 @@ export default function PendientesPage() {
     </div>
   )
 }
+

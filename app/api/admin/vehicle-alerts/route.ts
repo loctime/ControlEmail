@@ -27,20 +27,40 @@ export async function PATCH(request: Request) {
   if (!checkAdmin(request)) return unauthorizedResponse()
   try {
     const body = await request.json()
-    const rawPlate = typeof body?.plate === "string" ? body.plate : ""
-    // Normalizar la patente: eliminar caracteres especiales y convertir a uppercase
-    const plate = normalizePlate(rawPlate)
-    const rawResponsables = body?.responsables
-    const responsables = Array.isArray(rawResponsables)
-      ? (rawResponsables as unknown[]).map((v) => String(v).trim()).filter(Boolean)
-      : []
 
-    if (!plate) {
-      return NextResponse.json({ error: "plate_required" }, { status: 400 })
+    const toVehiclesPayload = (): Array<{ plate: string; responsables: string[] }> => {
+      if (Array.isArray(body?.vehicles)) {
+        return (body.vehicles as unknown[])
+          .map((row) => {
+            const plate = normalizePlate(String((row as { plate?: string })?.plate ?? ""))
+            const responsables = Array.isArray((row as { responsables?: unknown[] })?.responsables)
+              ? ((row as { responsables?: unknown[] }).responsables ?? [])
+                  .map((value) => String(value).trim())
+                  .filter(Boolean)
+              : []
+            return { plate, responsables }
+          })
+          .filter((row) => Boolean(row.plate))
+      }
+
+      const plate = normalizePlate(String(body?.plate ?? ""))
+      const responsables = Array.isArray(body?.responsables)
+        ? (body.responsables as unknown[]).map((value) => String(value).trim()).filter(Boolean)
+        : []
+
+      return plate ? [{ plate, responsables }] : []
     }
 
-    await updateVehicleAlerts(plate, { responsables })
-    return NextResponse.json({ ok: true })
+    const vehicles = toVehiclesPayload()
+    if (vehicles.length === 0) {
+      return NextResponse.json({ error: "vehicles_required" }, { status: 400 })
+    }
+
+    await Promise.all(
+      vehicles.map((vehicle) => updateVehicleAlerts(vehicle.plate, { responsables: vehicle.responsables })),
+    )
+
+    return NextResponse.json({ ok: true, vehiclesUpdated: vehicles.length })
   } catch (error) {
     console.error("[api/admin/vehicle-alerts] PATCH error:", error instanceof Error ? error.message : error)
     return NextResponse.json(

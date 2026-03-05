@@ -375,6 +375,36 @@ export async function allowedUserExistsByEmail(email: string): Promise<boolean> 
   return exists
 }
 
+export interface EmailAccessUser {
+  email: string
+  role: "admin" | "general" | "report" | "responsable"
+  enabled: boolean
+}
+
+export async function getEmailAccessUserByEmail(email: string): Promise<EmailAccessUser | null> {
+  const normalized = email.trim().toLowerCase()
+  if (!normalized) return null
+  const docPath = `apps/emails/users/${encodeURIComponent(normalized)}`
+  const path = `documents/${docPath}`
+  const res = await firestoreRequest(path, { method: "GET" }, { quiet404: true })
+  if (!res.ok) {
+    if (res.status === 404) return null
+    throw new Error(`Firestore get failed: ${res.status}`)
+  }
+  const json = await res.json()
+  const data = parseFields(json.fields ?? {})
+  const roleRaw = String(data.role ?? "responsable").toLowerCase()
+  const role = (["admin", "general", "report", "responsable"].includes(roleRaw)
+    ? roleRaw
+    : "responsable") as EmailAccessUser["role"]
+  const enabled = Boolean(data.enabled ?? data.active ?? true)
+  return {
+    email: normalized,
+    role,
+    enabled,
+  }
+}
+
 /**
  * Lista documentos de una colección (una página).
  * La REST API espera path con segmentos reales: documents/apps/emails/vehicleEvents
@@ -1206,3 +1236,4 @@ export async function getDailyAlertForVehicle(
 
   return { alert, meta }
 }
+

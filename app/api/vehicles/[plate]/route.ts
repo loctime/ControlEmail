@@ -76,7 +76,7 @@ export async function GET(
       return eventDate >= previousPeriodStart && eventDate < previousPeriodEnd && event.plate === plateUpper
     })
 
-    const riskScore = dailyAlert.alert ? dailyAlert.alert.riskScore : undefined
+    const riskScore = dailyAlert.alert && dailyAlert.alert.riskScore != null ? dailyAlert.alert.riskScore : undefined
     const aggregatedSeverity: Severity | undefined =
       typeof riskScore === "number" ? getSeverityFromRiskScore(riskScore) : undefined
 
@@ -103,3 +103,4 @@ export async function GET(
     )
   }
 }
+

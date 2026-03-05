@@ -155,3 +155,76 @@ export interface MarkAlertSentResultDTO {
   updated: string[]
   failed: Array<{ plate: string; error: string }>
 }
+
+// ==== DTOs del contrato frontend recomendado (my-*) ====
+
+export interface MeDTO {
+  ok: boolean
+  email: string
+  role: "admin" | "general" | "report" | "responsable"
+}
+
+export interface MyVehiclesItemDTO {
+  id: string
+  plate: string
+  brand: string
+  model: string
+  responsables: string[]
+  responsablesNormalized: string[]
+  operationName: string | null
+}
+
+export interface MyVehiclesDTO {
+  ok: boolean
+  vehicles: MyVehiclesItemDTO[]
+}
+
+export interface MyAlertItemDTO {
+  alertId: string
+  plate: string
+  dateKey: string
+  riskScore: number
+  alertSent: boolean
+  lastEventAt: string | null
+}
+
+export interface MyAlertsDTO {
+  ok: boolean
+  alerts: MyAlertItemDTO[]
+  startAfter: string | null
+}
+
+export interface MyAlertsVehiclesItemDTO {
+  plate: string
+  operationName: string | null
+  lastEvent: string
+  riskScore: number
+}
+
+export interface MyAlertsVehiclesDTO {
+  ok: boolean
+  vehicles: MyAlertsVehiclesItemDTO[]
+}
+
+export interface MyStatsDTO {
+  ok: boolean
+  stats: {
+    totalAlerts: number
+    alertsToday: number
+    alertsPending: number
+    alertsSent: number
+    maxRisk: number
+    avgRisk: number
+  }
+}
+
+export interface MyRiskItemDTO {
+  plate: string
+  alerts: number
+  maxRisk: number
+}
+
+export interface MyRiskDTO {
+  ok: boolean
+  vehicles: MyRiskItemDTO[]
+}

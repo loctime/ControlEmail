@@ -11,10 +11,9 @@ import { VehiclesContent } from "@/components/vehicles-content"
 import { AlertsContent } from "@/components/alerts-content"
 import { SettingsContent } from "@/components/settings-content"
 import { AppButton } from "@/components/app-button"
-import { emailModuleService } from "@/services/emailModule"
-import type { DailyAlertDTO } from "@/services/dto"
+import { emailFrontendApi } from "@/services/emailFrontendApi"
+import type { MyAlertItemDTO } from "@/services/dto"
 import { type VehicleEvent, type Vehicle } from "@/lib/data"
-import { getYesterdayKey } from "@/lib/domain/date"
 
 export default function Page() {
   const [activeSection, setActiveSection] = useState("dashboard")
@@ -24,7 +23,7 @@ export default function Page() {
   const [events, setEvents] = useState<VehicleEvent[]>([])
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
   const [excesosFromDailyAlerts, setExcesosFromDailyAlerts] = useState<number | null>(null)
-  const [pendingAlerts, setPendingAlerts] = useState<DailyAlertDTO[]>([])
+  const [pendingAlerts, setPendingAlerts] = useState<MyAlertItemDTO[]>([])
   const [loadingAlerts, setLoadingAlerts] = useState(true)
   const [errorAlerts, setErrorAlerts] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -34,14 +33,13 @@ export default function Page() {
     setLoading(true)
     setError(null)
     try {
-      const yesterday = getYesterdayKey()
-      const [eventsRes, vehiclesRes, metricsRes] = await Promise.all([
+      const [eventsRes, vehiclesRes, riskData] = await Promise.all([
         fetch("/api/vehicle-events", { credentials: "include" }),
         fetch("/api/vehicles", { credentials: "include" }),
-        fetch(`/api/email/daily-metrics?date=${yesterday}`, { credentials: "include" }),
+        emailFrontendApi.myRisk(),
       ])
       if (!eventsRes.ok) throw new Error("Error al cargar eventos")
-      if (!vehiclesRes.ok) throw new Error("Error al cargar vehículos")
+      if (!vehiclesRes.ok) throw new Error("Error al cargar vehiculos")
       const [eventsData, vehiclesData] = await Promise.all([
         eventsRes.json(),
         vehiclesRes.json(),
@@ -49,17 +47,11 @@ export default function Page() {
       setEvents(Array.isArray(eventsData) ? eventsData : [])
       setVehicles(Array.isArray(vehiclesData) ? vehiclesData : [])
 
-      if (metricsRes.ok) {
-        const metrics = await metricsRes.json()
-        const vehiclesList = metrics?.vehicles ?? []
-        const total = vehiclesList.reduce(
-          (sum: number, v: { summary?: { excesos?: number } }) => sum + (v.summary?.excesos ?? 0),
-          0
-        )
-        setExcesosFromDailyAlerts(total)
-      } else {
-        setExcesosFromDailyAlerts(null)
-      }
+      const totalExcesos = (riskData.vehicles ?? []).reduce(
+        (sum, vehicle) => sum + Number(vehicle.alerts ?? 0),
+        0,
+      )
+      setExcesosFromDailyAlerts(totalExcesos)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error desconocido")
       setEvents([])
@@ -74,8 +66,9 @@ export default function Page() {
     setLoadingAlerts(true)
     setErrorAlerts(null)
     try {
-      const list = await emailModuleService.getPendingAlerts()
-      setPendingAlerts(Array.isArray(list) ? list : [])
+      const data = await emailFrontendApi.myAlerts({ limit: 200 })
+      const alerts = Array.isArray(data.alerts) ? data.alerts : []
+      setPendingAlerts(alerts.filter((alert) => !alert.alertSent))
     } catch (e) {
       setErrorAlerts(e instanceof Error ? e.message : "Error al cargar alertas")
       setPendingAlerts([])
@@ -113,10 +106,10 @@ export default function Page() {
     return (
       <SidebarProvider>
         <AppSidebar
-        activeSection={activeSection}
-        onNavigate={handleNavigate}
-        pendingAlertsCount={pendingAlertsCount}
-      />
+          activeSection={activeSection}
+          onNavigate={handleNavigate}
+          pendingAlertsCount={pendingAlertsCount}
+        />
         <SidebarInset>
           <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8">
             <p className="text-destructive">{error}</p>

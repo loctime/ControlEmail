@@ -8,14 +8,12 @@ import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Search, Eye, AlertTriangle } from "lucide-react"
 import Link from "next/link"
-import { emailModuleService } from "@/services/emailModule"
-import type { DailyMetricsDTO } from "@/services/dto"
-import { normalizeBusinessDate } from "@/lib/domain/date"
-import { formatEventDateTime, formatEventTime } from "@/lib/ui/datetime"
+import { emailFrontendApi } from "@/services/emailFrontendApi"
+import type { MyAlertsVehiclesItemDTO } from "@/services/dto"
 
 export default function VehiclesPage() {
   const [searchTerm, setSearchTerm] = useState("")
-  const [data, setData] = useState<DailyMetricsDTO | null>(null)
+  const [vehicles, setVehicles] = useState<MyAlertsVehiclesItemDTO[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -23,11 +21,11 @@ export default function VehiclesPage() {
     setLoading(true)
     setError(null)
     try {
-      const today = normalizeBusinessDate(new Date())
-      const metrics = await emailModuleService.getDailyMetrics(today)
-      setData(metrics)
+      const response = await emailFrontendApi.myAlertsVehicles()
+      setVehicles(response.vehicles ?? [])
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error desconocido")
+      setVehicles([])
     } finally {
       setLoading(false)
     }
@@ -37,16 +35,15 @@ export default function VehiclesPage() {
     void loadData()
   }, [])
 
-  const filteredVehicles = data?.vehicles.filter(vehicle =>
-    vehicle.plate.toLowerCase().includes(searchTerm.toLowerCase())
-  ) ?? []
+  const filteredVehicles = vehicles.filter((vehicle) =>
+    vehicle.plate.toLowerCase().includes(searchTerm.toLowerCase()),
+  )
 
   if (loading) {
     return (
       <div className="container mx-auto py-8">
         <div className="animate-pulse space-y-4">
           <div className="h-8 w-64 bg-muted rounded"></div>
-          <div className="h-4 w-96 bg-muted rounded"></div>
           <Card>
             <CardContent className="pt-6">
               <div className="space-y-2">
@@ -64,10 +61,8 @@ export default function VehiclesPage() {
   return (
     <div className="container mx-auto space-y-6 py-8">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Vehículos</h1>
-        <p className="text-muted-foreground">
-          Vista general de todos los vehículos y su estado actual
-        </p>
+        <h1 className="text-3xl font-bold tracking-tight">Vehiculos</h1>
+        <p className="text-muted-foreground">Listado de vehiculos con riesgo agregado</p>
       </div>
 
       <div className="flex items-center gap-4">
@@ -80,9 +75,7 @@ export default function VehiclesPage() {
             className="pl-10"
           />
         </div>
-        <Button onClick={loadData} variant="outline">
-          Actualizar
-        </Button>
+        <Button onClick={loadData} variant="outline">Actualizar</Button>
       </div>
 
       {error && (
@@ -96,27 +89,23 @@ export default function VehiclesPage() {
       <Card>
         <CardHeader>
           <CardTitle>
-            Vehículos con Eventos Hoy
-            <Badge variant="secondary" className="ml-2">
-              {filteredVehicles.length}
-            </Badge>
+            Vehiculos
+            <Badge variant="secondary" className="ml-2">{filteredVehicles.length}</Badge>
           </CardTitle>
         </CardHeader>
         <CardContent>
           {filteredVehicles.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              <p>No hay vehículos que coincidan con la búsqueda</p>
+              <p>No hay vehiculos que coincidan con la busqueda</p>
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Patente</TableHead>
-                  <TableHead>Total Eventos</TableHead>
-                  <TableHead>Críticos</TableHead>
+                  <TableHead>Operacion</TableHead>
+                  <TableHead>Ultimo evento</TableHead>
                   <TableHead>Risk Score</TableHead>
-                  <TableHead>Último Evento</TableHead>
-                  <TableHead>Estado Alerta</TableHead>
                   <TableHead>Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -124,12 +113,8 @@ export default function VehiclesPage() {
                 {filteredVehicles.map((vehicle) => (
                   <TableRow key={vehicle.plate}>
                     <TableCell className="font-mono font-bold">{vehicle.plate}</TableCell>
-                    <TableCell>{vehicle.summary.totalEvents}</TableCell>
-                    <TableCell>
-                      <Badge variant={vehicle.summary.criticalEvents > 0 ? "destructive" : "secondary"}>
-                        {vehicle.summary.criticalEvents}
-                      </Badge>
-                    </TableCell>
+                    <TableCell>{vehicle.operationName ?? "-"}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{vehicle.lastEvent}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <span className="font-bold">{vehicle.riskScore}</span>
@@ -137,18 +122,6 @@ export default function VehiclesPage() {
                           <AlertTriangle className="h-4 w-4 text-destructive" />
                         )}
                       </div>
-                    </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {formatEventDateTime(vehicle.lastEventAt)}
-                  </TableCell>
-                    <TableCell>
-                      {vehicle.alertSent ? (
-                        <Badge variant="default">
-                          Enviado {formatEventTime(vehicle.sentAt)}
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline">Pendiente</Badge>
-                      )}
                     </TableCell>
                     <TableCell>
                       <Link href={`/vehiculos/${vehicle.plate}`}>

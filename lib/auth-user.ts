@@ -12,9 +12,9 @@ export interface CheckUserResult {
 }
 
 /**
- * Comprueba si un email está autorizado (existe en apps/emails/users/{email})
+ * Comprueba si un email esta autorizado (existe en apps/emails/users/{email})
  * y si ya existe un usuario de Firebase Auth con ese email.
- * No crea usuario en Auth; la creación la hace el frontend con createUserWithEmailAndPassword.
+ * No crea usuario en Auth; la creacion la hace el frontend con createUserWithEmailAndPassword.
  */
 export async function checkUserByEmail(email: string): Promise<CheckUserResult> {
   const normalized = email.trim().toLowerCase()
@@ -43,16 +43,26 @@ export interface AuthUser {
   uid: string
 }
 
-/**
- * Lee el ID token desde la cookie auth_token y lo verifica.
- * Devuelve el usuario (email, uid) o null si no hay cookie o el token es inválido.
- */
-export async function getAuthUserFromRequest(request: Request): Promise<AuthUser | null> {
+function extractBearerToken(request: Request): string | null {
+  const authHeader = request.headers.get("authorization") ?? request.headers.get("Authorization")
+  if (!authHeader) return null
+  const match = authHeader.match(/^Bearer\s+(.+)$/i)
+  return match?.[1]?.trim() ?? null
+}
+
+function extractCookieToken(request: Request): string | null {
   const cookieHeader = request.headers.get("cookie")
   if (!cookieHeader) return null
-
   const match = cookieHeader.match(new RegExp(`${AUTH_COOKIE_NAME}=([^;]+)`))
-  const token = match?.[1]?.trim()
+  return match?.[1]?.trim() ?? null
+}
+
+/**
+ * Lee el ID token desde Authorization Bearer o cookie auth_token y lo verifica.
+ * Devuelve el usuario (email, uid) o null si falta token o es invalido.
+ */
+export async function getAuthUserFromRequest(request: Request): Promise<AuthUser | null> {
+  const token = extractBearerToken(request) ?? extractCookieToken(request)
   if (!token) return null
 
   try {
@@ -66,7 +76,7 @@ export async function getAuthUserFromRequest(request: Request): Promise<AuthUser
 }
 
 /**
- * Devuelve el conjunto de patentes (plates) para las que el email está en responsables.
+ * Devuelve el conjunto de patentes (plates) para las que el email esta en responsables.
  * Se usa para filtrar todos los datos de la app por usuario.
  */
 export async function getAllowedPlatesForEmail(email: string): Promise<Set<string>> {
@@ -86,7 +96,7 @@ export interface AuthUserWithPlates extends AuthUser {
 
 /**
  * Obtiene el usuario autenticado y el set de patentes permitidas.
- * Devuelve null si no hay usuario o si falla la verificación/consulta (el llamador debe responder 401).
+ * Devuelve null si no hay usuario o si falla la verificacion/consulta (el llamador debe responder 401).
  * No lanza: ante cualquier error devuelve null para evitar 500.
  */
 export async function getAuthUserWithPlates(request: Request): Promise<AuthUserWithPlates | null> {
@@ -101,7 +111,7 @@ export async function getAuthUserWithPlates(request: Request): Promise<AuthUserW
   }
 }
 
-/** Respuesta 401 estándar para APIs que requieren login. */
+/** Respuesta 401 estandar para APIs que requieren login. */
 export function authUnauthorizedResponse() {
   return new Response(JSON.stringify({ error: "unauthorized" }), {
     status: 401,
@@ -109,7 +119,7 @@ export function authUnauthorizedResponse() {
   })
 }
 
-/** Opciones para la cookie de sesión (1h, httpOnly, sameSite, secure en prod). */
+/** Opciones para la cookie de sesion (1h, httpOnly, sameSite, secure en prod). */
 export function buildAuthCookieOptions(token: string): {
   name: string
   value: string
