@@ -6,7 +6,9 @@ export interface DebugPendingAlertsService {
 
 class DebugPendingAlertsServiceImpl implements DebugPendingAlertsService {
   async listPending(): Promise<DebugPendingAlertDTO[]> {
-    const response = await fetch("/api/email/debug-pending-alerts")
+    const response = await fetch("/api/email/debug-pending-alerts", {
+      credentials: "include",
+    })
     if (!response.ok) {
       throw new Error(`Error ${response.status}: ${response.statusText}`)
     }

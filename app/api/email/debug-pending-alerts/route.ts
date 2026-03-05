@@ -2,9 +2,13 @@ import { NextResponse } from "next/server"
 import { getDailyMetrics } from "@/lib/firestore-read"
 import { getYesterdayKey } from "@/lib/domain/date"
 import { getSeverityFromRiskScore } from "@/lib/domain/severity"
+import { getAuthUserWithPlates, authUnauthorizedResponse } from "@/lib/auth-user"
 import type { DebugPendingAlertDTO } from "@/services/dto"
 
-export async function GET() {
+export async function GET(request: Request) {
+  const auth = await getAuthUserWithPlates(request)
+  if (!auth) return authUnauthorizedResponse()
+
   try {
     // Día de referencia: ayer (las alertas diarias son del día anterior).
     const businessDate = getYesterdayKey()
@@ -12,7 +16,9 @@ export async function GET() {
     // Datos reales desde Firestore: apps/emails/dailyAlerts/{date}/meta y /vehicles.
     const metrics = await getDailyMetrics(businessDate)
 
-    const pending = metrics.vehicles.filter((v) => !v.alertSent)
+    const pending = metrics.vehicles.filter(
+      (v) => !v.alertSent && auth.allowedPlates.has(v.plate)
+    )
 
     const result: DebugPendingAlertDTO[] = pending.map((v) => ({
       id: `${businessDate}:${v.plate}`,

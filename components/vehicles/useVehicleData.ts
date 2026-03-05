@@ -66,7 +66,10 @@ export function useVehicleData(plate: string, daysFilter: 7 | 30 | 90 = 30): Veh
       setError(null)
       try {
         const plateUpper = plate.toUpperCase()
-        const response = await fetch(`/api/vehicles/${encodeURIComponent(plateUpper)}?daysBack=${daysFilter}`)
+        const response = await fetch(
+          `/api/vehicles/${encodeURIComponent(plateUpper)}?daysBack=${daysFilter}`,
+          { credentials: "include" }
+        )
         
         if (!response.ok) {
           if (response.status === 404) {
