@@ -6,8 +6,8 @@
 import * as admin from "firebase-admin"
 
 function getFirebaseAdminApp(): admin.app.App {
-  if (admin.app.getApps().length > 0) {
-    return admin.app.getApp()
+  if (admin.apps?.length > 0) {
+    return admin.app()
   }
   const clientEmail =
     process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL ?? process.env.FIREBASE_ADMIN_CLIENT_EMAIL
