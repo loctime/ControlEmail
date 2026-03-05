@@ -82,12 +82,18 @@ function eventDocToVehicleEvent(doc: Awaited<ReturnType<typeof listVehicleEvents
   }
 }
 
-export async function GET() {
-  console.log("[api/vehicle-events] GET: leyendo eventos desde Firestore (apps/emails/vehicleEvents)")
+export async function GET(request: Request) {
+  const { getAuthUserWithPlates, authUnauthorizedResponse } = await import("@/lib/auth-user")
+  const auth = await getAuthUserWithPlates(request)
+  if (!auth) return authUnauthorizedResponse()
+
+  console.log("[api/vehicle-events] GET: leyendo eventos desde Firestore (filtro por responsable:", auth.email, ")")
   try {
     const docs = await listVehicleEvents()
-    console.log("[api/vehicle-events] GET: recibidos", docs.length, "documentos de Firestore")
-    const events: VehicleEventLegacyDTO[] = docs.map(eventDocToVehicleEvent)
+    const allowedPlates = auth.allowedPlates
+    const filteredDocs = docs.filter((d) => allowedPlates.has(d.plate))
+    console.log("[api/vehicle-events] GET: recibidos", filteredDocs.length, "eventos (filtrados)")
+    const events: VehicleEventLegacyDTO[] = filteredDocs.map(eventDocToVehicleEvent)
     console.log("[api/vehicle-events] sample event (fecha, hora, patente):", events[0] ? {
       fecha: events[0].fecha,
       hora: events[0].hora,

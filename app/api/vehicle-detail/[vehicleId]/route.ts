@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { getVehicleByPlate, getVehicleEventsByPlate, getDailyAlertForVehicle } from "@/lib/firestore-read"
 import { getYesterdayKey } from "@/lib/domain/date"
 import { getSeverityFromRiskScore } from "@/lib/domain/severity"
+import { getAuthUserWithPlates, authUnauthorizedResponse } from "@/lib/auth-user"
+import { normalizePlate } from "@/lib/utils"
 import type { VehicleDetailDTO, VehicleEventSummaryDTO, Severity } from "@/services/dto"
 
 function mapEventSeverityToDomain(severity: "critico" | "advertencia"): Severity {
@@ -9,12 +11,21 @@ function mapEventSeverityToDomain(severity: "critico" | "advertencia"): Severity
 }
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ vehicleId: string }> },
 ) {
+  const auth = await getAuthUserWithPlates(request)
+  if (!auth) return authUnauthorizedResponse()
+
   try {
     const { vehicleId } = await params
-    const plateUpper = vehicleId.toUpperCase()
+    const plateUpper = normalizePlate(vehicleId) || vehicleId.toUpperCase()
+    if (!auth.allowedPlates.has(plateUpper)) {
+      return NextResponse.json(
+        { error: "No tienes acceso a este vehículo" },
+        { status: 403 },
+      )
+    }
 
     const vehicle = await getVehicleByPlate(plateUpper)
     if (!vehicle) {

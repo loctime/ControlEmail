@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server"
 import { getDailyMetrics } from "@/lib/firestore-read"
+import { getAuthUserWithPlates, authUnauthorizedResponse } from "@/lib/auth-user"
 import type { DailyMetricsDTO } from "@/services/dto"
 
 export async function GET(request: Request) {
+  const auth = await getAuthUserWithPlates(request)
+  if (!auth) return authUnauthorizedResponse()
+
   try {
     const { searchParams } = new URL(request.url)
     const date = searchParams.get("date")
@@ -12,7 +16,8 @@ export async function GET(request: Request) {
     }
     
     const metrics: DailyMetricsDTO = await getDailyMetrics(date)
-    return NextResponse.json(metrics)
+    const filteredVehicles = metrics.vehicles.filter((v) => auth.allowedPlates.has(v.plate))
+    return NextResponse.json({ ...metrics, vehicles: filteredVehicles })
   } catch (error) {
     console.error("[api/email/daily-metrics] Error:", error)
     return NextResponse.json(

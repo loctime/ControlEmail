@@ -15,7 +15,7 @@ export interface EmailModuleService {
 
 class EmailModuleServiceImpl implements EmailModuleService {
   async getDailyMetrics(date: string): Promise<DailyMetricsDTO> {
-    const response = await fetch(`/api/email/daily-metrics?date=${date}`)
+    const response = await fetch(`/api/email/daily-metrics?date=${date}`, { credentials: "include" })
     if (!response.ok) {
       throw new Error(`Error ${response.status}: ${response.statusText}`)
     }
@@ -23,7 +23,7 @@ class EmailModuleServiceImpl implements EmailModuleService {
   }
 
   async getPendingAlerts(): Promise<DailyAlertDTO[]> {
-    const response = await fetch("/api/email/get-pending-daily-alerts")
+    const response = await fetch("/api/email/get-pending-daily-alerts", { credentials: "include" })
     if (!response.ok) {
       throw new Error(`Error ${response.status}: ${response.statusText}`)
     }
@@ -34,6 +34,7 @@ class EmailModuleServiceImpl implements EmailModuleService {
     const response = await fetch("/api/email/mark-alert-sent", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify({ alertIds }),
     })
     if (!response.ok && response.status !== 207) {
@@ -43,7 +44,7 @@ class EmailModuleServiceImpl implements EmailModuleService {
   }
 
   async getDailyConsistency(date: string): Promise<DailyConsistencyDTO> {
-    const response = await fetch(`/api/email/daily-consistency?date=${date}`)
+    const response = await fetch(`/api/email/daily-consistency?date=${date}`, { credentials: "include" })
     if (!response.ok) {
       throw new Error(`Error ${response.status}: ${response.statusText}`)
     }

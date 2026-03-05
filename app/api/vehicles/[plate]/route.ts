@@ -2,15 +2,26 @@ import { NextRequest, NextResponse } from "next/server"
 import { getVehicleByPlate, getAllEventsByPeriod, getDailyAlertForVehicle } from "@/lib/firestore-read"
 import { getYesterdayKey } from "@/lib/domain/date"
 import { getSeverityFromRiskScore } from "@/lib/domain/severity"
+import { getAuthUserWithPlates, authUnauthorizedResponse } from "@/lib/auth-user"
+import { normalizePlate } from "@/lib/utils"
 import type { VehiclePlateDetailDTO, Severity } from "@/services/dto"
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ plate: string }> },
 ) {
+  const auth = await getAuthUserWithPlates(request)
+  if (!auth) return authUnauthorizedResponse()
+
   try {
     const { plate } = await params
-    const plateUpper = plate.toUpperCase()
+    const plateUpper = normalizePlate(plate) || plate.toUpperCase()
+    if (!auth.allowedPlates.has(plateUpper)) {
+      return NextResponse.json(
+        { error: "No tienes acceso a esta patente" },
+        { status: 403 },
+      )
+    }
 
     const searchParams = request.nextUrl.searchParams
     const daysBack = searchParams.get("daysBack")

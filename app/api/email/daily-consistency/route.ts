@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server"
 import { getDailyConsistency } from "@/lib/firestore-read"
+import { getAuthUserFromRequest, authUnauthorizedResponse } from "@/lib/auth-user"
 import type { DailyConsistencyDTO } from "@/services/dto"
 
 export async function GET(request: Request) {
+  const user = await getAuthUserFromRequest(request)
+  if (!user) return authUnauthorizedResponse()
+
   try {
     const { searchParams } = new URL(request.url)
     const date = searchParams.get("date")

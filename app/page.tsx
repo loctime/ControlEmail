@@ -36,9 +36,9 @@ export default function Page() {
     try {
       const yesterday = getYesterdayKey()
       const [eventsRes, vehiclesRes, metricsRes] = await Promise.all([
-        fetch("/api/vehicle-events"),
-        fetch("/api/vehicles"),
-        fetch(`/api/email/daily-metrics?date=${yesterday}`),
+        fetch("/api/vehicle-events", { credentials: "include" }),
+        fetch("/api/vehicles", { credentials: "include" }),
+        fetch(`/api/email/daily-metrics?date=${yesterday}`, { credentials: "include" }),
       ])
       if (!eventsRes.ok) throw new Error("Error al cargar eventos")
       if (!vehiclesRes.ok) throw new Error("Error al cargar vehículos")
