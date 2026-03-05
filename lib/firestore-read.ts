@@ -355,6 +355,19 @@ export interface VehicleDoc {
 }
 
 /**
+ * Comprueba si existe el documento apps/emails/users/{email}.
+ * El email se normaliza (trim + lowercase). Usado para autorización de acceso.
+ */
+export async function allowedUserExistsByEmail(email: string): Promise<boolean> {
+  const normalized = email.trim().toLowerCase()
+  if (!normalized) return false
+  const docPath = `apps/emails/users/${encodeURIComponent(normalized)}`
+  const path = `documents/${docPath}`
+  const res = await firestoreRequest(path, { method: "GET" }, { quiet404: true })
+  return res.ok
+}
+
+/**
  * Lista documentos de una colección (una página).
  * La REST API espera path con segmentos reales: documents/apps/emails/vehicleEvents
  * (NO codificar barras como %2F, sino la API interpreta una sola colección raíz y devuelve 0).

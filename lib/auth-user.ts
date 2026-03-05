@@ -3,8 +3,38 @@
  * y las patentes permitidas para ese usuario (responsables).
  */
 
-import { verifyIdToken } from "@/lib/firebase-admin"
-import { listVehicles } from "@/lib/firestore-read"
+import { verifyIdToken, getFirebaseAuth } from "@/lib/firebase-admin"
+import { listVehicles, allowedUserExistsByEmail } from "@/lib/firestore-read"
+
+export interface CheckUserResult {
+  allowed: boolean
+  authExists: boolean
+}
+
+/**
+ * Comprueba si un email está autorizado (existe en apps/emails/users/{email})
+ * y si ya existe un usuario de Firebase Auth con ese email.
+ * No crea usuario en Auth; la creación la hace el frontend con createUserWithEmailAndPassword.
+ */
+export async function checkUserByEmail(email: string): Promise<CheckUserResult> {
+  const normalized = email.trim().toLowerCase()
+  if (!normalized) return { allowed: false, authExists: false }
+
+  const allowed = await allowedUserExistsByEmail(normalized)
+  if (!allowed) return { allowed: false, authExists: false }
+
+  let authExists = false
+  try {
+    await getFirebaseAuth().getUserByEmail(normalized)
+    authExists = true
+  } catch (err: unknown) {
+    const code = (err as { code?: string })?.code
+    if (code === "auth/user-not-found") authExists = false
+    else throw err
+  }
+
+  return { allowed: true, authExists }
+}
 
 const AUTH_COOKIE_NAME = "auth_token"
 
