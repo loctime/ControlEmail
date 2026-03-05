@@ -450,12 +450,26 @@ export async function listVehicleEvents(): Promise<VehicleEventDoc[]> {
   })
 }
 
+/**
+ * Obtiene patentes distintas de eventos recientes (últimos 90 días).
+ * Sirve para mostrar en alertas vehículos que tienen eventos aunque no tengan doc en apps/emails/vehicles.
+ */
+export async function getDistinctPlatesFromRecentEvents(
+  daysBack = 90,
+  limit = 500,
+): Promise<string[]> {
+  const events = await getAllEventsByPeriod(daysBack, undefined, limit)
+  const plates = [...new Set(events.map((e) => e.plate.toUpperCase()).filter(Boolean))]
+  console.log("[firestore-read] getDistinctPlatesFromRecentEvents:", { daysBack, eventsCount: events.length, distinctPlates: plates.length })
+  return plates
+}
+
 export async function listVehicles(): Promise<VehicleDoc[]> {
   const path = "apps/emails/vehicles"
   console.log("[firestore-read] listVehicles: leyendo desde", path)
   const items = await listCollection(path)
   console.log("[firestore-read] listVehicles: leídos", items.length, "vehículos")
-  return items.map(({ id, data }) => {
+  const fromCollection = items.map(({ id, data }) => {
     const rawResponsables = data.responsables
     const responsables = Array.isArray(rawResponsables)
       ? (rawResponsables as unknown[]).map((v) => String(v))
@@ -473,6 +487,32 @@ export async function listVehicles(): Promise<VehicleDoc[]> {
       responsables,
     }
   })
+
+  const byPlate = new Map<string, VehicleDoc>()
+  for (const v of fromCollection) {
+    const key = (v.plate || v.id).toUpperCase().trim()
+    if (key) byPlate.set(key, v)
+  }
+
+  // Completar con patentes que aparecen en eventos recientes y no tienen doc en vehicles
+  try {
+    const platesFromEvents = await getDistinctPlatesFromRecentEvents(90, 500)
+    for (const plate of platesFromEvents) {
+      if (!byPlate.has(plate)) {
+        byPlate.set(plate, {
+          id: plate,
+          plate,
+          brand: "",
+          model: "",
+          responsables: [],
+        })
+      }
+    }
+  } catch (err) {
+    console.error("[firestore-read] listVehicles: error al obtener patentes de eventos:", err instanceof Error ? err.message : err)
+  }
+
+  return Array.from(byPlate.values())
 }
 
 /**
@@ -743,6 +783,94 @@ function toFirestoreFields(fields: Record<string, unknown>): Record<string, Reco
 
 export interface VehicleAlertsUpdate {
   responsables: string[]
+}
+
+/** Configuración de destinatarios globales de alertas por email (documento apps/emails/config/config). */
+export interface EmailConfigDoc {
+  generalRecipients: string[]
+  ccRecipients: string[]
+  reportRecipients: string[]
+}
+
+const EMAIL_CONFIG_DOC_PATH = "apps/emails/config/config"
+
+/**
+ * Obtiene la configuración de destinatarios de email desde apps/emails/config/config.
+ * Si el documento no existe, devuelve listas vacías.
+ */
+export async function getEmailConfig(): Promise<EmailConfigDoc> {
+  const path = `documents/${EMAIL_CONFIG_DOC_PATH}`
+  const res = await firestoreRequest(path, { method: "GET" }, { quiet404: true })
+  if (!res.ok) {
+    if (res.status === 404) {
+      return {
+        generalRecipients: [],
+        ccRecipients: [],
+        reportRecipients: [],
+      }
+    }
+    throw new Error(`Firestore get failed: ${res.status}`)
+  }
+  const json = (await res.json()) as { fields?: Record<string, Record<string, unknown>> }
+  if (!json.fields) {
+    return { generalRecipients: [], ccRecipients: [], reportRecipients: [] }
+  }
+  const data = parseFields(json.fields) as Record<string, unknown>
+  const toStrArr = (v: unknown): string[] =>
+    Array.isArray(v) ? (v as unknown[]).map((x) => String(x).trim().toLowerCase()).filter(Boolean) : []
+  return {
+    generalRecipients: toStrArr(data.generalRecipients),
+    ccRecipients: toStrArr(data.ccRecipients),
+    reportRecipients: toStrArr(data.reportRecipients),
+  }
+}
+
+/**
+ * Guarda la configuración de destinatarios en apps/emails/config/config.
+ * Crea el documento si no existe.
+ */
+export async function updateEmailConfig(payload: EmailConfigDoc): Promise<void> {
+  const path = `documents/${EMAIL_CONFIG_DOC_PATH}`
+  const projectId = getEnvOrThrow(
+    "FIREBASE_PROJECT_ID",
+    "NEXT_PUBLIC_FIREBASE_PROJECT_ID",
+  )
+  const documentName = `projects/${projectId}/databases/(default)/documents/${EMAIL_CONFIG_DOC_PATH}`
+  const fields = toFirestoreFields({
+    generalRecipients: payload.generalRecipients,
+    ccRecipients: payload.ccRecipients,
+    reportRecipients: payload.reportRecipients,
+  })
+  const body = { name: documentName, fields }
+  const updateMask = "updateMask.fieldPaths=generalRecipients&updateMask.fieldPaths=ccRecipients&updateMask.fieldPaths=reportRecipients"
+  const res = await firestoreRequest(`${path}?${updateMask}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  })
+  if (res.status === 404) {
+    // Crear documento: POST a la colección padre con documentId (body = Document)
+    const parentPath = "documents/apps/emails/config"
+    const createRes = await firestoreRequest(
+      `${parentPath}?documentId=config`,
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      },
+    )
+    if (!createRes.ok) {
+      const text = await createRes.text()
+      console.error("[firestore-read] updateEmailConfig create failed:", createRes.status, text)
+      throw new Error(`Firestore create config failed: ${createRes.status}`)
+    }
+    console.log("[firestore-read] updateEmailConfig: document created")
+    return
+  }
+  if (!res.ok) {
+    const text = await res.text()
+    console.error("[firestore-read] updateEmailConfig failed:", res.status, text)
+    throw new Error(`Firestore update failed: ${res.status}`)
+  }
+  console.log("[firestore-read] updateEmailConfig OK")
 }
 
 /**
