@@ -2,9 +2,9 @@
 
 import { usePathname } from "next/navigation"
 import { RequireAuth } from "./auth/RequireAuth"
-import LoginPage from "./pages/LoginPage"
-import RegisterPage from "./pages/RegisterPage"
-import Dashboard from "./pages/Dashboard"
+import LoginPage from "./views/LoginPage"
+import RegisterPage from "./views/RegisterPage"
+import Dashboard from "./views/Dashboard"
 
 /**
  * Router: /panel/login, /panel/register, /panel/dashboard
