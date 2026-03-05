@@ -357,6 +357,7 @@ export interface VehicleDoc {
 /**
  * Comprueba si existe el documento apps/emails/users/{email}.
  * El email se normaliza (trim + lowercase). Usado para autorización de acceso.
+ * El ID del documento en Firestore debe ser exactamente el email normalizado (ej: user@domain.com).
  */
 export async function allowedUserExistsByEmail(email: string): Promise<boolean> {
   const normalized = email.trim().toLowerCase()
@@ -364,7 +365,14 @@ export async function allowedUserExistsByEmail(email: string): Promise<boolean> 
   const docPath = `apps/emails/users/${encodeURIComponent(normalized)}`
   const path = `documents/${docPath}`
   const res = await firestoreRequest(path, { method: "GET" }, { quiet404: true })
-  return res.ok
+  const exists = res.ok
+  console.log("[auth] allowedUserExistsByEmail:", {
+    email: normalized,
+    path: docPath,
+    exists,
+    status: res.status,
+  })
+  return exists
 }
 
 /**

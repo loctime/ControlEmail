@@ -11,6 +11,7 @@ export async function GET(request: Request) {
 
   try {
     const result = await checkUserByEmail(email)
+    console.log("[api/auth/check-user] email=%s result=%o", email, result)
     return NextResponse.json(result)
   } catch (error) {
     console.error("[api/auth/check-user] Error:", error)

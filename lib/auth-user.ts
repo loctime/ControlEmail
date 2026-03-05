@@ -86,13 +86,19 @@ export interface AuthUserWithPlates extends AuthUser {
 
 /**
  * Obtiene el usuario autenticado y el set de patentes permitidas.
- * Devuelve null si no hay usuario (el llamador debe responder 401).
+ * Devuelve null si no hay usuario o si falla la verificación/consulta (el llamador debe responder 401).
+ * No lanza: ante cualquier error devuelve null para evitar 500.
  */
 export async function getAuthUserWithPlates(request: Request): Promise<AuthUserWithPlates | null> {
-  const user = await getAuthUserFromRequest(request)
-  if (!user) return null
-  const allowedPlates = await getAllowedPlatesForEmail(user.email)
-  return { ...user, allowedPlates }
+  try {
+    const user = await getAuthUserFromRequest(request)
+    if (!user) return null
+    const allowedPlates = await getAllowedPlatesForEmail(user.email)
+    return { ...user, allowedPlates }
+  } catch (err) {
+    console.error("[auth-user] getAuthUserWithPlates error:", err)
+    return null
+  }
 }
 
 /** Respuesta 401 estándar para APIs que requieren login. */
