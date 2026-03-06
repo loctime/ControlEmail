@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { usePathname, useRouter } from "next/navigation"
+import { authApi } from "@/services/api"
 
 const PUBLIC_PATHS = ["/login", "/register", "/panel"]
 const ADMIN_PATH_PREFIX = "/admin"
@@ -30,18 +31,20 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     }
 
     let cancelled = false
-    fetch("/api/auth/me", { credentials: "include" })
-      .then((res) => {
+    authApi
+      .me()
+      .then(() => {
+        if (!cancelled) setChecked(true)
+      })
+      .catch((err) => {
         if (cancelled) return
-        if (res.status === 401) {
+        const status = (err as { status?: number })?.status
+        if (status === 401) {
           const toLogin = `/login?next=${encodeURIComponent(pathname)}`
           router.replace(toLogin)
           return
         }
-        setChecked(true)
-      })
-      .catch(() => {
-        if (!cancelled) router.replace("/login")
+        router.replace("/login")
       })
 
     return () => {
@@ -56,11 +59,10 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   if (!checked) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <p className="text-muted-foreground">Verificando sesión…</p>
+        <p className="text-muted-foreground">Verificando sesion...</p>
       </div>
     )
   }
 
   return <>{children}</>
 }
-

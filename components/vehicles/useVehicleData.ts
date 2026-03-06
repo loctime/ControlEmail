@@ -3,7 +3,8 @@
 import { useEffect, useState, useMemo } from "react"
 import type { VehicleDoc, VehicleEventDashboard } from "@/lib/firestore-read"
 import { getLastClosedDate } from "@/lib/domain/closed-date"
-import type { VehiclePlateDetailDTO } from "@/services/dto"
+import { vehiclesApi } from "@/services/api"
+import type { VehiclePlateDetailDTO } from "@/services/api/vehicles/types"
 
 export interface VehicleKpis {
   totalEventos: number
@@ -66,31 +67,19 @@ export function useVehicleData(plate: string, daysFilter: 7 | 30 | 90 = 30): Veh
       setError(null)
       try {
         const plateUpper = plate.toUpperCase()
-        const response = await fetch(
-          `/api/vehicles/${encodeURIComponent(plateUpper)}?daysBack=${daysFilter}`,
-          { credentials: "include" }
-        )
-        
-        if (!response.ok) {
-          if (response.status === 404) {
-            setError("Vehículo no encontrado")
-            setVehicle(null)
-            setEvents([])
-            setLoading(false)
-            return
-          }
-          throw new Error(`Error ${response.status}: ${await response.text()}`)
-        }
-
-        const data: VehiclePlateDetailDTO = await response.json()
+        const data: VehiclePlateDetailDTO = await vehiclesApi.vehicleDetailByPlate(plateUpper, daysFilter)
         setVehicle(data.vehicle)
         setEvents(data.events || [])
         setPreviousEvents(data.previousEvents || [])
         setRanking(data.ranking || { position: 0, totalVehicles: 0 })
         setRiskScoreFromApi(typeof data.riskScore === "number" ? data.riskScore : null)
       } catch (err) {
-        console.error("[useVehicleData] Error:", err)
-        setError(err instanceof Error ? err.message : "Error desconocido")
+        const status = (err as { status?: number })?.status
+        if (status === 404) {
+          setError("Vehiculo no encontrado")
+        } else {
+          setError(err instanceof Error ? err.message : "Error desconocido")
+        }
         setVehicle(null)
         setEvents([])
       } finally {
@@ -101,35 +90,33 @@ export function useVehicleData(plate: string, daysFilter: 7 | 30 | 90 = 30): Veh
     void fetchData()
   }, [plate, daysFilter])
 
-  // Eventos filtrados (ya vienen filtrados del servidor, pero por si acaso)
   const filteredEvents = useMemo(() => {
     if (!events.length) return []
-    
+
     const cutoffDate = getLastClosedDate()
     cutoffDate.setDate(cutoffDate.getDate() - daysFilter)
-    
-    return events.filter((event) => {
-      const eventDate = new Date(event.eventTimestamp)
-      return eventDate >= cutoffDate
-    }).sort((a, b) => {
-      return b.eventTimestamp.localeCompare(a.eventTimestamp)
-    })
+
+    return events
+      .filter((event) => {
+        const eventDate = new Date(event.eventTimestamp)
+        return eventDate >= cutoffDate
+      })
+      .sort((a, b) => b.eventTimestamp.localeCompare(a.eventTimestamp))
   }, [events, daysFilter])
 
-  // Calcular KPIs (uso de negocio/UI a partir de eventos ya filtrados)
   const kpis = useMemo((): VehicleKpis => {
     const totalEventos = filteredEvents.length
     const totalCriticos = filteredEvents.filter((e) => e.severity === "critico").length
     const totalAdvertencias = filteredEvents.filter((e) => e.severity === "advertencia").length
-    const totalSinLlave = filteredEvents.filter((e) => 
-      e.type === "sin_llave" || 
-      e.type === "sin_llave" || 
-      e.type?.toLowerCase().includes("sin_llave") ||
-      e.type?.toLowerCase().includes("sin llave")
+    const totalSinLlave = filteredEvents.filter(
+      (e) =>
+        e.type === "sin_llave" ||
+        e.type === "sin_llave" ||
+        e.type?.toLowerCase().includes("sin_llave") ||
+        e.type?.toLowerCase().includes("sin llave"),
     ).length
     const ultimoEvento = filteredEvents.length > 0 ? filteredEvents[0] : null
-    
-    // Calcular días sin eventos
+
     let diasSinEventos = 0
     if (ultimoEvento) {
       const ultimoEventoDate = new Date(ultimoEvento.eventTimestamp)
@@ -137,13 +124,10 @@ export function useVehicleData(plate: string, daysFilter: 7 | 30 | 90 = 30): Veh
       const diffMs = ahora.getTime() - ultimoEventoDate.getTime()
       diasSinEventos = Math.floor(diffMs / (1000 * 60 * 60 * 24))
     } else {
-      diasSinEventos = daysFilter // Si no hay eventos, usar el rango completo
+      diasSinEventos = daysFilter
     }
 
-    // Calcular porcentaje sin llave
-    const porcentajeSinLlave = totalEventos > 0
-      ? Math.round((totalSinLlave / totalEventos) * 100)
-      : 0
+    const porcentajeSinLlave = totalEventos > 0 ? Math.round((totalSinLlave / totalEventos) * 100) : 0
 
     return {
       totalEventos,
@@ -156,19 +140,14 @@ export function useVehicleData(plate: string, daysFilter: 7 | 30 | 90 = 30): Veh
     }
   }, [filteredEvents, daysFilter])
 
-  // Obtener score de riesgo de negocio si existe desde el backend.
-  const score = useMemo(() => {
-    return riskScoreFromApi ?? 0
-  }, [riskScoreFromApi])
+  const score = useMemo(() => riskScoreFromApi ?? 0, [riskScoreFromApi])
 
-  // Determinar nivel de riesgo
   const riskLevel = useMemo<"bajo" | "medio" | "alto">(() => {
     if (score <= 5) return "bajo"
     if (score <= 15) return "medio"
     return "alto"
   }, [score])
 
-  // Calcular tendencia vs período anterior
   const trend = useMemo((): TrendData => {
     const currentPeriodEvents = filteredEvents.length
     const previousPeriodEvents = previousEvents.length
@@ -203,11 +182,9 @@ export function useVehicleData(plate: string, daysFilter: 7 | 30 | 90 = 30): Veh
     }
   }, [filteredEvents, previousEvents])
 
-  // Calcular score mensual (últimos 6 meses)
   const monthlyScores = useMemo((): MonthlyScore[] => {
     const months: Record<string, VehicleEventDashboard[]> = {}
-    
-    // Inicializar últimos 6 meses
+
     for (let i = 5; i >= 0; i--) {
       const date = new Date()
       date.setMonth(date.getMonth() - i)
@@ -215,7 +192,6 @@ export function useVehicleData(plate: string, daysFilter: 7 | 30 | 90 = 30): Veh
       months[monthKey] = []
     }
 
-    // Agrupar eventos por mes
     events.forEach((event) => {
       try {
         const eventDate = new Date(event.eventTimestamp)
@@ -224,22 +200,22 @@ export function useVehicleData(plate: string, daysFilter: 7 | 30 | 90 = 30): Veh
           months[monthKey].push(event)
         }
       } catch {
-        // Ignorar eventos con fecha inválida
+        // Ignorar eventos con fecha invalida.
       }
     })
 
-    // Calcular score por mes
     return Object.entries(months).map(([month, monthEvents]) => {
       const criticos = monthEvents.filter((e) => e.severity === "critico").length
       const advertencias = monthEvents.filter((e) => e.severity === "advertencia").length
-      const sinLlave = monthEvents.filter((e) => 
-        e.type === "sin_llave" || 
-        e.type?.toLowerCase().includes("sin_llave") ||
-        e.type?.toLowerCase().includes("sin llave")
+      const sinLlave = monthEvents.filter(
+        (e) =>
+          e.type === "sin_llave" ||
+          e.type?.toLowerCase().includes("sin_llave") ||
+          e.type?.toLowerCase().includes("sin llave"),
       ).length
-      
+
       const monthScore = criticos * 5 + advertencias * 2 + sinLlave * 3
-      
+
       return {
         month,
         score: monthScore,
@@ -261,6 +237,3 @@ export function useVehicleData(plate: string, daysFilter: 7 | 30 | 90 = 30): Veh
     error,
   }
 }
-
-
-

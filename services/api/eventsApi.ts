@@ -1,6 +1,2 @@
-import type { VehicleEventLegacyDTO } from "@/services/dto"
-import { sessionApiFetch } from "@/services/api/http"
-
-export const eventsApi = {
-  listGlobal: () => sessionApiFetch<VehicleEventLegacyDTO[]>("/api/vehicle-events"),
-}
+export { eventsApi } from "@/services/api/events/eventsApi"
+export type * from "@/services/api/events/types"

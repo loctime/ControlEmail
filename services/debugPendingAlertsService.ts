@@ -1,4 +1,5 @@
-import type { DebugPendingAlertDTO } from "@/services/dto"
+import { alertsApi } from "@/services/api/alerts/alertsApi"
+import type { DebugPendingAlertDTO } from "@/services/api/alerts/types"
 
 export interface DebugPendingAlertsService {
   listPending(): Promise<DebugPendingAlertDTO[]>
@@ -6,16 +7,9 @@ export interface DebugPendingAlertsService {
 
 class DebugPendingAlertsServiceImpl implements DebugPendingAlertsService {
   async listPending(): Promise<DebugPendingAlertDTO[]> {
-    const response = await fetch("/api/email/debug-pending-alerts", {
-      credentials: "include",
-    })
-    if (!response.ok) {
-      throw new Error(`Error ${response.status}: ${response.statusText}`)
-    }
-    return response.json()
+    return alertsApi.debugPending()
   }
 }
 
 export const debugPendingAlertsService: DebugPendingAlertsService =
   new DebugPendingAlertsServiceImpl()
-

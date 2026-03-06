@@ -1,10 +1,11 @@
+import { alertsApi } from "@/services/api/alerts/alertsApi"
+import { qualityApi } from "@/services/api/quality/qualityApi"
 import type {
   DailyAlertDTO,
   DailyAlertMetaDTO,
-  DailyMetricsDTO,
-  DailyConsistencyDTO,
   MarkAlertSentResultDTO,
-} from "@/services/dto"
+} from "@/services/api/alerts/types"
+import type { DailyConsistencyDTO, DailyMetricsDTO } from "@/services/api/quality/types"
 
 export interface EmailModuleService {
   getDailyMetrics(date: string): Promise<DailyMetricsDTO>
@@ -15,46 +16,24 @@ export interface EmailModuleService {
 
 class EmailModuleServiceImpl implements EmailModuleService {
   async getDailyMetrics(date: string): Promise<DailyMetricsDTO> {
-    const response = await fetch(`/api/email/daily-metrics?date=${date}`, { credentials: "include" })
-    if (!response.ok) {
-      throw new Error(`Error ${response.status}: ${response.statusText}`)
-    }
-    return response.json()
+    return qualityApi.dailyMetrics(date)
   }
 
   async getPendingAlerts(): Promise<DailyAlertDTO[]> {
-    const response = await fetch("/api/email/get-pending-daily-alerts", { credentials: "include" })
-    if (!response.ok) {
-      throw new Error(`Error ${response.status}: ${response.statusText}`)
-    }
-    return response.json()
+    return alertsApi.pendingDaily()
   }
 
   async markAlertSent(alertIds: string[]): Promise<MarkAlertSentResultDTO> {
-    const response = await fetch("/api/email/mark-alert-sent", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ alertIds }),
-    })
-    if (!response.ok && response.status !== 207) {
-      throw new Error(`Error ${response.status}: ${response.statusText}`)
-    }
-    return response.json()
+    return alertsApi.markAlertSent(alertIds)
   }
 
   async getDailyConsistency(date: string): Promise<DailyConsistencyDTO> {
-    const response = await fetch(`/api/email/daily-consistency?date=${date}`, { credentials: "include" })
-    if (!response.ok) {
-      throw new Error(`Error ${response.status}: ${response.statusText}`)
-    }
-    return response.json()
+    return qualityApi.dailyConsistency(date)
   }
 }
 
 export const emailModuleService = new EmailModuleServiceImpl()
 
-// Types para uso en componentes (reexportados desde DTOs de dominio)
 export type {
   DailyAlertDTO,
   DailyAlertMetaDTO,

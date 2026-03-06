@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Plus, X } from "lucide-react"
+import { adminApi } from "@/services/api"
 
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase()
@@ -25,7 +26,7 @@ type SectionKey = "generalRecipients" | "ccRecipients" | "reportRecipients"
 const SECTIONS: { key: SectionKey; title: string }[] = [
   { key: "generalRecipients", title: "Destinatarios generales" },
   { key: "ccRecipients", title: "Copias (CC)" },
-  { key: "reportRecipients", title: "Reportes técnicos" },
+  { key: "reportRecipients", title: "Reportes tecnicos" },
 ]
 
 export default function EmailConfigPage() {
@@ -46,31 +47,30 @@ export default function EmailConfigPage() {
 
   useEffect(() => {
     let cancelled = false
-    setFetchError(null)
-    setNeedsLogin(false)
-    fetch("/api/admin/email-config", { credentials: "include" })
-      .then((res) => {
-        if (res.status === 401) {
-          if (!cancelled) setNeedsLogin(true)
-          return
-        }
-        if (!res.ok) throw new Error(res.statusText)
-        return res.json()
-      })
-      .then((data) => {
+
+    const load = async () => {
+      setFetchError(null)
+      setNeedsLogin(false)
+      try {
+        const data = await adminApi.getEmailConfig()
         if (cancelled) return
-        if (data != null) {
-          setGeneralRecipients(Array.isArray(data.generalRecipients) ? data.generalRecipients : [])
-          setCcRecipients(Array.isArray(data.ccRecipients) ? data.ccRecipients : [])
-          setReportRecipients(Array.isArray(data.reportRecipients) ? data.reportRecipients : [])
+        setGeneralRecipients(Array.isArray(data.generalRecipients) ? data.generalRecipients : [])
+        setCcRecipients(Array.isArray(data.ccRecipients) ? data.ccRecipients : [])
+        setReportRecipients(Array.isArray(data.reportRecipients) ? data.reportRecipients : [])
+      } catch (err) {
+        if (cancelled) return
+        const status = (err as { status?: number })?.status
+        if (status === 401) {
+          setNeedsLogin(true)
+        } else {
+          setFetchError(err instanceof Error ? err.message : "Error al cargar")
         }
-      })
-      .catch((e) => {
-        if (!cancelled) setFetchError(e instanceof Error ? e.message : "Error al cargar")
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) setLoading(false)
-      })
+      }
+    }
+
+    void load()
     return () => {
       cancelled = true
     }
@@ -81,21 +81,12 @@ export default function EmailConfigPage() {
     setLoginError(null)
     setLoginLoading(true)
     try {
-      const res = await fetch("/api/admin/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ password }),
-      })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        const msg = data?.error === "invalid_password" ? "Contraseña incorrecta" : "Error al ingresar"
-        setLoginError(msg)
-        return
-      }
+      await adminApi.login({ password })
       window.location.reload()
-    } catch {
-      setLoginError("Error de conexión")
+    } catch (err) {
+      const apiErr = err as { message?: string }
+      const msg = apiErr?.message === "invalid_password" ? "Contrasena incorrecta" : apiErr?.message || "Error al ingresar"
+      setLoginError(msg)
     } finally {
       setLoginLoading(false)
     }
@@ -137,27 +128,17 @@ export default function EmailConfigPage() {
     const cc = dedupeEmails(ccRecipients.map((e) => normalizeEmail(e)).filter(Boolean))
     const report = dedupeEmails(reportRecipients.map((e) => normalizeEmail(e)).filter(Boolean))
     try {
-      const res = await fetch("/api/admin/email-config", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          generalRecipients: general,
-          ccRecipients: cc,
-          reportRecipients: report,
-        }),
+      await adminApi.updateEmailConfig({
+        generalRecipients: general,
+        ccRecipients: cc,
+        reportRecipients: report,
       })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        setSaveError(data?.error ?? "Error al guardar")
-        return
-      }
-      setSaveMessage("Configuración guardada")
+      setSaveMessage("Configuracion guardada")
       setGeneralRecipients(general)
       setCcRecipients(cc)
       setReportRecipients(report)
-    } catch {
-      setSaveError("Error de conexión")
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Error al guardar")
     } finally {
       setSaving(false)
     }
@@ -166,7 +147,7 @@ export default function EmailConfigPage() {
   if (loading) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
-        <p className="text-muted-foreground">Cargando…</p>
+        <p className="text-muted-foreground">Cargando...</p>
       </div>
     )
   }
@@ -178,23 +159,21 @@ export default function EmailConfigPage() {
           <h1 className="text-center text-xl font-semibold">Acceso administrador</h1>
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="admin-password">Contraseña</Label>
+              <Label htmlFor="admin-password">Contrasena</Label>
               <Input
                 id="admin-password"
                 type="password"
                 autoComplete="current-password"
-                placeholder="Contraseña"
+                placeholder="Contrasena"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={loginLoading}
                 className="w-full"
               />
             </div>
-            {loginError && (
-              <p className="text-sm text-destructive">{loginError}</p>
-            )}
+            {loginError && <p className="text-sm text-destructive">{loginError}</p>}
             <Button type="submit" className="w-full" disabled={loginLoading}>
-              {loginLoading ? "Ingresando…" : "Ingresar"}
+              {loginLoading ? "Ingresando..." : "Ingresar"}
             </Button>
           </form>
         </div>
@@ -205,12 +184,8 @@ export default function EmailConfigPage() {
   return (
     <div className="container mx-auto max-w-4xl space-y-6 py-8">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Configuración de destinatarios de alertas
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Destinatarios globales del sistema de alertas por email.
-        </p>
+        <h1 className="text-2xl font-semibold tracking-tight">Configuracion de destinatarios de alertas</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Destinatarios globales del sistema de alertas por email.</p>
       </div>
 
       {fetchError && (
@@ -262,14 +237,10 @@ export default function EmailConfigPage() {
 
       <div className="flex flex-col gap-2">
         <Button onClick={handleSave} disabled={saving}>
-          {saving ? "Guardando…" : "Guardar configuración"}
+          {saving ? "Guardando..." : "Guardar configuracion"}
         </Button>
-        {saveMessage && (
-          <p className="text-sm text-green-600 dark:text-green-400">{saveMessage}</p>
-        )}
-        {saveError && (
-          <p className="text-sm text-destructive">{saveError}</p>
-        )}
+        {saveMessage && <p className="text-sm text-green-600 dark:text-green-400">{saveMessage}</p>}
+        {saveError && <p className="text-sm text-destructive">{saveError}</p>}
       </div>
     </div>
   )

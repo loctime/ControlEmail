@@ -7,6 +7,7 @@ import { auth } from "@/lib/firebase-client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { authApi } from "@/services/api"
 
 type Step = "email" | "password" | "loading" | "error"
 
@@ -29,20 +30,8 @@ function LoginForm() {
     setStep("loading")
 
     try {
-      const res = await fetch(
-        `/api/auth/check-user?email=${encodeURIComponent(value)}`,
-        { credentials: "include" }
-      )
-      const data = await res.json().catch(() => ({}))
-
-      if (!res.ok) {
-        setErrorMessage(data?.error ?? "Error al verificar usuario")
-        setStep("error")
-        return
-      }
-
-      const { allowed } = data as { allowed?: boolean; authExists?: boolean }
-      if (!allowed) {
+      const data = await authApi.checkUser(value)
+      if (data?.allowed !== true) {
         setErrorMessage("Usuario no autorizado")
         setStep("error")
         return
@@ -50,8 +39,9 @@ function LoginForm() {
 
       setStep("password")
       setPassword("")
-    } catch {
-      setErrorMessage("Error de conexión")
+    } catch (err) {
+      const apiErr = err as { message?: string }
+      setErrorMessage(apiErr?.message || "Error al verificar usuario")
       setStep("error")
     }
   }
@@ -78,19 +68,7 @@ function LoginForm() {
         }
       }
 
-      const res = await fetch("/api/auth/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ idToken }),
-      })
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        setErrorMessage(data?.error === "invalid_token" ? "Sesión no válida" : "Error al iniciar sesión")
-        setStep("password")
-        return
-      }
+      await authApi.createSession({ idToken })
 
       router.push(nextUrl.startsWith("/") ? nextUrl : "/")
       router.refresh()
@@ -112,9 +90,7 @@ function LoginForm() {
       <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-muted/30 p-4">
         <div className="w-full max-w-sm space-y-2 text-center">
           <h1 className="text-2xl font-semibold tracking-tight">FleetGuard</h1>
-          <p className="text-sm text-muted-foreground">
-            Verificando…
-          </p>
+          <p className="text-sm text-muted-foreground">Verificando...</p>
         </div>
       </div>
     )
@@ -125,7 +101,7 @@ function LoginForm() {
       <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-muted/30 p-4">
         <div className="w-full max-w-sm space-y-2 text-center">
           <h1 className="text-2xl font-semibold tracking-tight">FleetGuard</h1>
-          <p className="text-sm text-destructive font-medium">{errorMessage}</p>
+          <p className="text-sm font-medium text-destructive">{errorMessage}</p>
         </div>
         <div className="flex w-full max-w-sm gap-2">
           <Button variant="outline" className="flex-1" onClick={backToEmail}>
@@ -141,19 +117,17 @@ function LoginForm() {
       <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-muted/30 p-4">
         <div className="w-full max-w-sm space-y-2 text-center">
           <h1 className="text-2xl font-semibold tracking-tight">FleetGuard</h1>
-          <p className="text-sm text-muted-foreground">
-            Ingresa tu contraseña para {email}
-          </p>
+          <p className="text-sm text-muted-foreground">Ingresa tu contrasena para {email}</p>
         </div>
         <form onSubmit={handleAuth} className="flex w-full max-w-sm flex-col gap-4 rounded-lg border bg-card p-6 shadow-sm">
           <div className="grid gap-2">
-            <Label htmlFor="password">Contraseña</Label>
+            <Label htmlFor="password">Contrasena</Label>
             <Input
               id="password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
+              placeholder="********"
               required
               autoComplete="current-password"
               autoFocus
@@ -162,7 +136,7 @@ function LoginForm() {
           {errorMessage && <p className="text-sm text-destructive">{errorMessage}</p>}
           <div className="flex gap-2">
             <Button type="button" variant="outline" onClick={backToEmail}>
-              Atrás
+              Atras
             </Button>
             <Button type="submit" className="flex-1">
               Ingresar
@@ -177,9 +151,7 @@ function LoginForm() {
     <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-muted/30 p-4">
       <div className="w-full max-w-sm space-y-2 text-center">
         <h1 className="text-2xl font-semibold tracking-tight">FleetGuard</h1>
-        <p className="text-sm text-muted-foreground">
-          Ingresa tu email para continuar
-        </p>
+        <p className="text-sm text-muted-foreground">Ingresa tu email para continuar</p>
       </div>
       <form onSubmit={handleContinue} className="flex w-full max-w-sm flex-col gap-4 rounded-lg border bg-card p-6 shadow-sm">
         <div className="grid gap-2">
@@ -194,9 +166,7 @@ function LoginForm() {
             autoComplete="email"
           />
         </div>
-        <Button type="submit">
-          Continuar
-        </Button>
+        <Button type="submit">Continuar</Button>
       </form>
     </div>
   )
@@ -207,7 +177,7 @@ export default function LoginPage() {
     <Suspense
       fallback={
         <div className="flex min-h-screen items-center justify-center bg-muted/30">
-          <p className="text-muted-foreground">Cargando…</p>
+          <p className="text-muted-foreground">Cargando...</p>
         </div>
       }
     >
