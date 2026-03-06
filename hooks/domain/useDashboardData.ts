@@ -1,10 +1,12 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { dashboardApi } from "@/services/api"
 import type { MyAlertItemDTO, MyRiskDTO, MyStatsDTO } from "@/services/api/dashboard/types"
 import type { DailyConsistencyDTO } from "@/services/api/quality/types"
 import { getLastClosedDateKey } from "@/lib/domain/closed-date"
+import { queryKeys } from "@/lib/query/queryKeys"
 
 interface DashboardDataState {
   stats: MyStatsDTO["stats"] | null
@@ -17,45 +19,41 @@ interface DashboardDataState {
 }
 
 export function useDashboardData(): DashboardDataState {
-  const [stats, setStats] = useState<MyStatsDTO["stats"] | null>(null)
-  const [riskVehicles, setRiskVehicles] = useState<MyRiskDTO["vehicles"]>([])
-  const [pendingAlerts, setPendingAlerts] = useState<MyAlertItemDTO[]>([])
-  const [consistency, setConsistency] = useState<DailyConsistencyDTO | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const dateKey = getLastClosedDateKey()
 
-  const refetch = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-
-    try {
-      const date = getLastClosedDateKey()
+  const query = useQuery({
+    queryKey: queryKeys.dashboard.myData(dateKey),
+    queryFn: async () => {
       const [statsRes, riskRes, alertsRes, consistencyRes] = await Promise.all([
         dashboardApi.myStats(),
         dashboardApi.myRisk(),
         dashboardApi.myAlerts({ limit: 200 }),
-        dashboardApi.dailyConsistency(date),
+        dashboardApi.dailyConsistency(dateKey),
       ])
 
-      setStats(statsRes.stats)
-      setRiskVehicles(Array.isArray(riskRes.vehicles) ? riskRes.vehicles : [])
       const alerts = Array.isArray(alertsRes.alerts) ? alertsRes.alerts : []
-      setPendingAlerts(alerts.filter((item) => !item.alertSent))
-      setConsistency(consistencyRes)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error desconocido")
-      setStats(null)
-      setRiskVehicles([])
-      setPendingAlerts([])
-      setConsistency(null)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
 
-  useEffect(() => {
-    void refetch()
-  }, [refetch])
+      return {
+        stats: statsRes.stats ?? null,
+        riskVehicles: Array.isArray(riskRes.vehicles) ? riskRes.vehicles : [],
+        pendingAlerts: alerts.filter((item) => !item.alertSent),
+        consistency: consistencyRes ?? null,
+      }
+    },
+    staleTime: 60_000,
+  })
 
-  return { stats, riskVehicles, pendingAlerts, consistency, loading, error, refetch }
+  const refetch = useCallback(async () => {
+    await query.refetch()
+  }, [query.refetch])
+
+  return {
+    stats: query.data?.stats ?? null,
+    riskVehicles: query.data?.riskVehicles ?? [],
+    pendingAlerts: query.data?.pendingAlerts ?? [],
+    consistency: query.data?.consistency ?? null,
+    loading: query.isPending,
+    error: query.error instanceof Error ? query.error.message : query.error ? "Error desconocido" : null,
+    refetch,
+  }
 }

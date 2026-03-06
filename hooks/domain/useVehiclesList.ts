@@ -1,8 +1,10 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useMemo } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { vehiclesApi } from "@/services/api"
 import type { MyAlertsVehiclesItemDTO, MyVehiclesItemDTO } from "@/services/api/vehicles/types"
+import { queryKeys } from "@/lib/query/queryKeys"
 
 export interface VehicleListRow {
   plate: string
@@ -13,48 +15,44 @@ export interface VehicleListRow {
 }
 
 export function useVehiclesList() {
-  const [rows, setRows] = useState<VehicleListRow[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const myVehiclesQuery = useQuery({
+    queryKey: queryKeys.vehicles.myVehicles(),
+    queryFn: () => vehiclesApi.myVehicles(),
+    staleTime: 2 * 60_000,
+  })
+
+  const alertsVehiclesQuery = useQuery({
+    queryKey: queryKeys.vehicles.myAlertsVehicles(),
+    queryFn: () => vehiclesApi.myAlertsVehicles(),
+    staleTime: 60_000,
+  })
+
+  const rows = useMemo(() => {
+    const byPlate = new Map<string, MyVehiclesItemDTO>()
+    for (const vehicle of myVehiclesQuery.data?.vehicles ?? []) {
+      byPlate.set(vehicle.plate, vehicle)
+    }
+
+    return (alertsVehiclesQuery.data?.vehicles ?? []).map((item: MyAlertsVehiclesItemDTO) => {
+      const vehicle = byPlate.get(item.plate)
+      return {
+        plate: item.plate,
+        operationName: item.operationName ?? vehicle?.operationName ?? null,
+        lastEvent: item.lastEvent,
+        riskScore: item.riskScore,
+        responsables: vehicle?.responsables ?? [],
+      }
+    })
+  }, [alertsVehiclesQuery.data?.vehicles, myVehiclesQuery.data?.vehicles])
+
+  const loading = myVehiclesQuery.isPending || alertsVehiclesQuery.isPending
+  const errorObj = myVehiclesQuery.error ?? alertsVehiclesQuery.error
+  const error =
+    errorObj instanceof Error ? errorObj.message : errorObj ? "Error desconocido" : null
 
   const refetch = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-
-    try {
-      const [alertsVehicles, myVehicles] = await Promise.all([
-        vehiclesApi.myAlertsVehicles(),
-        vehiclesApi.myVehicles(),
-      ])
-
-      const byPlate = new Map<string, MyVehiclesItemDTO>()
-      for (const vehicle of myVehicles.vehicles ?? []) {
-        byPlate.set(vehicle.plate, vehicle)
-      }
-
-      const merged = (alertsVehicles.vehicles ?? []).map((item: MyAlertsVehiclesItemDTO) => {
-        const vehicle = byPlate.get(item.plate)
-        return {
-          plate: item.plate,
-          operationName: item.operationName ?? vehicle?.operationName ?? null,
-          lastEvent: item.lastEvent,
-          riskScore: item.riskScore,
-          responsables: vehicle?.responsables ?? [],
-        }
-      })
-
-      setRows(merged)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error desconocido")
-      setRows([])
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    void refetch()
-  }, [refetch])
+    await Promise.all([myVehiclesQuery.refetch(), alertsVehiclesQuery.refetch()])
+  }, [alertsVehiclesQuery.refetch, myVehiclesQuery.refetch])
 
   return { rows, loading, error, refetch }
 }

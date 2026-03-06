@@ -5,6 +5,7 @@ import { Inter } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { AuthGuard } from "@/components/auth-guard"
+import { QueryProvider } from "@/components/query-provider"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -38,7 +39,9 @@ export default function RootLayout({
           storageKey="fleetguard-theme"
           disableTransitionOnChange={false}
         >
-          <AuthGuard>{children}</AuthGuard>
+          <QueryProvider>
+            <AuthGuard>{children}</AuthGuard>
+          </QueryProvider>
         </ThemeProvider>
       </body>
     </html>
