@@ -20,16 +20,24 @@ export async function emailApiFetch<T>(url: string, options: RequestInit = {}): 
   const path = url.startsWith("/") ? url : `/${url}`
   const fullUrl = `${baseUrl}${path}`
 
+  const headers: HeadersInit = {
+    Authorization: `Bearer ${token}`,
+    ...(options.headers ?? {}),
+  }
+
+  if (!(options.body instanceof FormData)) {
+    ;(headers as Record<string, string>)["Content-Type"] = "application/json"
+  }
+
   const response = await fetch(fullUrl, {
     ...options,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      ...(options.headers ?? {}),
-    },
+    headers,
   })
 
-  const data = await response.json().catch(() => ({}))
+  let data: any = {}
+  if (response.status !== 204) {
+    data = await response.json().catch(() => ({}))
+  }
 
   if (!response.ok) {
     const err = new Error(data?.error || data?.message || response.statusText || "Request failed") as ApiError
