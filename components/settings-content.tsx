@@ -1,105 +1,45 @@
-"use client"
-
-import {
-  AppCard,
-  AppCardHeader,
-  AppCardTitle,
-  AppCardDescription,
-  AppCardContent,
-} from "@/components/app-card"
-import { PageContainer } from "@/components/page-container"
-import { SectionHeader } from "@/components/section-header"
-import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
-import { Separator } from "@/components/ui/separator"
+import Link from "next/link"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 
 export function SettingsContent() {
   return (
-    <PageContainer>
-      <SectionHeader
-        title="Configuracion"
-        description="Preferencias del sistema de control vehicular"
-      />
+    <div className="space-y-6">
+      <header>
+        <h1 className="text-2xl font-semibold">Configuracion del sistema</h1>
+        <p className="text-sm text-muted-foreground">
+          Esta pantalla no simula reglas inexistentes. Muestra configuraciones reales y accesos administrativos.
+        </p>
+      </header>
 
-      <AppCard className="flex flex-col">
-        <AppCardHeader className="pb-3">
-          <AppCardTitle className="text-base">Notificaciones</AppCardTitle>
-          <AppCardDescription className="text-sm">
-            Configura que alertas deseas recibir
-          </AppCardDescription>
-        </AppCardHeader>
-        <AppCardContent className="flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="speed" className="flex flex-col gap-0.5 text-sm">
-              <span>Excesos de velocidad</span>
-              <span className="font-normal text-muted-foreground">
-                Recibir alertas cuando un vehiculo supere el limite
-              </span>
-            </Label>
-            <Switch id="speed" defaultChecked />
-          </div>
-          <Separator />
-          <div className="flex items-center justify-between">
-            <Label htmlFor="unid" className="flex flex-col gap-0.5 text-sm">
-              <span>Vehiculos no identificados</span>
-              <span className="font-normal text-muted-foreground">
-                Alertas por vehiculos sin registro en el sistema
-              </span>
-            </Label>
-            <Switch id="unid" defaultChecked />
-          </div>
-          <Separator />
-          <div className="flex items-center justify-between">
-            <Label htmlFor="route" className="flex flex-col gap-0.5 text-sm">
-              <span>Desvios de ruta</span>
-              <span className="font-normal text-muted-foreground">
-                Notificar cuando un vehiculo se desvie del trayecto
-              </span>
-            </Label>
-            <Switch id="route" defaultChecked />
-          </div>
-          <Separator />
-          <div className="flex items-center justify-between">
-            <Label htmlFor="night" className="flex flex-col gap-0.5 text-sm">
-              <span>Conduccion nocturna</span>
-              <span className="font-normal text-muted-foreground">
-                Alertar circulacion fuera de horario autorizado
-              </span>
-            </Label>
-            <Switch id="night" />
-          </div>
-        </AppCardContent>
-      </AppCard>
+      <Card>
+        <CardHeader>
+          <CardTitle>Reglas de negocio activas</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          <p>Los datos consolidados del sistema corresponden al ultimo cierre disponible (ayer).</p>
+          <p>Las vistas historicas y de calidad no permiten fechas futuras ni el dia actual.</p>
+          <Badge variant="outline">TODO backend: reglas configurables de riesgo por operacion</Badge>
+        </CardContent>
+      </Card>
 
-      <AppCard className="flex flex-col">
-        <AppCardHeader className="pb-3">
-          <AppCardTitle className="text-base">Sistema</AppCardTitle>
-          <AppCardDescription className="text-sm">
-            Parametros generales de la plataforma
-          </AppCardDescription>
-        </AppCardHeader>
-        <AppCardContent className="flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="sounds" className="flex flex-col gap-0.5 text-sm">
-              <span>Sonidos de alerta</span>
-              <span className="font-normal text-muted-foreground">
-                Reproducir sonido al recibir alerta critica
-              </span>
-            </Label>
-            <Switch id="sounds" defaultChecked />
-          </div>
-          <Separator />
-          <div className="flex items-center justify-between">
-            <Label htmlFor="auto" className="flex flex-col gap-0.5 text-sm">
-              <span>Actualizacion automatica</span>
-              <span className="font-normal text-muted-foreground">
-                Refrescar datos cada 30 segundos
-              </span>
-            </Label>
-            <Switch id="auto" defaultChecked />
-          </div>
-        </AppCardContent>
-      </AppCard>
-    </PageContainer>
+      <Card>
+        <CardHeader>
+          <CardTitle>Accesos administrativos</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          <p>
+            <Link className="underline" href="/admin/email-config">
+              Administrar destinatarios de correo
+            </Link>
+          </p>
+          <p>
+            <Link className="underline" href="/admin/vehicle-alerts">
+              Administrar responsables por vehiculo
+            </Link>
+          </p>
+        </CardContent>
+      </Card>
+    </div>
   )
 }

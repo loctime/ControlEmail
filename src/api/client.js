@@ -1,4 +1,4 @@
-import { auth } from "../firebase"
+// LEGACY ONLY: usado exclusivamente por /panel`r`nimport { auth } from "../firebase"
 
 const getBaseUrl = () => {
   if (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL) {
@@ -40,3 +40,4 @@ export async function apiFetch(url, options = {}) {
   }
   return data
 }
+

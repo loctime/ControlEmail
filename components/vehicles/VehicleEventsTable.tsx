@@ -22,23 +22,9 @@ interface VehicleEventsTableProps {
 export function VehicleEventsTable({ events, loading }: VehicleEventsTableProps) {
   const getSeverityBadge = (severity: "critico" | "advertencia") => {
     if (severity === "critico") {
-      return (
-        <Badge
-          variant="destructive"
-          className="bg-red-100 text-red-800 border-red-300 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800"
-        >
-          Crítico
-        </Badge>
-      )
+      return <Badge variant="destructive">Critico</Badge>
     }
-    return (
-      <Badge
-        variant="outline"
-        className="bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-900/20 dark:text-orange-400 dark:border-orange-800"
-      >
-        Advertencia
-      </Badge>
-    )
+    return <Badge variant="outline">Advertencia</Badge>
   }
 
   if (loading) {
@@ -62,11 +48,11 @@ export function VehicleEventsTable({ events, loading }: VehicleEventsTableProps)
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Eventos del Vehículo</CardTitle>
+          <CardTitle>Eventos del vehiculo</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-center py-8 text-muted-foreground">
-            <p>No hay eventos registrados para este vehículo en el período seleccionado.</p>
+            <p>No hay eventos registrados para este vehiculo en el periodo seleccionado.</p>
           </div>
         </CardContent>
       </Card>
@@ -76,7 +62,7 @@ export function VehicleEventsTable({ events, loading }: VehicleEventsTableProps)
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Eventos del Vehículo</CardTitle>
+        <CardTitle>Eventos del vehiculo</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="rounded-md border">
@@ -85,35 +71,23 @@ export function VehicleEventsTable({ events, loading }: VehicleEventsTableProps)
               <TableRow>
                 <TableHead>Fecha/Hora</TableHead>
                 <TableHead>Tipo</TableHead>
-                <TableHead>Velocidad</TableHead>
-                <TableHead>Ubicación</TableHead>
                 <TableHead>Severidad</TableHead>
+                <TableHead>Driver</TableHead>
+                <TableHead>Velocidad</TableHead>
+                <TableHead>Location</TableHead>
+                <TableHead>Reason</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {events.map((event) => (
                 <TableRow key={event.id}>
-                  <TableCell className="font-medium">
-                    {formatEventDateTime(event.eventTimestamp)}
-                  </TableCell>
-                  <TableCell>
-                    <span className="capitalize">{event.type.replace(/_/g, " ")}</span>
-                  </TableCell>
-                  <TableCell>
-                    {event.speed != null ? (
-                      <span className="font-semibold">{event.speed} km/h</span>
-                    ) : (
-                      <span className="text-muted-foreground">-</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {event.location ? (
-                      <span className="text-sm">{event.location}</span>
-                    ) : (
-                      <span className="text-muted-foreground">-</span>
-                    )}
-                  </TableCell>
+                  <TableCell className="font-medium">{formatEventDateTime(event.eventTimestamp)}</TableCell>
+                  <TableCell><span className="capitalize">{event.type.replace(/_/g, " ")}</span></TableCell>
                   <TableCell>{getSeverityBadge(event.severity)}</TableCell>
+                  <TableCell>{event.driver ?? "-"}</TableCell>
+                  <TableCell>{event.speed != null ? <span className="font-semibold">{event.speed} km/h</span> : <span className="text-muted-foreground">-</span>}</TableCell>
+                  <TableCell>{event.location ?? "-"}</TableCell>
+                  <TableCell className="max-w-[360px] truncate" title={event.reason}>{event.reason ?? "-"}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

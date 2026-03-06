@@ -1,152 +1,57 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import {
-  LayoutDashboard,
-  AlertTriangle,
-  Car,
-  Bell,
-  Settings,
-  Shield,
-  BarChart3,
-  LogOut,
-} from "lucide-react"
 import Link from "next/link"
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuBadge,
-  SidebarMenuItem,
-  SidebarMenuButton,
-  SidebarFooter,
-  SidebarSeparator,
-} from "@/components/ui/sidebar"
-
-function SidebarUserAndLogout() {
-  const router = useRouter()
-  const [email, setEmail] = useState<string | null>(null)
-
-  useEffect(() => {
-    fetch("/api/auth/me", { credentials: "include" })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => data?.email && setEmail(data.email))
-      .catch(() => {})
-  }, [])
-
-  const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST", credentials: "include" })
-    router.replace("/login")
-    router.refresh()
-  }
-
-  return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-3 rounded-lg bg-sidebar-accent p-3">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sidebar-primary text-sidebar-primary-foreground text-xs font-bold">
-          {email ? email.slice(0, 2).toUpperCase() : "--"}
-        </div>
-        <div className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-xs font-medium text-sidebar-accent-foreground">
-            {email ?? "Sesion"}
-          </span>
-          <span className="text-xs text-sidebar-foreground/60">
-            Patentes asignadas
-          </span>
-        </div>
-      </div>
-      <SidebarMenuButton onClick={handleLogout} className="w-full justify-center text-muted-foreground">
-        <LogOut className="h-4 w-4" />
-        <span>Cerrar sesion</span>
-      </SidebarMenuButton>
-    </div>
-  )
-}
-
-const inPageSections = [
-  { label: "Dashboard", icon: LayoutDashboard, id: "dashboard" },
-  { label: "Eventos", icon: AlertTriangle, id: "eventos" },
-  { label: "Vehiculos", icon: Car, id: "vehiculos" },
-  { label: "Alertas", icon: Bell, id: "alertas" },
-  { label: "Configuracion", icon: Settings, id: "configuracion" },
-] as const
+import { usePathname } from "next/navigation"
+import { BarChart3, Bell, Car, Database, FileClock, Gauge, ListChecks, Settings } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
 
 interface AppSidebarProps {
-  activeSection: string
-  onNavigate: (section: string) => void
   pendingAlertsCount?: number
 }
 
-export function AppSidebar({ activeSection, onNavigate, pendingAlertsCount = 0 }: AppSidebarProps) {
+const navItems = [
+  { href: "/dashboard", label: "Dashboard", icon: Gauge },
+  { href: "/vehiculos", label: "Vehiculos", icon: Car },
+  { href: "/eventos", label: "Eventos", icon: ListChecks },
+  { href: "/pendientes", label: "Pendientes", icon: Bell },
+  { href: "/historico", label: "Historico", icon: FileClock },
+  { href: "/calidad", label: "Calidad", icon: Database },
+  { href: "/configuracion", label: "Configuracion", icon: Settings },
+]
+
+export function AppSidebar({ pendingAlertsCount = 0 }: AppSidebarProps) {
+  const pathname = usePathname()
+
   return (
-    <Sidebar collapsible="icon">
-      <SidebarHeader className="p-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary">
-            <Shield className="h-4 w-4 text-primary-foreground" />
-          </div>
-          <div className="flex flex-col group-data-[collapsible=icon]:hidden">
-            <span className="text-sm font-semibold text-sidebar-accent-foreground">FleetGuard</span>
-            <span className="text-xs text-sidebar-foreground/60">Control Vehicular</span>
-          </div>
-        </div>
-      </SidebarHeader>
-      <SidebarSeparator />
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Navegacion</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {inPageSections.map((item) => (
-                <SidebarMenuItem key={item.id}>
-                  <SidebarMenuButton
-                    isActive={activeSection === item.id}
-                    onClick={() => onNavigate(item.id)}
-                    tooltip={item.label}
-                  >
-                    <item.icon className="h-4 w-4" />
-                    <span>{item.label}</span>
-                  </SidebarMenuButton>
-                  {item.id === "alertas" && pendingAlertsCount > 0 && (
-                    <SidebarMenuBadge>{pendingAlertsCount}</SidebarMenuBadge>
-                  )}
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-        <SidebarGroup>
-          <SidebarGroupLabel>Vistas</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <Link href="/dashboard" title="Dashboard de alertas">
-                    <BarChart3 className="h-4 w-4" />
-                    <span>Dashboard alertas</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <Link href="/vehiculos" title="Vehiculos con riesgo">
-                    <Car className="h-4 w-4" />
-                    <span>Vehiculos</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
-      <SidebarFooter className="p-4 group-data-[collapsible=icon]:hidden">
-        <SidebarUserAndLogout />
-      </SidebarFooter>
-    </Sidebar>
+    <aside className="hidden w-64 shrink-0 border-r bg-background lg:block">
+      <div className="flex h-16 items-center gap-2 border-b px-4">
+        <BarChart3 className="h-5 w-5" />
+        <p className="font-semibold">FleetGuard</p>
+      </div>
+      <nav className="space-y-1 p-3">
+        {navItems.map((item) => {
+          const active = pathname === item.href || pathname.startsWith(`${item.href}/`)
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`flex items-center justify-between rounded-md px-3 py-2 text-sm ${
+                active ? "bg-muted font-medium" : "text-muted-foreground hover:bg-muted/60"
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <item.icon className="h-4 w-4" />
+                {item.label}
+              </span>
+              {item.href === "/pendientes" && pendingAlertsCount > 0 && <Badge>{pendingAlertsCount}</Badge>}
+            </Link>
+          )
+        })}
+      </nav>
+
+      <div className="border-t px-3 py-4 text-xs text-muted-foreground">
+        <p>Panel legacy disponible en /panel</p>
+      </div>
+    </aside>
   )
 }

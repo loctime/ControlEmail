@@ -1,69 +1,49 @@
 "use client"
 
-import { Bell, Search } from "lucide-react"
-import { SidebarTrigger } from "@/components/ui/sidebar"
-import { Input } from "@/components/ui/input"
+import { useMemo } from "react"
+import { usePathname, useRouter } from "next/navigation"
+import { LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
-import { ThemeToggle } from "@/components/theme-toggle"
 
-const sectionTitles: Record<string, string> = {
-  dashboard: "Dashboard",
-  eventos: "Eventos",
-  vehiculos: "Vehiculos",
-  alertas: "Alertas",
-  configuracion: "Configuracion",
+const titles: Record<string, string> = {
+  "/dashboard": "Dashboard",
+  "/vehiculos": "Vehiculos",
+  "/eventos": "Eventos",
+  "/pendientes": "Alertas pendientes",
+  "/historico": "Historico",
+  "/calidad": "Calidad de datos",
+  "/configuracion": "Configuracion",
 }
 
 interface TopNavbarProps {
-  activeSection: string
-  searchQuery: string
-  onSearchChange: (query: string) => void
-  /** Número de alertas pendientes de envío (backend real). */
-  pendingAlertsCount: number
-  onNavigate: (section: string) => void
+  subtitle?: string
+  onLogout: () => Promise<void>
 }
 
-export function TopNavbar({
-  activeSection,
-  searchQuery,
-  onSearchChange,
-  pendingAlertsCount,
-  onNavigate,
-}: TopNavbarProps) {
+export function TopNavbar({ subtitle, onLogout }: TopNavbarProps) {
+  const pathname = usePathname()
+  const router = useRouter()
+
+  const title = useMemo(() => {
+    const matched = Object.keys(titles).find((path) => pathname === path || pathname.startsWith(`${path}/`))
+    return matched ? titles[matched] : "FleetGuard"
+  }, [pathname])
+
   return (
-    <header className="sticky top-0 z-30 flex min-h-[56px] items-center gap-3 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <SidebarTrigger />
-      <Separator orientation="vertical" className="h-5" />
-      <h1 className="text-base font-semibold">
-        {sectionTitles[activeSection] || "Dashboard"}
-      </h1>
-      <div className="ml-auto flex items-center gap-3">
-        <div className="relative hidden sm:block">
-          <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar patente, evento..."
-            className="h-11 min-h-[44px] w-48 pl-10 text-sm lg:w-64"
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-          />
+    <header className="sticky top-0 z-20 border-b bg-background/95 px-4 py-3 backdrop-blur">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h1 className="text-lg font-semibold">{title}</h1>
+          {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
         </div>
-        <ThemeToggle />
-        <Button
-          variant="ghost"
-          size="icon"
-          className="relative h-11 w-11 min-h-[44px] min-w-[44px]"
-          onClick={() => onNavigate("alertas")}
-        >
-          <Bell className="h-5 w-5" />
-          {pendingAlertsCount > 0 && (
-            <Badge className="absolute -right-1 -top-1 flex h-5 w-5 min-w-[20px] items-center justify-center rounded-full bg-destructive p-0 text-xs text-destructive-foreground">
-              {pendingAlertsCount}
-            </Badge>
-          )}
-          <span className="sr-only">Notificaciones</span>
-        </Button>
+
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => router.push("/admin/vehicle-alerts")}>Admin</Button>
+          <Button variant="ghost" size="sm" onClick={() => void onLogout()}>
+            <LogOut className="mr-2 h-4 w-4" />
+            Salir
+          </Button>
+        </div>
       </div>
     </header>
   )

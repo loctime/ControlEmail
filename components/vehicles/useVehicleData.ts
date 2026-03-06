@@ -1,8 +1,8 @@
 "use client"
 
 import { useEffect, useState, useMemo } from "react"
-import { emailModuleService } from "@/services/emailModule"
 import type { VehicleDoc, VehicleEventDashboard } from "@/lib/firestore-read"
+import { getLastClosedDate } from "@/lib/domain/closed-date"
 import type { VehiclePlateDetailDTO } from "@/services/dto"
 
 export interface VehicleKpis {
@@ -105,7 +105,7 @@ export function useVehicleData(plate: string, daysFilter: 7 | 30 | 90 = 30): Veh
   const filteredEvents = useMemo(() => {
     if (!events.length) return []
     
-    const cutoffDate = new Date()
+    const cutoffDate = getLastClosedDate()
     cutoffDate.setDate(cutoffDate.getDate() - daysFilter)
     
     return events.filter((event) => {
@@ -133,7 +133,7 @@ export function useVehicleData(plate: string, daysFilter: 7 | 30 | 90 = 30): Veh
     let diasSinEventos = 0
     if (ultimoEvento) {
       const ultimoEventoDate = new Date(ultimoEvento.eventTimestamp)
-      const ahora = new Date()
+      const ahora = getLastClosedDate()
       const diffMs = ahora.getTime() - ultimoEventoDate.getTime()
       diasSinEventos = Math.floor(diffMs / (1000 * 60 * 60 * 24))
     } else {
@@ -261,3 +261,6 @@ export function useVehicleData(plate: string, daysFilter: 7 | 30 | 90 = 30): Veh
     error,
   }
 }
+
+
+
