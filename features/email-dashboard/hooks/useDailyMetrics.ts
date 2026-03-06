@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { emailModuleService } from "@/services/emailModule"
-import type { DailyMetricsDTO } from "@/services/dto"
+import type { DailyMetricsDTO } from "@/services/api/quality/types"
 
 export function useDailyMetrics(date: string) {
   const [data, setData] = useState<DailyMetricsDTO | null>(null)

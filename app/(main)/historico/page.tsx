@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { AsyncState } from "@/components/common/async-state"
 import { LastClosedDateBadge } from "@/components/common/last-closed-date-badge"
 import { qualityApi } from "@/services/api"
-import type { DailyMetricsDTO } from "@/services/dto"
+import type { DailyMetricsDTO } from "@/services/api/quality/types"
 import { getLastClosedDate } from "@/lib/domain/closed-date"
 import { formatEventDateTime } from "@/lib/ui/datetime"
 

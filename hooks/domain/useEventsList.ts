@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { eventsApi } from "@/services/api"
-import type { VehicleEventLegacyDTO } from "@/services/dto"
+import type { VehicleEventLegacyDTO } from "@/services/api/events/types"
 
 export function useEventsList() {
   const [events, setEvents] = useState<VehicleEventLegacyDTO[]>([])

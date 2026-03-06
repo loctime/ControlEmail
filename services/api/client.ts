@@ -1,3 +1,4 @@
+import { auth } from "@/lib/firebase-client"
 import { emailApiFetch, sessionApiFetch } from "@/services/api/http"
 
 export type ApiAuthMode = "session" | "firebase"
@@ -9,9 +10,9 @@ export interface ApiClientError extends Error {
 
 interface RequestConfig<TBody = unknown> {
   authMode?: ApiAuthMode
-  body?: TBody
   headers?: HeadersInit
   okStatuses?: number[]
+  body?: TBody
 }
 
 interface InternalRequestConfig<TBody = unknown> extends RequestConfig<TBody> {
@@ -31,61 +32,6 @@ function buildInit<TBody>(config: InternalRequestConfig<TBody>): RequestInit {
   return init
 }
 
-async function request<TResponse, TBody = unknown>(
-  path: string,
-  config: InternalRequestConfig<TBody>,
-): Promise<TResponse> {
-  const authMode = config.authMode ?? "session"
-  const okStatuses = config.okStatuses
-
-  if (!okStatuses || okStatuses.length === 0) {
-    return authMode === "firebase"
-      ? emailApiFetch<TResponse>(path, buildInit(config))
-      : sessionApiFetch<TResponse>(path, buildInit(config))
-  }
-
-  const transport = authMode === "firebase" ? emailApiFetch<Response> : sessionApiFetch<Response>
-  const response = await transport(path, {
-    ...buildInit(config),
-    // Force raw response for custom statuses.
-    headers: {
-      Accept: "application/json",
-      ...(config.headers ?? {}),
-    },
-  })
-
-  // The branch above is unreachable with current transports, keep fallback for typing safety.
-  return response as unknown as TResponse
-}
-
-async function requestWithStatuses<TResponse, TBody = unknown>(
-  path: string,
-  config: InternalRequestConfig<TBody>,
-): Promise<TResponse> {
-  const authMode = config.authMode ?? "session"
-  const init = buildInit(config)
-
-  const rawResponse = authMode === "firebase"
-    ? await fetchWithFirebase(path, init)
-    : await fetchWithSession(path, init)
-
-  const data = (rawResponse.status === 204
-    ? {}
-    : await rawResponse.json().catch(() => ({}))) as TResponse & { error?: string; message?: string; code?: string }
-
-  const allowed = [200, 201, 202, 204, ...(config.okStatuses ?? [])]
-  if (!allowed.includes(rawResponse.status)) {
-    const err = new Error(
-      data?.error ?? data?.message ?? rawResponse.statusText ?? "Request failed",
-    ) as ApiClientError
-    err.status = rawResponse.status
-    err.code = data?.code
-    throw err
-  }
-
-  return data
-}
-
 async function fetchWithSession(path: string, init: RequestInit): Promise<Response> {
   return fetch(path, {
     ...init,
@@ -98,7 +44,6 @@ async function fetchWithSession(path: string, init: RequestInit): Promise<Respon
 }
 
 async function fetchWithFirebase(path: string, init: RequestInit): Promise<Response> {
-  const { auth } = await import("@/lib/firebase-client")
   const user = auth.currentUser
   if (!user) {
     const err = new Error("Usuario no autenticado") as ApiClientError
@@ -120,21 +65,50 @@ async function fetchWithFirebase(path: string, init: RequestInit): Promise<Respo
   })
 }
 
+async function requestWithStatuses<TResponse, TBody = unknown>(
+  path: string,
+  config: InternalRequestConfig<TBody>,
+): Promise<TResponse> {
+  const authMode = config.authMode ?? "session"
+  const init = buildInit(config)
+  const response = authMode === "firebase"
+    ? await fetchWithFirebase(path, init)
+    : await fetchWithSession(path, init)
+
+  const data = (response.status === 204
+    ? {}
+    : await response.json().catch(() => ({}))) as TResponse & { error?: string; message?: string; code?: string }
+
+  const allowedStatuses = new Set([200, 201, 202, 204, ...(config.okStatuses ?? [])])
+  if (!allowedStatuses.has(response.status)) {
+    const err = new Error(data.error ?? data.message ?? response.statusText ?? "Request failed") as ApiClientError
+    err.status = response.status
+    if (typeof data.code === "string") err.code = data.code
+    throw err
+  }
+
+  return data
+}
+
+async function request<TResponse, TBody = unknown>(path: string, config: InternalRequestConfig<TBody>): Promise<TResponse> {
+  if (config.okStatuses && config.okStatuses.length > 0) {
+    return requestWithStatuses<TResponse, TBody>(path, config)
+  }
+
+  const init = buildInit(config)
+  const authMode = config.authMode ?? "session"
+  return authMode === "firebase"
+    ? emailApiFetch<TResponse>(path, init)
+    : sessionApiFetch<TResponse>(path, init)
+}
+
 export const apiClient = {
   get: <TResponse>(path: string, config: Omit<RequestConfig, "body"> = {}) =>
-    config.okStatuses?.length
-      ? requestWithStatuses<TResponse>(path, { ...config, method: "GET" })
-      : request<TResponse>(path, { ...config, method: "GET" }),
+    request<TResponse>(path, { ...config, method: "GET" }),
   post: <TResponse, TBody = unknown>(path: string, body?: TBody, config: Omit<RequestConfig<TBody>, "body"> = {}) =>
-    config.okStatuses?.length
-      ? requestWithStatuses<TResponse, TBody>(path, { ...config, method: "POST", body })
-      : request<TResponse, TBody>(path, { ...config, method: "POST", body }),
+    request<TResponse, TBody>(path, { ...config, method: "POST", body }),
   patch: <TResponse, TBody = unknown>(path: string, body?: TBody, config: Omit<RequestConfig<TBody>, "body"> = {}) =>
-    config.okStatuses?.length
-      ? requestWithStatuses<TResponse, TBody>(path, { ...config, method: "PATCH", body })
-      : request<TResponse, TBody>(path, { ...config, method: "PATCH", body }),
+    request<TResponse, TBody>(path, { ...config, method: "PATCH", body }),
   delete: <TResponse, TBody = unknown>(path: string, body?: TBody, config: Omit<RequestConfig<TBody>, "body"> = {}) =>
-    config.okStatuses?.length
-      ? requestWithStatuses<TResponse, TBody>(path, { ...config, method: "DELETE", body })
-      : request<TResponse, TBody>(path, { ...config, method: "DELETE", body }),
+    request<TResponse, TBody>(path, { ...config, method: "DELETE", body }),
 }

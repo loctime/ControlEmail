@@ -12,7 +12,7 @@ import { DataTable, type DataTableColumn } from "@/components/tables/data-table"
 import { LastClosedDateBadge } from "@/components/common/last-closed-date-badge"
 import { useEventsList } from "@/hooks/domain/useEventsList"
 import { getLastClosedDateKey } from "@/lib/domain/closed-date"
-import type { VehicleEventLegacyDTO } from "@/services/dto"
+import type { VehicleEventLegacyDTO } from "@/services/api/events/types"
 
 function severityFromStatus(status: VehicleEventLegacyDTO["estado"]): "ALTA" | "MEDIA" | "BAJA" {
   if (status === "critico") return "ALTA"

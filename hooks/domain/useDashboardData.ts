@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { dashboardApi } from "@/services/api"
-import type { DailyConsistencyDTO, MyAlertItemDTO, MyRiskDTO, MyStatsDTO } from "@/services/dto"
+import type { MyAlertItemDTO, MyRiskDTO, MyStatsDTO } from "@/services/api/dashboard/types"
+import type { DailyConsistencyDTO } from "@/services/api/quality/types"
 import { getLastClosedDateKey } from "@/lib/domain/closed-date"
 
 interface DashboardDataState {

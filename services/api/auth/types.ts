@@ -20,3 +20,9 @@ export interface CreateSessionRequestDTO {
 export interface CreateSessionResponseDTO {
   ok: boolean
 }
+
+export interface EmailMeDTO {
+  ok: boolean
+  email: string
+  role: "admin" | "general" | "report" | "responsable"
+}

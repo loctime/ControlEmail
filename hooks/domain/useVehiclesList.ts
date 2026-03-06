@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { vehiclesApi } from "@/services/api"
-import type { MyAlertsVehiclesItemDTO, MyVehiclesItemDTO } from "@/services/dto"
+import type { MyAlertsVehiclesItemDTO, MyVehiclesItemDTO } from "@/services/api/vehicles/types"
 
 export interface VehicleListRow {
   plate: string

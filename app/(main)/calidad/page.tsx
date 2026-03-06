@@ -12,7 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { AsyncState } from "@/components/common/async-state"
 import { LastClosedDateBadge } from "@/components/common/last-closed-date-badge"
 import { qualityApi } from "@/services/api"
-import type { DailyConsistencyDTO } from "@/services/dto"
+import type { DailyConsistencyDTO } from "@/services/api/quality/types"
 import { getLastClosedDate } from "@/lib/domain/closed-date"
 import { formatEventDateTime } from "@/lib/ui/datetime"
 

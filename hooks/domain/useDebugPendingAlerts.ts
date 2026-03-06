@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { debugPendingAlertsService } from "@/services/debugPendingAlertsService"
-import type { DebugPendingAlertDTO } from "@/services/dto"
+import type { DebugPendingAlertDTO } from "@/services/api/alerts/types"
 
 interface UseDebugPendingAlertsResult {
   data: DebugPendingAlertDTO[]

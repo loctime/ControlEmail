@@ -3,7 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { TrendingUp, TrendingDown, Minus, AlertTriangle, Users, Activity } from "lucide-react"
-import type { DailyMetricsDTO } from "@/services/dto"
+import type { DailyMetricsDTO } from "@/services/api/quality/types"
 
 interface DashboardKpisProps {
   data: DailyMetricsDTO | null

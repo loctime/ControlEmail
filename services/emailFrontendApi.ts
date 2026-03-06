@@ -1,10 +1,10 @@
 import { apiClient } from "@/services/api/client"
-import type { MeDTO } from "@/services/dto"
+import type { EmailMeDTO } from "@/services/api/auth/types"
 import type { MyAlertsDTO, MyRiskDTO, MyStatsDTO } from "@/services/api/dashboard/types"
 import type { MyAlertsVehiclesDTO, MyVehiclesDTO } from "@/services/api/vehicles/types"
 
 export const emailFrontendApi = {
-  me: () => apiClient.get<MeDTO>("/api/email/me", { authMode: "firebase" }),
+  me: () => apiClient.get<EmailMeDTO>("/api/email/me", { authMode: "firebase" }),
   myVehicles: () => apiClient.get<MyVehiclesDTO>("/api/email/my-vehicles", { authMode: "firebase" }),
   myAlerts: (params?: { limit?: number; startAfter?: string }) => {
     const query = new URLSearchParams()

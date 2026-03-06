@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { alertsApi, vehiclesApi } from "@/services/api"
-import type { DailyAlertDTO, MarkAlertSentResultDTO } from "@/services/dto"
+import type { DailyAlertDTO, MarkAlertSentResultDTO } from "@/services/api/alerts/types"
 
 export interface PendingAlertRow extends DailyAlertDTO {
   responsables: string[]
