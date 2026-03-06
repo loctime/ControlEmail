@@ -1,14 +1,16 @@
 import { NextResponse } from "next/server"
 import { getAuthUserWithPlates, authUnauthorizedResponse } from "@/lib/auth-user"
 import { getDailyMetrics } from "@/lib/firestore-read"
-import { getYesterdayKey } from "@/lib/domain/date"
+import { getYesterdayKey, normalizeBusinessDate } from "@/lib/domain/date"
 
 export async function GET(request: Request) {
   const auth = await getAuthUserWithPlates(request)
   if (!auth) return authUnauthorizedResponse()
 
   try {
-    const dateKey = getYesterdayKey()
+    const { searchParams } = new URL(request.url)
+    const dateParam = searchParams.get("date")
+    const dateKey = dateParam ? normalizeBusinessDate(dateParam) : getYesterdayKey()
     const metrics = await getDailyMetrics(dateKey)
     const vehicles = metrics.vehicles
       .filter((item) => auth.allowedPlates.has(item.plate))

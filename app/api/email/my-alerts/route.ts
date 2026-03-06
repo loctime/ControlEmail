@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { getAuthUserWithPlates, authUnauthorizedResponse } from "@/lib/auth-user"
 import { getDailyMetrics } from "@/lib/firestore-read"
-import { getYesterdayKey } from "@/lib/domain/date"
+import { getYesterdayKey, normalizeBusinessDate } from "@/lib/domain/date"
 
 function makeAlertId(dateKey: string, plate: string): string {
   return `${dateKey}_${plate}`
@@ -16,8 +16,8 @@ export async function GET(request: Request) {
     const limitRaw = Number(searchParams.get("limit") ?? 50)
     const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(200, limitRaw)) : 50
     const startAfter = (searchParams.get("startAfter") ?? "").trim()
-
-    const dateKey = getYesterdayKey()
+    const dateParam = searchParams.get("date")
+    const dateKey = dateParam ? normalizeBusinessDate(dateParam) : getYesterdayKey()
     const metrics = await getDailyMetrics(dateKey)
 
     const alerts = metrics.vehicles

@@ -3,6 +3,7 @@
 export const queryKeys = {
   dashboard: {
     myData: (dateKey: string) => ["dashboard", "myData", dateKey] as const,
+    lastDate: () => ["dashboard", "lastDate"] as const,
   },
   vehicles: {
     myVehicles: () => ["vehicles", "myVehicles"] as const,

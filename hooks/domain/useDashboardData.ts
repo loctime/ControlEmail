@@ -5,7 +5,6 @@ import { useQuery } from "@tanstack/react-query"
 import { dashboardApi } from "@/services/api"
 import type { MyAlertItemDTO, MyRiskDTO, MyStatsDTO } from "@/services/api/dashboard/types"
 import type { DailyConsistencyDTO } from "@/services/api/quality/types"
-import { getLastClosedDateKey } from "@/lib/domain/closed-date"
 import { queryKeys } from "@/lib/query/queryKeys"
 
 interface DashboardDataState {
@@ -18,16 +17,14 @@ interface DashboardDataState {
   refetch: () => Promise<void>
 }
 
-export function useDashboardData(): DashboardDataState {
-  const dateKey = getLastClosedDateKey()
-
+export function useDashboardData(dateKey?: string): DashboardDataState {
   const query = useQuery({
     queryKey: queryKeys.dashboard.myData(dateKey),
     queryFn: async () => {
       const [statsRes, riskRes, alertsRes, consistencyRes] = await Promise.all([
-        dashboardApi.myStats(),
-        dashboardApi.myRisk(),
-        dashboardApi.myAlerts({ limit: 200 }),
+        dashboardApi.myStats(dateKey),
+        dashboardApi.myRisk(dateKey),
+        dashboardApi.myAlerts({ date: dateKey, limit: 200 }),
         dashboardApi.dailyConsistency(dateKey),
       ])
 
@@ -40,6 +37,7 @@ export function useDashboardData(): DashboardDataState {
         consistency: consistencyRes ?? null,
       }
     },
+    enabled: !!dateKey,
     staleTime: 60_000,
   })
 
