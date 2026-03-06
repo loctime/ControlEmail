@@ -355,14 +355,14 @@ export interface VehicleDoc {
 }
 
 /**
- * Comprueba si existe el documento apps/emails/users/{email}.
+ * Comprueba si existe el documento apps/emails/access/{email}.
  * El email se normaliza (trim + lowercase). Usado para autorización de acceso.
- * El ID del documento en Firestore debe ser exactamente el email normalizado (ej: user@domain.com).
+ * La colección access es la fuente de verdad (sincronizada por POST /email/sync-access-users).
  */
 export async function allowedUserExistsByEmail(email: string): Promise<boolean> {
   const normalized = email.trim().toLowerCase()
   if (!normalized) return false
-  const docPath = `apps/emails/users/${encodeURIComponent(normalized)}`
+  const docPath = `apps/emails/access/${encodeURIComponent(normalized)}`
   const path = `documents/${docPath}`
   const res = await firestoreRequest(path, { method: "GET" }, { quiet404: true })
   const exists = res.ok
@@ -384,8 +384,8 @@ export interface EmailAccessUser {
 export async function getEmailAccessUserByEmail(email: string): Promise<EmailAccessUser | null> {
   const normalized = email.trim().toLowerCase()
   if (!normalized) return null
-  const docPath = `apps/emails/users/${encodeURIComponent(normalized)}`
-  const path = `documents/${docPath}`
+  const docPath = `apps/emails/access/${encodeURIComponent(normalized)}`
+    const path = `documents/${docPath}`
   const res = await firestoreRequest(path, { method: "GET" }, { quiet404: true })
   if (!res.ok) {
     if (res.status === 404) return null
