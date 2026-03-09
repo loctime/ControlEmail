@@ -946,6 +946,10 @@ export interface DailyAlertVehicle {
     noKeyEvents: number
     /** Excesos de velocidad del día (desde dailyAlerts). */
     excesos?: number
+    no_identificados?: number
+    contactos?: number
+    llave_sin_cargar?: number
+    conductor_inactivo?: number
   }
   /** Risk score agregado calculado en backend. Si falta en origen, se expone como null. */
   riskScore: number | null
@@ -998,14 +1002,20 @@ function parseVehicleSummary(summary: Record<string, unknown>): DailyAlertVehicl
   const excesos = Number(summary.excesos ?? 0)
   const noIdentificados = Number(summary.no_identificados ?? summary.noKeyEvents ?? 0)
   const contactos = Number(summary.contactos ?? 0)
+  const llaveSinCargar = Number(summary.llave_sin_cargar ?? summary.noKeyEvents ?? 0)
+  const conductorInactivo = Number(summary.conductor_inactivo ?? 0)
   const totalFromFields = excesos + noIdentificados + contactos +
-    Number(summary.conductor_inactivo ?? 0) + Number(summary.llave_sin_cargar ?? 0)
+    conductorInactivo + llaveSinCargar
   return {
     totalEvents: Number(summary.totalEvents ?? totalFromFields ?? 0),
     criticalEvents: Number(summary.criticalEvents ?? excesos + noIdentificados ?? 0),
     warningEvents: Number(summary.warningEvents ?? 0),
-    noKeyEvents: Number(summary.noKeyEvents ?? summary.llave_sin_cargar ?? 0),
+    noKeyEvents: Number(summary.noKeyEvents ?? llaveSinCargar),
     excesos,
+    no_identificados: noIdentificados,
+    contactos,
+    llave_sin_cargar: llaveSinCargar,
+    conductor_inactivo: conductorInactivo,
   }
 }
 
@@ -1236,4 +1246,6 @@ export async function getDailyAlertForVehicle(
 
   return { alert, meta }
 }
+
+
 

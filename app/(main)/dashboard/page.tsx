@@ -1,219 +1,122 @@
 "use client"
 
-import { useCallback, useMemo, useState } from "react"
-import Link from "next/link"
-import { format } from "date-fns"
-import { es } from "date-fns/locale"
-import {
-  AlertTriangle,
-  BarChart3,
-  CalendarDays,
-  Clock,
-  Send,
-  ShieldAlert,
-  TrendingUp,
-} from "lucide-react"
-import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { AsyncState } from "@/components/common/async-state"
-import { useDashboardData } from "@/hooks/domain/useDashboardData"
-import { useDashboardDate } from "@/hooks/domain/useDashboardDate"
-import {
-  DashboardHeader,
-  DateControls,
-  KpiGrid,
-  RiskVehiclesCard,
-  DataConsistencyCard,
-  PendingAlertsCard,
-} from "@/components/dashboard"
-import type { KpiCardProps } from "@/components/dashboard"
-import { cn } from "@/lib/utils"
+import { useMemo, useState } from "react"
+import { AlertCircle, Loader2 } from "lucide-react"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { DashboardHeader } from "@/components/dashboard/dashboard-header"
+import { CriticalAlerts } from "@/components/dashboard/critical-alerts"
+import { KpiCards } from "@/components/dashboard/kpi-cards"
+import { EventDistributionChart } from "@/components/dashboard/event-distribution"
+import { TopVehiclesTable } from "@/components/dashboard/top-vehicles-table"
+import { RecentEvents } from "@/components/dashboard/recent-events"
+import { FleetRiskMap } from "@/components/dashboard/fleet-risk-map"
+import { TrendChart } from "@/components/dashboard/trend-chart"
+import { useDashboardData } from "@/hooks/use-dashboard-data"
+import type { DashboardRangePreset } from "@/services/dashboard-api"
 
-const MAX_RISK_VEHICLES = 10
-const MAX_PENDING_ALERTS = 8
+function getTodayKey(): string {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+  return formatter.format(new Date())
+}
 
-export type DashboardViewMode = "day" | "month" | "year"
+function offsetDate(dateKey: string, deltaDays: number): string {
+  const [y, m, d] = dateKey.split("-").map(Number)
+  const date = new Date(y, m - 1, d + deltaDays)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
+function presetRange(preset: DashboardRangePreset): { startDate: string; endDate: string } {
+  const today = getTodayKey()
+  if (preset === "yesterday") {
+    const day = offsetDate(today, -1)
+    return { startDate: day, endDate: day }
+  }
+  if (preset === "7d") return { startDate: offsetDate(today, -6), endDate: today }
+  if (preset === "30d") return { startDate: offsetDate(today, -29), endDate: today }
+  return { startDate: today, endDate: today }
+}
 
 export default function DashboardPage() {
-  const [mode, setMode] = useState<DashboardViewMode>("day")
+  const initialRange = presetRange("7d")
+  const [range, setRange] = useState<DashboardRangePreset>("7d")
+  const [startDate, setStartDate] = useState(initialRange.startDate)
+  const [endDate, setEndDate] = useState(initialRange.endDate)
+
+  const params = useMemo(
+    () => ({ range, startDate, endDate }),
+    [range, startDate, endDate],
+  )
 
   const {
-    selectedDate,
-    selectedDateLabel,
-    selectedDateObj,
-    disabledDays,
-    canGoPrev,
-    canGoNext,
-    loadingLastDate,
-    lastDateData,
-    setDate,
-    handlePrev,
-    handleNext,
-  } = useDashboardDate()
+    summary,
+    distribution,
+    criticalAlerts,
+    riskMap,
+    topVehicles,
+    recentEvents,
+    trend,
+    isLoading,
+    isFetching,
+    error,
+  } = useDashboardData(params)
 
-  const { stats, riskVehicles, pendingAlerts, consistency, loading, error, refetch } =
-    useDashboardData(selectedDate, mode)
-
-  const handleRefetch = useCallback(() => void refetch(), [refetch])
-
-  const hasData =
-    (stats?.totalAlerts ?? 0) > 0 ||
-    riskVehicles.length > 0 ||
-    pendingAlerts.length > 0
-
-  const topRiskVehicles = useMemo(
-    () => riskVehicles.slice(0, MAX_RISK_VEHICLES),
-    [riskVehicles]
-  )
-  const topPendingAlerts = useMemo(
-    () => pendingAlerts.slice(0, MAX_PENDING_ALERTS),
-    [pendingAlerts]
-  )
-  const globalMaxRisk = topRiskVehicles[0]?.maxRisk ?? 1
-
-  /** Etiqueta del período según el modo: día "04 mar 2026", mes "marzo 2026", año "2026" */
-  const periodLabel = useMemo(() => {
-    if (!selectedDate) return "este período"
-    if (mode === "day") return selectedDateLabel
-    const d = new Date(`${selectedDate}T00:00:00`)
-    if (Number.isNaN(d.getTime())) return selectedDate
-    if (mode === "month") return format(d, "LLLL yyyy", { locale: es })
-    return format(d, "yyyy", { locale: es })
-  }, [selectedDate, selectedDateLabel, mode])
-
-  const kpis: KpiCardProps[] = useMemo(
-    () => [
-      {
-        label: "Total alertas",
-        value: stats?.totalAlerts ?? 0,
-        icon: <BarChart3 size={20} />,
-        accent: "default",
-      },
-      {
-        label: "Pendientes",
-        value: stats?.alertsPending ?? 0,
-        icon: <Clock size={20} />,
-        accent: (stats?.alertsPending ?? 0) > 0 ? "warning" : "success",
-      },
-      {
-        label: "Enviadas",
-        value: stats?.alertsSent ?? 0,
-        icon: <Send size={20} />,
-        accent: "success",
-      },
-      {
-        label: "Riesgo máximo",
-        value: stats?.maxRisk ?? 0,
-        icon: <ShieldAlert size={20} />,
-        accent:
-          (stats?.maxRisk ?? 0) >= 15
-            ? "danger"
-            : (stats?.maxRisk ?? 0) >= 8
-              ? "warning"
-              : "default",
-      },
-      {
-        label: "Riesgo promedio",
-        value: stats?.avgRisk ?? 0,
-        icon: <TrendingUp size={20} />,
-        accent: "default",
-      },
-    ],
-    [stats]
-  )
+  const handlePresetChange = (preset: DashboardRangePreset) => {
+    setRange(preset)
+    if (preset !== "custom") {
+      const next = presetRange(preset)
+      setStartDate(next.startDate)
+      setEndDate(next.endDate)
+    }
+  }
 
   return (
-    <div className="min-h-screen space-y-6 p-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <DashboardHeader />
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex rounded-lg border border-white/10 bg-white/[0.04] p-0.5">
-            {(
-              [
-                { value: "day" as const, label: "Día", icon: CalendarDays },
-                { value: "month" as const, label: "Mes", icon: CalendarDays },
-                { value: "year" as const, label: "Año", icon: CalendarDays },
-              ] as const
-            ).map(({ value, label, icon: Icon }) => (
-              <Button
-                key={value}
-                variant="ghost"
-                size="sm"
-                className={cn(
-                  "h-8 gap-1.5 px-3 text-xs text-white/60 hover:text-white",
-                  mode === value && "bg-white/10 text-white",
-                )}
-                onClick={() => setMode(value)}
-              >
-                <Icon size={14} />
-                {label}
-              </Button>
-            ))}
-          </div>
-          <DateControls
-          selectedDate={selectedDate}
-          selectedDateLabel={selectedDateLabel}
-          selectedDateObj={selectedDateObj}
-          disabledDays={disabledDays}
-          canGoPrev={canGoPrev}
-          canGoNext={canGoNext}
-          loadingLastDate={loadingLastDate}
-          loading={loading}
-          lastDateData={lastDateData}
-          onPrev={handlePrev}
-          onNext={handleNext}
-          onRefetch={handleRefetch}
-          onSetDate={setDate}
-        />
+    <main className="space-y-6 p-6">
+      <DashboardHeader
+        range={range}
+        startDate={startDate}
+        endDate={endDate}
+        onChangePreset={handlePresetChange}
+        onChangeStartDate={setStartDate}
+        onChangeEndDate={setEndDate}
+      />
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error al cargar dashboard</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {isFetching && !isLoading && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Actualizando datos...
         </div>
+      )}
+
+      <CriticalAlerts alerts={criticalAlerts} loading={isLoading} />
+
+      <KpiCards summary={summary} loading={isLoading} />
+
+      <div className="grid gap-6 xl:grid-cols-2">
+        <EventDistributionChart distribution={distribution} loading={isLoading} />
+        <TopVehiclesTable vehicles={topVehicles} loading={isLoading} />
       </div>
 
-      <AsyncState loading={loading} error={error} onRetry={handleRefetch} />
+      <RecentEvents events={recentEvents} loading={isLoading} />
 
-      {!loading && !error && !hasData && selectedDate && (
-        <Card className="border-white/5 bg-white/[0.02]">
-          <CardContent className="flex items-center gap-3 py-6 text-sm text-white/40">
-            <AlertTriangle size={16} className="shrink-0 text-yellow-400/60" />
-            No hay alertas registradas para {periodLabel}.
-          </CardContent>
-        </Card>
-      )}
+      <FleetRiskMap items={riskMap} loading={isLoading} />
 
-      {!loading && !error && hasData && (
-        <div className="space-y-5">
-          <KpiGrid kpis={kpis} />
-
-          <div className="grid gap-4 xl:grid-cols-2">
-            <RiskVehiclesCard
-              vehicles={topRiskVehicles}
-              totalCount={riskVehicles.length}
-              globalMaxRisk={globalMaxRisk}
-            />
-            <DataConsistencyCard consistency={consistency} />
-          </div>
-
-          <PendingAlertsCard alerts={topPendingAlerts} totalCount={pendingAlerts.length} />
-
-          <div className="flex flex-wrap gap-2 pt-1">
-            {[
-              { href: "/historico", label: "Histórico" },
-              { href: "/pendientes", label: "Pendientes" },
-              { href: "/vehiculos", label: "Vehículos" },
-              { href: "/configuracion", label: "Configuración" },
-            ].map(({ href, label }) => (
-              <Link key={href} href={href}>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="border-white/10 bg-white/[0.03] text-white/50 transition-colors hover:bg-white/[0.07] hover:text-white"
-                >
-                  {label}
-                </Button>
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
+      <TrendChart trend={trend} loading={isLoading} />
+    </main>
   )
 }
