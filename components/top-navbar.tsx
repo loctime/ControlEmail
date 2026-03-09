@@ -4,6 +4,7 @@ import { useMemo } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 const titles: Record<string, string> = {
   "/dashboard": "Dashboard",
@@ -38,6 +39,7 @@ export function TopNavbar({ subtitle, onLogout }: TopNavbarProps) {
         </div>
 
         <div className="flex items-center gap-2">
+          <ThemeToggle />
           <Button variant="outline" size="sm" onClick={() => router.push("/admin/vehicle-alerts")}>Admin</Button>
           <Button variant="ghost" size="sm" onClick={() => void onLogout()}>
             <LogOut className="mr-2 h-4 w-4" />

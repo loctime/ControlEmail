@@ -1,16 +1,18 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { AlertCircle, Loader2 } from "lucide-react"
+import { AlertCircle } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { DashboardHeader } from "@/components/dashboard/dashboard-header"
-import { CriticalAlerts } from "@/components/dashboard/critical-alerts"
-import { KpiCards } from "@/components/dashboard/kpi-cards"
-import { EventDistributionChart } from "@/components/dashboard/event-distribution"
-import { TopVehiclesTable } from "@/components/dashboard/top-vehicles-table"
-import { RecentEvents } from "@/components/dashboard/recent-events"
-import { FleetRiskMap } from "@/components/dashboard/fleet-risk-map"
-import { TrendChart } from "@/components/dashboard/trend-chart"
+import { DashboardHeader } from "@/components/dashboard/DashboardHeader"
+import { DateRangeSelector } from "@/components/dashboard/DateRangeSelector"
+import { FleetHealthIndicator } from "@/components/dashboard/FleetHealthIndicator"
+import { DashboardKpis } from "@/components/dashboard/DashboardKpis"
+import { CriticalVehiclesPanel } from "@/components/dashboard/CriticalVehiclesPanel"
+import { FleetRiskHeatmap } from "@/components/dashboard/FleetRiskHeatmap"
+import { TopRiskVehicles } from "@/components/dashboard/TopRiskVehicles"
+import { EventsTrendChart } from "@/components/dashboard/EventsTrendChart"
+import { TopEventsPanel } from "@/components/dashboard/TopEventsPanel"
+import { FleetInsightsPanel } from "@/components/dashboard/FleetInsightsPanel"
 import { useDashboardData } from "@/hooks/use-dashboard-data"
 import type { DashboardRangePreset } from "@/services/dashboard-api"
 
@@ -50,10 +52,7 @@ export default function DashboardPage() {
   const [startDate, setStartDate] = useState(initialRange.startDate)
   const [endDate, setEndDate] = useState(initialRange.endDate)
 
-  const params = useMemo(
-    () => ({ range, startDate, endDate }),
-    [range, startDate, endDate],
-  )
+  const params = useMemo(() => ({ range, startDate, endDate }), [range, startDate, endDate])
 
   const {
     summary,
@@ -78,8 +77,10 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="space-y-6 p-6">
-      <DashboardHeader
+    <main className="min-h-screen space-y-6 bg-background p-4 md:p-6">
+      <DashboardHeader isFetching={isFetching && !isLoading} />
+
+      <DateRangeSelector
         range={range}
         startDate={startDate}
         endDate={endDate}
@@ -89,34 +90,40 @@ export default function DashboardPage() {
       />
 
       {error && (
-        <Alert variant="destructive">
+        <Alert variant="destructive" aria-live="polite">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Error al cargar dashboard</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
-      {isFetching && !isLoading && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Actualizando datos...
-        </div>
-      )}
+      <FleetHealthIndicator maxRisk={summary.maxRisk} loading={isLoading} />
 
-      <CriticalAlerts alerts={criticalAlerts} loading={isLoading} />
+      <DashboardKpis summary={summary} loading={isLoading} />
 
-      <KpiCards summary={summary} loading={isLoading} />
+      <TopEventsPanel distribution={distribution} recentEvents={recentEvents} loading={isLoading} />
+
+      <CriticalVehiclesPanel
+        alerts={criticalAlerts}
+        vehicles={topVehicles}
+        recentEvents={recentEvents}
+        loading={isLoading}
+      />
+
+      <FleetRiskHeatmap items={riskMap} loading={isLoading} />
+
+      <EventsTrendChart trend={trend} avgRisk={summary.avgRisk} loading={isLoading} />
 
       <div className="grid gap-6 xl:grid-cols-2">
-        <EventDistributionChart distribution={distribution} loading={isLoading} />
-        <TopVehiclesTable vehicles={topVehicles} loading={isLoading} />
+        <TopRiskVehicles vehicles={topVehicles} loading={isLoading} />
+        <FleetInsightsPanel
+          summary={summary}
+          distribution={distribution}
+          topVehicles={topVehicles}
+          trend={trend}
+          loading={isLoading}
+        />
       </div>
-
-      <RecentEvents events={recentEvents} loading={isLoading} />
-
-      <FleetRiskMap items={riskMap} loading={isLoading} />
-
-      <TrendChart trend={trend} loading={isLoading} />
     </main>
   )
 }

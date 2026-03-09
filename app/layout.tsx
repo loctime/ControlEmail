@@ -32,13 +32,7 @@ export default function RootLayout({
   return (
     <html lang="es" suppressHydrationWarning>
       <body className={`${inter.className} antialiased`}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          storageKey="fleetguard-theme"
-          disableTransitionOnChange={false}
-        >
+        <ThemeProvider storageKey="fleetguard-theme">
           <QueryProvider>
             <AuthGuard>{children}</AuthGuard>
           </QueryProvider>
