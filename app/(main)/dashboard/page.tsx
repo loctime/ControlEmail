@@ -1,339 +1,175 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useMemo } from "react"
 import Link from "next/link"
-import { format } from "date-fns"
-import { es } from "date-fns/locale"
-import { CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react"
-import { useQuery } from "@tanstack/react-query"
-import type { Matcher } from "react-day-picker"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  AlertTriangle,
+  BarChart3,
+  Clock,
+  Send,
+  ShieldAlert,
+  TrendingUp,
+} from "lucide-react"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { AsyncState } from "@/components/common/async-state"
-import { Calendar } from "@/components/ui/calendar"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { useDashboardData } from "@/hooks/domain/useDashboardData"
-import { dashboardApi } from "@/services/api"
-import { queryKeys } from "@/lib/query/queryKeys"
-import { getYesterdayKey, normalizeBusinessDate } from "@/lib/domain/date"
+import { useDashboardDate } from "@/hooks/domain/useDashboardDate"
+import {
+  DashboardHeader,
+  DateControls,
+  KpiGrid,
+  RiskVehiclesCard,
+  DataConsistencyCard,
+  PendingAlertsCard,
+} from "@/components/dashboard"
+import type { KpiCardProps } from "@/components/dashboard"
 
-const DASHBOARD_SELECTED_DATE_KEY = "dashboard:selectedDate"
-
-function getStoredSelectedDate(): string | undefined {
-  if (typeof window === "undefined") return undefined
-  try {
-    const stored = localStorage.getItem(DASHBOARD_SELECTED_DATE_KEY)
-    return stored && stored.length > 0 ? stored : undefined
-  } catch {
-    return undefined
-  }
-}
+const MAX_RISK_VEHICLES = 10
+const MAX_PENDING_ALERTS = 8
 
 export default function DashboardPage() {
-  const [selectedDate, setSelectedDate] = useState<string | undefined>(undefined)
-  const [hasRestoredFromStorage, setHasRestoredFromStorage] = useState(false)
-
   const {
-    data: lastDateData,
-    isLoading: loadingLastDate,
-    error: lastDateError,
-  } = useQuery({
-    queryKey: queryKeys.dashboard.lastDate(),
-    queryFn: dashboardApi.myLastDateWithData,
-    staleTime: 5 * 60_000,
-  })
+    selectedDate,
+    selectedDateLabel,
+    selectedDateObj,
+    disabledDays,
+    canGoPrev,
+    canGoNext,
+    loadingLastDate,
+    lastDateData,
+    setDate,
+    handlePrev,
+    handleNext,
+  } = useDashboardDate()
 
-  // Restaurar última fecha seleccionada desde localStorage al montar (solo cliente).
-  useEffect(() => {
-    const stored = getStoredSelectedDate()
-    if (stored) {
-      setSelectedDate(stored)
-    }
-    setHasRestoredFromStorage(true)
-  }, [])
+  const { stats, riskVehicles, pendingAlerts, consistency, loading, error, refetch } =
+    useDashboardData(selectedDate)
 
-  // Persistir fecha seleccionada en localStorage cuando cambie.
-  useEffect(() => {
-    if (selectedDate && typeof window !== "undefined") {
-      try {
-        localStorage.setItem(DASHBOARD_SELECTED_DATE_KEY, selectedDate)
-      } catch {
-        // ignore quota / private mode
-      }
-    }
-  }, [selectedDate])
-
-  // Inicializar fecha seleccionada solo si no hay valor guardado ni restaurado: último día con datos o, si falla, ayer.
-  useEffect(() => {
-    if (!hasRestoredFromStorage || selectedDate) return
-    if (lastDateData?.date) {
-      setSelectedDate(normalizeBusinessDate(lastDateData.date))
-    } else if (lastDateError) {
-      setSelectedDate(getYesterdayKey())
-    }
-  }, [lastDateData, lastDateError, selectedDate, hasRestoredFromStorage])
-
-  const {
-    stats,
-    riskVehicles,
-    pendingAlerts,
-    consistency,
-    loading,
-    error,
-    refetch,
-  } = useDashboardData(selectedDate)
-
-  const maxAvailableDate = useMemo(() => {
-    const base = lastDateData?.maxDate ?? lastDateData?.date
-    return base ? normalizeBusinessDate(base) : undefined
-  }, [lastDateData])
-
-  const minAvailableDate = useMemo(() => {
-    const base = lastDateData?.minDate
-    return base ? normalizeBusinessDate(base) : undefined
-  }, [lastDateData])
-
-  const selectedDateLabel = useMemo(() => {
-    if (!selectedDate) return "Seleccionar fecha"
-    const d = new Date(`${selectedDate}T00:00:00`)
-    if (Number.isNaN(d.getTime())) return selectedDate
-    return format(d, "dd/MM/yyyy")
-  }, [selectedDate])
+  const handleRefetch = useCallback(() => void refetch(), [refetch])
 
   const hasData =
     (stats?.totalAlerts ?? 0) > 0 ||
     riskVehicles.length > 0 ||
     pendingAlerts.length > 0
 
-  const selectedDateObj = selectedDate
-    ? new Date(`${selectedDate}T00:00:00`)
-    : undefined
+  const topRiskVehicles = useMemo(
+    () => riskVehicles.slice(0, MAX_RISK_VEHICLES),
+    [riskVehicles]
+  )
+  const topPendingAlerts = useMemo(
+    () => pendingAlerts.slice(0, MAX_PENDING_ALERTS),
+    [pendingAlerts]
+  )
+  const globalMaxRisk = topRiskVehicles[0]?.maxRisk ?? 1
 
-  const maxDateObj = maxAvailableDate
-    ? new Date(`${maxAvailableDate}T00:00:00`)
-    : undefined
-
-  const minDateObj = minAvailableDate
-    ? new Date(`${minAvailableDate}T00:00:00`)
-    : undefined
-
-  const disabledDays: Matcher | undefined = maxDateObj ? { after: maxDateObj } : undefined
-
-  const kpis = [
-    { label: "Total alertas (ultimo cierre)", value: stats?.totalAlerts ?? 0 },
-    { label: "Pendientes", value: stats?.alertsPending ?? 0 },
-    { label: "Enviadas", value: stats?.alertsSent ?? 0 },
-    { label: "Riesgo maximo", value: stats?.maxRisk ?? 0 },
-    { label: "Riesgo promedio", value: stats?.avgRisk ?? 0 },
-  ]
+  const kpis: KpiCardProps[] = useMemo(
+    () => [
+      {
+        label: "Total alertas",
+        value: stats?.totalAlerts ?? 0,
+        icon: <BarChart3 size={20} />,
+        accent: "default",
+      },
+      {
+        label: "Pendientes",
+        value: stats?.alertsPending ?? 0,
+        icon: <Clock size={20} />,
+        accent: (stats?.alertsPending ?? 0) > 0 ? "warning" : "success",
+      },
+      {
+        label: "Enviadas",
+        value: stats?.alertsSent ?? 0,
+        icon: <Send size={20} />,
+        accent: "success",
+      },
+      {
+        label: "Riesgo máximo",
+        value: stats?.maxRisk ?? 0,
+        icon: <ShieldAlert size={20} />,
+        accent:
+          (stats?.maxRisk ?? 0) >= 15
+            ? "danger"
+            : (stats?.maxRisk ?? 0) >= 8
+              ? "warning"
+              : "default",
+      },
+      {
+        label: "Riesgo promedio",
+        value: stats?.avgRisk ?? 0,
+        icon: <TrendingUp size={20} />,
+        accent: "default",
+      },
+    ],
+    [stats]
+  )
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">Dashboard </h1>
-          <p className="text-sm text-muted-foreground">
-            Vista ejecutiva para HSE, operaciones y gerencia.
-          </p>
-        </div>
-        <div className="flex flex-col items-end gap-2">
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" disabled={loadingLastDate}>
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {selectedDateLabel}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar
-                  mode="single"
-                  locale={es}
-                  selected={selectedDateObj}
-                  onSelect={(d) => {
-                    if (!d) return
-                    setSelectedDate(normalizeBusinessDate(d))
-                  }}
-                  disabled={disabledDays}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-            <span className="text-xs text-muted-foreground">
-              Fecha seleccionada: {selectedDateLabel}
-            </span>
-          </div>
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setSelectedDate(normalizeBusinessDate(new Date()))}
-            >
-              Hoy
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setSelectedDate(getYesterdayKey())}
-            >
-              Ayer
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={loadingLastDate || !lastDateData?.date}
-              onClick={() =>
-                lastDateData?.date &&
-                setSelectedDate(normalizeBusinessDate(lastDateData.date))
-              }
-            >
-              Último con datos
-            </Button>
-            <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                disabled={
-                  !selectedDate ||
-                  !minAvailableDate ||
-                  normalizeBusinessDate(selectedDate) <= minAvailableDate
-                }
-                onClick={() => {
-                  if (!selectedDate) return
-                  const d = new Date(`${selectedDate}T00:00:00`)
-                  d.setDate(d.getDate() - 1)
-                  setSelectedDate(normalizeBusinessDate(d))
-                }}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                disabled={
-                  !selectedDate ||
-                  !maxAvailableDate ||
-                  normalizeBusinessDate(selectedDate) >= maxAvailableDate
-                }
-                onClick={() => {
-                  if (!selectedDate) return
-                  const d = new Date(`${selectedDate}T00:00:00`)
-                  d.setDate(d.getDate() + 1)
-                  setSelectedDate(normalizeBusinessDate(d))
-                }}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-            <Button
-              variant="outline"
-              onClick={() => void refetch()}
-              disabled={loading || !selectedDate}
-            >
-              Actualizar
-            </Button>
-          </div>
-        </div>
+    <div className="min-h-screen space-y-6 p-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <DashboardHeader />
+        <DateControls
+          selectedDate={selectedDate}
+          selectedDateLabel={selectedDateLabel}
+          selectedDateObj={selectedDateObj}
+          disabledDays={disabledDays}
+          canGoPrev={canGoPrev}
+          canGoNext={canGoNext}
+          loadingLastDate={loadingLastDate}
+          loading={loading}
+          lastDateData={lastDateData}
+          onPrev={handlePrev}
+          onNext={handleNext}
+          onRefetch={handleRefetch}
+          onSetDate={setDate}
+        />
       </div>
 
-      <AsyncState loading={loading} error={error} onRetry={() => void refetch()} />
+      <AsyncState loading={loading} error={error} onRetry={handleRefetch} />
 
       {!loading && !error && !hasData && selectedDate && (
-        <Card>
-          <CardContent className="py-4 text-sm text-muted-foreground">
-            No existen alertas registradas para esta fecha ({selectedDateLabel}).
+        <Card className="border-white/5 bg-white/[0.02]">
+          <CardContent className="flex items-center gap-3 py-6 text-sm text-white/40">
+            <AlertTriangle size={16} className="shrink-0 text-yellow-400/60" />
+            No hay alertas registradas para {selectedDateLabel}.
           </CardContent>
         </Card>
       )}
 
       {!loading && !error && hasData && (
-        <>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-            {kpis.map((kpi) => (
-              <Card key={kpi.label}>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-xs text-muted-foreground">{kpi.label}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-2xl font-semibold">{kpi.value}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+        <div className="space-y-5">
+          <KpiGrid kpis={kpis} />
 
           <div className="grid gap-4 xl:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Vehiculos de mayor riesgo</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {riskVehicles.slice(0, 10).map((item) => (
-                  <div key={item.plate} className="flex items-center justify-between rounded border p-2 text-sm">
-                    <span className="font-mono">{item.plate}</span>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline">Eventos: {item.alerts}</Badge>
-                      <Badge>{item.maxRisk}</Badge>
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Resumen de calidad</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm">
-                {consistency ? (
-                  <>
-                    <p>Expected total: <strong>{consistency.expectedTotal}</strong></p>
-                    <p>Actual total: <strong>{consistency.actualTotal}</strong></p>
-                    <p>
-                      Estado: {consistency.isConsistent ? <Badge>Consistente</Badge> : <Badge variant="destructive">Inconsistente</Badge>}
-                    </p>
-                    <p>Ultima verificacion: {consistency.lastChecked ?? "Sin dato"}</p>
-                  </>
-                ) : (
-                  <p className="text-muted-foreground">Sin datos de consistencia</p>
-                )}
-              </CardContent>
-            </Card>
+            <RiskVehiclesCard
+              vehicles={topRiskVehicles}
+              totalCount={riskVehicles.length}
+              globalMaxRisk={globalMaxRisk}
+            />
+            <DataConsistencyCard consistency={consistency} />
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Tendencia 7/30/90</CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm text-muted-foreground">
-              TODO tecnico: el backend actual no expone serie temporal consolidada en endpoints my-* para calcular tendencia global 7/30/90.
-            </CardContent>
-          </Card>
+          <PendingAlertsCard alerts={topPendingAlerts} totalCount={pendingAlerts.length} />
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Alertas pendientes ({pendingAlerts.length})</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              {pendingAlerts.slice(0, 8).map((alert) => (
-                <div key={alert.alertId} className="flex items-center justify-between rounded border p-2">
-                  <div>
-                    <p className="font-mono">{alert.plate}</p>
-                    <p className="text-xs text-muted-foreground">Fecha cierre: {alert.dateKey}</p>
-                  </div>
-                  <Badge variant={alert.riskScore >= 15 ? "destructive" : "outline"}>Risk {alert.riskScore}</Badge>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-
-          <div className="flex flex-wrap gap-2">
-            <Link href="/historico"><Button variant="outline">Historico</Button></Link>
-            <Link href="/pendientes"><Button variant="outline">Pendientes</Button></Link>
-            <Link href="/vehiculos"><Button variant="outline">Vehiculos</Button></Link>
-            <Link href="/configuracion"><Button variant="outline">Configuracion</Button></Link>
+          <div className="flex flex-wrap gap-2 pt-1">
+            {[
+              { href: "/historico", label: "Histórico" },
+              { href: "/pendientes", label: "Pendientes" },
+              { href: "/vehiculos", label: "Vehículos" },
+              { href: "/configuracion", label: "Configuración" },
+            ].map(({ href, label }) => (
+              <Link key={href} href={href}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-white/10 bg-white/[0.03] text-white/50 transition-colors hover:bg-white/[0.07] hover:text-white"
+                >
+                  {label}
+                </Button>
+              </Link>
+            ))}
           </div>
-        </>
+        </div>
       )}
     </div>
   )
