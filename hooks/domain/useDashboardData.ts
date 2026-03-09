@@ -38,7 +38,7 @@ export function useDashboardData(dateKey?: string): DashboardDataState {
       }
     },
     enabled: !!dateKey,
-    staleTime: 60_000,
+    // Usa staleTime y refetchOnWindowFocus del QueryClient (5 min, false) para evitar llamadas innecesarias cuando los datos están en caché.
   })
 
   const refetch = useCallback(async () => {

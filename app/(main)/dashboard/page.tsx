@@ -18,8 +18,21 @@ import { dashboardApi } from "@/services/api"
 import { queryKeys } from "@/lib/query/queryKeys"
 import { getYesterdayKey, normalizeBusinessDate } from "@/lib/domain/date"
 
+const DASHBOARD_SELECTED_DATE_KEY = "dashboard:selectedDate"
+
+function getStoredSelectedDate(): string | undefined {
+  if (typeof window === "undefined") return undefined
+  try {
+    const stored = localStorage.getItem(DASHBOARD_SELECTED_DATE_KEY)
+    return stored && stored.length > 0 ? stored : undefined
+  } catch {
+    return undefined
+  }
+}
+
 export default function DashboardPage() {
-  const [selectedDate, setSelectedDate] = useState<string | undefined>()
+  const [selectedDate, setSelectedDate] = useState<string | undefined>(undefined)
+  const [hasRestoredFromStorage, setHasRestoredFromStorage] = useState(false)
 
   const {
     data: lastDateData,
@@ -31,16 +44,35 @@ export default function DashboardPage() {
     staleTime: 5 * 60_000,
   })
 
-  // Inicializar fecha seleccionada con el último día con datos o, si falla, con el último cierre conocido (ayer).
+  // Restaurar última fecha seleccionada desde localStorage al montar (solo cliente).
   useEffect(() => {
-    if (!selectedDate) {
-      if (lastDateData?.date) {
-        setSelectedDate(normalizeBusinessDate(lastDateData.date))
-      } else if (lastDateError) {
-        setSelectedDate(getYesterdayKey())
+    const stored = getStoredSelectedDate()
+    if (stored) {
+      setSelectedDate(stored)
+    }
+    setHasRestoredFromStorage(true)
+  }, [])
+
+  // Persistir fecha seleccionada en localStorage cuando cambie.
+  useEffect(() => {
+    if (selectedDate && typeof window !== "undefined") {
+      try {
+        localStorage.setItem(DASHBOARD_SELECTED_DATE_KEY, selectedDate)
+      } catch {
+        // ignore quota / private mode
       }
     }
-  }, [lastDateData, lastDateError, selectedDate])
+  }, [selectedDate])
+
+  // Inicializar fecha seleccionada solo si no hay valor guardado ni restaurado: último día con datos o, si falla, ayer.
+  useEffect(() => {
+    if (!hasRestoredFromStorage || selectedDate) return
+    if (lastDateData?.date) {
+      setSelectedDate(normalizeBusinessDate(lastDateData.date))
+    } else if (lastDateError) {
+      setSelectedDate(getYesterdayKey())
+    }
+  }, [lastDateData, lastDateError, selectedDate, hasRestoredFromStorage])
 
   const {
     stats,
@@ -100,7 +132,7 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Dashboard profesional</h1>
+          <h1 className="text-2xl font-semibold">Dashboard </h1>
           <p className="text-sm text-muted-foreground">
             Vista ejecutiva para HSE, operaciones y gerencia.
           </p>
