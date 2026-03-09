@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { memo, useMemo } from "react"
 import { Activity } from "lucide-react"
@@ -13,7 +13,7 @@ interface TopEventsPanelProps {
   loading?: boolean
 }
 
-type EventKey = "contactos" | "excesos" | "sin conductor" | "sin llave" | "otros"
+type EventKey = "contactos" | "excesos" | "sin conductor" | "sin llave" | "no identificados"
 
 type EventRow = {
   key: EventKey
@@ -27,9 +27,10 @@ function normalizeEventType(value: string): EventKey {
   const normalized = value.replace(/_/g, " ").toLowerCase().trim()
   if (normalized.includes("contact")) return "contactos"
   if (normalized.includes("exceso")) return "excesos"
-  if (normalized.includes("no identificado") || normalized.includes("sin conductor")) return "sin conductor"
+  if (normalized.includes("inactivo") || normalized.includes("sin conductor")) return "sin conductor"
+  if (normalized.includes("no identificado") || normalized.includes("sin identificar")) return "no identificados"
   if (normalized.includes("llave") || normalized.includes("sin llave")) return "sin llave"
-  return "otros"
+  return "contactos"
 }
 
 function TopEventsPanelBase({ distribution, recentEvents, loading = false }: TopEventsPanelProps) {
@@ -37,9 +38,9 @@ function TopEventsPanelBase({ distribution, recentEvents, loading = false }: Top
     const baseRows: EventRow[] = [
       { key: "contactos", label: "contactos peligrosos", count: distribution.contactos, topPlate: null, topPlateCount: 0 },
       { key: "excesos", label: "excesos de velocidad", count: distribution.excesos, topPlate: null, topPlateCount: 0 },
-      { key: "sin conductor", label: "conductor inactivo", count: distribution.no_identificados, topPlate: null, topPlateCount: 0 },
+      { key: "sin conductor", label: "conductor inactivo", count: distribution.conductor_inactivo, topPlate: null, topPlateCount: 0 },
+      { key: "no identificados", label: "no identificados", count: distribution.no_identificados, topPlate: null, topPlateCount: 0 },
       { key: "sin llave", label: "sin llave", count: distribution.llave_sin_cargar, topPlate: null, topPlateCount: 0 },
-      { key: "otros", label: "otros", count: distribution.conductor_inactivo, topPlate: null, topPlateCount: 0 },
     ]
 
     const platesByEvent = new Map<EventKey, Map<string, number>>()

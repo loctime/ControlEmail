@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useMemo, useState } from "react"
 import { AlertCircle } from "lucide-react"
@@ -103,12 +103,7 @@ export default function DashboardPage() {
 
       <TopEventsPanel distribution={distribution} recentEvents={recentEvents} loading={isLoading} />
 
-      <CriticalVehiclesPanel
-        alerts={criticalAlerts}
-        vehicles={topVehicles}
-        recentEvents={recentEvents}
-        loading={isLoading}
-      />
+      <CriticalVehiclesPanel alerts={criticalAlerts} vehicles={topVehicles} loading={isLoading} />
 
       <FleetRiskHeatmap items={riskMap} loading={isLoading} />
 
@@ -127,3 +122,4 @@ export default function DashboardPage() {
     </main>
   )
 }
+

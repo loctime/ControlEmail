@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Lectura desde Firestore (apps/emails/vehicleEvents, apps/emails/vehicles) para las API routes.
  * Usa las mismas credenciales que email-local-ingest (FIREBASE_ADMIN_* o GOOGLE_*).
  */
@@ -28,7 +28,7 @@ function getEnvOrThrow(name: string, fallbackName?: string): string {
   return value
 }
 
-/** Log de qué variables de entorno están definidas (sin mostrar valores). */
+/** Log de quÃ© variables de entorno estÃ¡n definidas (sin mostrar valores). */
 function logEnvCheck(): void {
   const vars = [
     "FIREBASE_PROJECT_ID",
@@ -208,7 +208,7 @@ export interface RunStructuredQueryResult {
 
 /**
  * Helper reutilizable para ejecutar consultas estructuradas (documents:runQuery) sobre Firestore.
- * IMPORTANTE: requiere índices compuestos adecuados según los filtros/orden usados.
+ * IMPORTANTE: requiere Ã­ndices compuestos adecuados segÃºn los filtros/orden usados.
  */
 async function runStructuredQuery(params: RunStructuredQueryParams): Promise<RunStructuredQueryResult> {
   const projectId = getEnvOrThrow(
@@ -319,7 +319,7 @@ export interface VehicleEventDoc {
   plate: string
   brand: string
   model: string
-  /** Fecha del evento en formato YYYY-MM-DD (día de referencia del sistema). */
+  /** Fecha del evento en formato YYYY-MM-DD (dÃ­a de referencia del sistema). */
   dateKey?: string
   /** Fecha/hora del evento, ej. "2026-03-03T13:13:46-03:00". */
   eventTimestamp?: string
@@ -356,8 +356,8 @@ export interface VehicleDoc {
 
 /**
  * Comprueba si existe el documento apps/emails/access/{email}.
- * El email se normaliza (trim + lowercase). Usado para autorización de acceso.
- * La colección access es la fuente de verdad (sincronizada por POST /email/sync-access-users).
+ * El email se normaliza (trim + lowercase). Usado para autorizaciÃ³n de acceso.
+ * La colecciÃ³n access es la fuente de verdad (sincronizada por POST /email/sync-access-users).
  */
 export async function allowedUserExistsByEmail(email: string): Promise<boolean> {
   const normalized = email.trim().toLowerCase()
@@ -406,9 +406,9 @@ export async function getEmailAccessUserByEmail(email: string): Promise<EmailAcc
 }
 
 /**
- * Lista documentos de una colección (una página).
+ * Lista documentos de una colecciÃ³n (una pÃ¡gina).
  * La REST API espera path con segmentos reales: documents/apps/emails/vehicleEvents
- * (NO codificar barras como %2F, sino la API interpreta una sola colección raíz y devuelve 0).
+ * (NO codificar barras como %2F, sino la API interpreta una sola colecciÃ³n raÃ­z y devuelve 0).
  */
 export async function listCollection(
   collectionPath: string,
@@ -437,14 +437,14 @@ export async function listCollection(
   })
 }
 
-/** Máximo de eventos a leer para el dashboard/API (Firestore limita por página). */
+/** MÃ¡ximo de eventos a leer para el dashboard/API (Firestore limita por pÃ¡gina). */
 const VEHICLE_EVENTS_PAGE_SIZE = 500
 
 export async function listVehicleEvents(): Promise<VehicleEventDoc[]> {
   const path = "apps/emails/vehicleEvents"
   console.log("[firestore-read] listVehicleEvents: leyendo desde", path)
   const items = await listCollection(path, VEHICLE_EVENTS_PAGE_SIZE)
-  console.log("[firestore-read] listVehicleEvents: leídos", items.length, "eventos")
+  console.log("[firestore-read] listVehicleEvents: leÃ­dos", items.length, "eventos")
   return items.map(({ id, data }) => {
     const rawDate = data.eventDate
     let eventDate = ""
@@ -481,8 +481,8 @@ export async function listVehicleEvents(): Promise<VehicleEventDoc[]> {
 }
 
 /**
- * Obtiene patentes distintas de eventos recientes (últimos 90 días).
- * Sirve para mostrar en alertas vehículos que tienen eventos aunque no tengan doc en apps/emails/vehicles.
+ * Obtiene patentes distintas de eventos recientes (Ãºltimos 90 dÃ­as).
+ * Sirve para mostrar en alertas vehÃ­culos que tienen eventos aunque no tengan doc en apps/emails/vehicles.
  */
 export async function getDistinctPlatesFromRecentEvents(
   daysBack = 90,
@@ -498,7 +498,7 @@ export async function listVehicles(): Promise<VehicleDoc[]> {
   const path = "apps/emails/vehicles"
   console.log("[firestore-read] listVehicles: leyendo desde", path)
   const items = await listCollection(path)
-  console.log("[firestore-read] listVehicles: leídos", items.length, "vehículos")
+  console.log("[firestore-read] listVehicles: leÃ­dos", items.length, "vehÃ­culos")
   const fromCollection = items.map(({ id, data }) => {
     const rawResponsables = data.responsables
     const responsables = Array.isArray(rawResponsables)
@@ -546,7 +546,7 @@ export async function listVehicles(): Promise<VehicleDoc[]> {
 }
 
 /**
- * Obtiene un vehículo específico por patente.
+ * Obtiene un vehÃ­culo especÃ­fico por patente.
  */
 export async function getVehicleByPlate(plate: string): Promise<VehicleDoc | null> {
   const docPath = `apps/emails/vehicles/${encodeURIComponent(plate)}`
@@ -582,8 +582,8 @@ export async function getVehicleByPlate(plate: string): Promise<VehicleDoc | nul
 }
 
 /**
- * Obtiene eventos de un vehículo específico, filtrados por rango de fechas.
- * La estructura esperada es según la especificación del usuario:
+ * Obtiene eventos de un vehÃ­culo especÃ­fico, filtrados por rango de fechas.
+ * La estructura esperada es segÃºn la especificaciÃ³n del usuario:
  * - type: string
  * - severity: "critico" | "advertencia"
  * - eventTimestamp: string (ISO)
@@ -604,12 +604,12 @@ export interface VehicleEventDashboard {
 }
 
 /**
- * Obtiene eventos de un vehículo específico usando documents:runQuery con:
+ * Obtiene eventos de un vehÃ­culo especÃ­fico usando documents:runQuery con:
  * - where plate == y eventTimestamp >= cutoff
  * - orderBy eventTimestamp DESC
- * - paginación por cursor basado en eventTimestamp.
+ * - paginaciÃ³n por cursor basado en eventTimestamp.
  *
- * Índice requerido:
+ * Ãndice requerido:
  * - collectionId: apps/emails/vehicleEvents
  *   fields: [plate ASC, eventTimestamp DESC]
  */
@@ -672,7 +672,7 @@ export async function getVehicleEventsByPlate(
       let severity: "critico" | "advertencia" = "advertencia"
       if (typeof data.severity === "string") {
         const sev = (data.severity as string).toLowerCase()
-        if (sev === "critico" || sev === "crítico") {
+        if (sev === "critico" || sev === "crÃ­tico") {
           severity = "critico"
         }
       } else if (data.speed != null) {
@@ -699,16 +699,16 @@ export async function getVehicleEventsByPlate(
 }
 
 /**
- * Obtiene todos los eventos de un período específico (sin filtrar por patente).
+ * Obtiene todos los eventos de un perÃ­odo especÃ­fico (sin filtrar por patente).
  * Usado para calcular rankings y comparaciones.
  */
 /**
- * Obtiene todos los eventos de un período específico usando documents:runQuery con:
+ * Obtiene todos los eventos de un perÃ­odo especÃ­fico usando documents:runQuery con:
  * - where eventTimestamp >= cutoff
  * - orderBy eventTimestamp DESC
- * - paginación por cursor basado en eventTimestamp.
+ * - paginaciÃ³n por cursor basado en eventTimestamp.
  *
- * Índice requerido:
+ * Ãndice requerido:
  * - collectionId: apps/emails/vehicleEvents
  *   fields: [eventTimestamp DESC]
  */
@@ -764,7 +764,7 @@ export async function getAllEventsByPeriod(
       let severity: "critico" | "advertencia" = "advertencia"
       if (typeof data.severity === "string") {
         const sev = (data.severity as string).toLowerCase()
-        if (sev === "critico" || sev === "crítico") {
+        if (sev === "critico" || sev === "crÃ­tico") {
           severity = "critico"
         }
       } else if (data.speed != null) {
@@ -815,7 +815,7 @@ export interface VehicleAlertsUpdate {
   responsables: string[]
 }
 
-/** Configuración de destinatarios globales de alertas por email (documento apps/emails/config/config). */
+/** ConfiguraciÃ³n de destinatarios globales de alertas por email (documento apps/emails/config/config). */
 export interface EmailConfigDoc {
   generalRecipients: string[]
   ccRecipients: string[]
@@ -825,8 +825,8 @@ export interface EmailConfigDoc {
 const EMAIL_CONFIG_DOC_PATH = "apps/emails/config/config"
 
 /**
- * Obtiene la configuración de destinatarios de email desde apps/emails/config/config.
- * Si el documento no existe, devuelve listas vacías.
+ * Obtiene la configuraciÃ³n de destinatarios de email desde apps/emails/config/config.
+ * Si el documento no existe, devuelve listas vacÃ­as.
  */
 export async function getEmailConfig(): Promise<EmailConfigDoc> {
   const path = `documents/${EMAIL_CONFIG_DOC_PATH}`
@@ -856,7 +856,7 @@ export async function getEmailConfig(): Promise<EmailConfigDoc> {
 }
 
 /**
- * Guarda la configuración de destinatarios en apps/emails/config/config.
+ * Guarda la configuraciÃ³n de destinatarios en apps/emails/config/config.
  * Crea el documento si no existe.
  */
 export async function updateEmailConfig(payload: EmailConfigDoc): Promise<void> {
@@ -878,7 +878,7 @@ export async function updateEmailConfig(payload: EmailConfigDoc): Promise<void> 
     body: JSON.stringify(body),
   })
   if (res.status === 404) {
-    // Crear documento: POST a la colección padre con documentId (body = Document)
+    // Crear documento: POST a la colecciÃ³n padre con documentId (body = Document)
     const parentPath = "documents/apps/emails/config"
     const createRes = await firestoreRequest(
       `${parentPath}?documentId=config`,
@@ -904,7 +904,7 @@ export async function updateEmailConfig(payload: EmailConfigDoc): Promise<void> 
 }
 
 /**
- * Actualiza responsables de un vehículo en apps/emails/vehicles/{plate}.
+ * Actualiza responsables de un vehÃ­culo en apps/emails/vehicles/{plate}.
  * Si el documento no tiene responsables, se escriben los enviados (no se inicializa en lectura).
  */
 export async function updateVehicleAlerts(
@@ -944,7 +944,7 @@ export interface DailyAlertVehicle {
     criticalEvents: number
     warningEvents: number
     noKeyEvents: number
-    /** Excesos de velocidad del día (desde dailyAlerts). */
+    /** Excesos de velocidad del dÃ­a (desde dailyAlerts). */
     excesos?: number
     no_identificados?: number
     contactos?: number
@@ -956,7 +956,7 @@ export interface DailyAlertVehicle {
   alertSent: boolean
   sentAt?: string
   events: string[]
-  /** Último evento conocido del día. Si falta en origen, se expone como null. */
+  /** Ãšltimo evento conocido del dÃ­a. Si falta en origen, se expone como null. */
   lastEventAt: string | null
 }
 
@@ -966,7 +966,7 @@ export interface DailyAlertMeta {
   totalCriticos: number
   totalAdvertencias: number
   vehiclesWithCritical: number
-  /** Timestamp ISO de generación de métricas; null si no existe en origen. */
+  /** Timestamp ISO de generaciÃ³n de mÃ©tricas; null si no existe en origen. */
   generatedAt: string | null
   lastUpdatedAt?: string
 }
@@ -976,7 +976,7 @@ export interface DailyAlertsResponse {
   vehicles: DailyAlertVehicle[]
 }
 
-/** Formato del documento del día en Firestore: YYYY-MM-DD (ej. 2026-03-03). */
+/** Formato del documento del dÃ­a en Firestore: YYYY-MM-DD (ej. 2026-03-03). */
 function toDailyDocId(date: string): string {
   const normalized = date.replace(/-/g, "").trim()
   if (normalized.length >= 8) {
@@ -1000,7 +1000,7 @@ function parseMetaFromFields(data: Record<string, unknown>): DailyAlertMeta {
 /** Mapea summary del doc (excesos, no_identificados, contactos...) al formato esperado. */
 function parseVehicleSummary(summary: Record<string, unknown>): DailyAlertVehicle["summary"] {
   const excesos = Number(summary.excesos ?? 0)
-  const noIdentificados = Number(summary.no_identificados ?? summary.noKeyEvents ?? 0)
+  const noIdentificados = Number(summary.no_identificados ?? 0)
   const contactos = Number(summary.contactos ?? 0)
   const llaveSinCargar = Number(summary.llave_sin_cargar ?? summary.noKeyEvents ?? 0)
   const conductorInactivo = Number(summary.conductor_inactivo ?? 0)
@@ -1033,7 +1033,7 @@ export async function getDailyMetrics(date: string): Promise<DailyAlertsResponse
     lastUpdatedAt: undefined,
   }
 
-  // Get meta: primero meta/meta, si 404 intentar documento del día (meta en el doc)
+  // Get meta: primero meta/meta, si 404 intentar documento del dÃ­a (meta en el doc)
   const metaPath = `documents/${basePath}/meta/meta`
   const metaRes = await firestoreRequest(metaPath, { method: "GET" }, { quiet404: true })
   let meta: DailyAlertMeta = defaultMeta
@@ -1054,7 +1054,7 @@ export async function getDailyMetrics(date: string): Promise<DailyAlertsResponse
     }
   }
   
-  // Get vehicles (subcolección dailyAlerts/{dateKey}/vehicles)
+  // Get vehicles (subcolecciÃ³n dailyAlerts/{dateKey}/vehicles)
   const vehiclesPath = `documents/${basePath}/vehicles`
   const vehiclesRes = await firestoreRequest(vehiclesPath, { method: "GET" })
   const vehicles: DailyAlertVehicle[] = []
@@ -1063,7 +1063,7 @@ export async function getDailyMetrics(date: string): Promise<DailyAlertsResponse
     const vehiclesJson = await vehiclesRes.json()
     const docList = vehiclesJson.documents ?? []
     if (docList.length === 0) {
-      console.log("[firestore-read] getDailyMetrics: sin documentos en", vehiclesPath, "(¿generaste alertas para esta fecha?)")
+      console.log("[firestore-read] getDailyMetrics: sin documentos en", vehiclesPath, "(Â¿generaste alertas para esta fecha?)")
     }
     for (const doc of docList) {
         const plate = doc.name.split("/").pop() ?? ""
@@ -1143,7 +1143,7 @@ export interface DailyConsistency {
   actualTotal: number
   /** Estado de consistencia reportado por el proceso batch. */
   isConsistent: boolean
-  /** Timestamp ISO de la última verificación; null si no existe en origen. */
+  /** Timestamp ISO de la Ãºltima verificaciÃ³n; null si no existe en origen. */
   lastChecked: string | null
   discrepancies?: Array<{
     plate: string
@@ -1161,7 +1161,7 @@ export async function getDailyConsistency(date: string): Promise<DailyConsistenc
   
   if (!res.ok) {
     if (res.status === 404) {
-      // Si no existe documento de consistencia, devolvemos estructura vacía sin inventar timestamps.
+      // Si no existe documento de consistencia, devolvemos estructura vacÃ­a sin inventar timestamps.
       return {
         expectedTotal: 0,
         actualTotal: 0,
@@ -1195,8 +1195,8 @@ export async function getDailyConsistency(date: string): Promise<DailyConsistenc
 }
 
 /**
- * Devuelve la alerta diaria y meta asociada para un vehículo y fecha de negocio dada.
- * Única función de acceso a dailyAlerts por vehículo; otras capas no deben leer directamente Firestore.
+ * Devuelve la alerta diaria y meta asociada para un vehÃ­culo y fecha de negocio dada.
+ * Ãšnica funciÃ³n de acceso a dailyAlerts por vehÃ­culo; otras capas no deben leer directamente Firestore.
  */
 export async function getDailyAlertForVehicle(
   date: string,
@@ -1205,7 +1205,7 @@ export async function getDailyAlertForVehicle(
   const dateDocId = toDailyDocId(date)
   const basePath = `apps/emails/dailyAlerts/${dateDocId}`
 
-  // Meta del día (404 esperado si no existe el doc)
+  // Meta del dÃ­a (404 esperado si no existe el doc)
   const metaPath = `documents/${basePath}/meta/meta`
   const metaRes = await firestoreRequest(metaPath, { method: "GET" }, { quiet404: true })
   let meta: DailyAlertMeta | null = null
@@ -1216,7 +1216,7 @@ export async function getDailyAlertForVehicle(
     }
   }
 
-  // Alerta diaria específica del vehículo (404 esperado si no hay alerta para esa patente)
+  // Alerta diaria especÃ­fica del vehÃ­culo (404 esperado si no hay alerta para esa patente)
   const vehicleDocPath = `documents/${basePath}/vehicles/${encodeURIComponent(plate)}`
   const vehicleRes = await firestoreRequest(vehicleDocPath, { method: "GET" }, { quiet404: true })
   if (!vehicleRes.ok) {
@@ -1246,6 +1246,7 @@ export async function getDailyAlertForVehicle(
 
   return { alert, meta }
 }
+
 
 
 

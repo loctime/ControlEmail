@@ -1,4 +1,4 @@
-import { normalizeBusinessDate } from "@/lib/domain/date"
+﻿import { normalizeBusinessDate } from "@/lib/domain/date"
 import { getAllEventsByPeriod, getDailyMetrics } from "@/lib/firestore-read"
 
 export type DashboardRangePreset = "today" | "yesterday" | "7d" | "30d" | "custom"
@@ -118,6 +118,8 @@ function offsetDate(dateKey: string, deltaDays: number): string {
   return `${year}-${month}-${day}`
 }
 
+// NOTE: current boundaries are UTC-based; to fully align with business time
+// (America/Argentina/Buenos_Aires), migrate this helper to timezone-local day bounds.
 function dateToEpoch(dateKey: string): number {
   const [y, m, d] = dateKey.split("-").map(Number)
   return Date.UTC(y, m - 1, d)
@@ -380,3 +382,4 @@ export async function getRecentEvents(
       }
     })
 }
+
