@@ -63,3 +63,30 @@ export function getYesterdayKey(): string {
   return `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, "0")}-${String(yesterday.getDate()).padStart(2, "0")}`
 }
 
+/** Devuelve todas las claves YYYY-MM-DD del mes (ej. "2026-03" → ["2026-03-01", ..., "2026-03-31"]). */
+export function getDateKeysInMonth(month: string): string[] {
+  const [y, m] = month.split("-").map(Number)
+  if (!Number.isFinite(y) || !Number.isFinite(m) || m < 1 || m > 12) return []
+  const first = new Date(y, m - 1, 1)
+  const last = new Date(y, m, 0)
+  const keys: string[] = []
+  for (let d = first.getDate(); d <= last.getDate(); d++) {
+    keys.push(
+      `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`,
+    )
+  }
+  return keys
+}
+
+/** Devuelve todas las claves YYYY-MM-DD del año (ej. "2026" → ["2026-01-01", ..., "2026-12-31"]). */
+export function getDateKeysInYear(year: string): string[] {
+  const y = Number(year)
+  if (!Number.isFinite(y)) return []
+  const keys: string[] = []
+  for (let m = 1; m <= 12; m++) {
+    const monthStr = `${y}-${String(m).padStart(2, "0")}`
+    keys.push(...getDateKeysInMonth(monthStr))
+  }
+  return keys
+}
+

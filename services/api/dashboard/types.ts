@@ -39,3 +39,19 @@ export interface MyRiskDTO {
 }
 
 export type DashboardDailyConsistencyDTO = DailyConsistencyDTO
+
+/** Payload returned by ControlFile aggregated endpoints (metrics/daily, monthly, yearly) */
+export interface DashboardAggregatedStats {
+  totalAlerts: number
+  alertsPending?: number
+  alertsSent?: number
+  maxRisk?: number
+  avgRisk?: number
+}
+
+export interface DashboardAggregatedPayload {
+  stats: DashboardAggregatedStats
+  vehicles?: MyRiskItemDTO[]
+  pendingAlerts?: MyAlertItemDTO[]
+  consistency?: DailyConsistencyDTO | null
+}

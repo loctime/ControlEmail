@@ -1,10 +1,13 @@
 "use client"
 
-import { useCallback, useMemo } from "react"
+import { useCallback, useMemo, useState } from "react"
 import Link from "next/link"
+import { format } from "date-fns"
+import { es } from "date-fns/locale"
 import {
   AlertTriangle,
   BarChart3,
+  CalendarDays,
   Clock,
   Send,
   ShieldAlert,
@@ -24,11 +27,16 @@ import {
   PendingAlertsCard,
 } from "@/components/dashboard"
 import type { KpiCardProps } from "@/components/dashboard"
+import { cn } from "@/lib/utils"
 
 const MAX_RISK_VEHICLES = 10
 const MAX_PENDING_ALERTS = 8
 
+export type DashboardViewMode = "day" | "month" | "year"
+
 export default function DashboardPage() {
+  const [mode, setMode] = useState<DashboardViewMode>("day")
+
   const {
     selectedDate,
     selectedDateLabel,
@@ -44,7 +52,7 @@ export default function DashboardPage() {
   } = useDashboardDate()
 
   const { stats, riskVehicles, pendingAlerts, consistency, loading, error, refetch } =
-    useDashboardData(selectedDate)
+    useDashboardData(selectedDate, mode)
 
   const handleRefetch = useCallback(() => void refetch(), [refetch])
 
@@ -62,6 +70,16 @@ export default function DashboardPage() {
     [pendingAlerts]
   )
   const globalMaxRisk = topRiskVehicles[0]?.maxRisk ?? 1
+
+  /** Etiqueta del período según el modo: día "04 mar 2026", mes "marzo 2026", año "2026" */
+  const periodLabel = useMemo(() => {
+    if (!selectedDate) return "este período"
+    if (mode === "day") return selectedDateLabel
+    const d = new Date(`${selectedDate}T00:00:00`)
+    if (Number.isNaN(d.getTime())) return selectedDate
+    if (mode === "month") return format(d, "LLLL yyyy", { locale: es })
+    return format(d, "yyyy", { locale: es })
+  }, [selectedDate, selectedDateLabel, mode])
 
   const kpis: KpiCardProps[] = useMemo(
     () => [
@@ -108,7 +126,31 @@ export default function DashboardPage() {
     <div className="min-h-screen space-y-6 p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <DashboardHeader />
-        <DateControls
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex rounded-lg border border-white/10 bg-white/[0.04] p-0.5">
+            {(
+              [
+                { value: "day" as const, label: "Día", icon: CalendarDays },
+                { value: "month" as const, label: "Mes", icon: CalendarDays },
+                { value: "year" as const, label: "Año", icon: CalendarDays },
+              ] as const
+            ).map(({ value, label, icon: Icon }) => (
+              <Button
+                key={value}
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "h-8 gap-1.5 px-3 text-xs text-white/60 hover:text-white",
+                  mode === value && "bg-white/10 text-white",
+                )}
+                onClick={() => setMode(value)}
+              >
+                <Icon size={14} />
+                {label}
+              </Button>
+            ))}
+          </div>
+          <DateControls
           selectedDate={selectedDate}
           selectedDateLabel={selectedDateLabel}
           selectedDateObj={selectedDateObj}
@@ -123,6 +165,7 @@ export default function DashboardPage() {
           onRefetch={handleRefetch}
           onSetDate={setDate}
         />
+        </div>
       </div>
 
       <AsyncState loading={loading} error={error} onRetry={handleRefetch} />
@@ -131,7 +174,7 @@ export default function DashboardPage() {
         <Card className="border-white/5 bg-white/[0.02]">
           <CardContent className="flex items-center gap-3 py-6 text-sm text-white/40">
             <AlertTriangle size={16} className="shrink-0 text-yellow-400/60" />
-            No hay alertas registradas para {selectedDateLabel}.
+            No hay alertas registradas para {periodLabel}.
           </CardContent>
         </Card>
       )}
