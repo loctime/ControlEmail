@@ -2,6 +2,7 @@
 
 import { Activity, Loader2, ShieldAlert } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { cn } from "@/lib/utils"
 
 interface DashboardHeaderProps {
   isFetching?: boolean
@@ -11,31 +12,33 @@ export function DashboardHeader({ isFetching = false }: DashboardHeaderProps) {
   return (
     <header
       aria-label="Cabecera del dashboard de riesgo"
-      className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-r from-card via-muted/40 to-card p-6 text-foreground"
+      className={cn(
+        "relative overflow-hidden rounded-xl border border-border bg-card p-5 text-foreground transition-shadow duration-200",
+        isFetching && "ring-1 ring-primary/20",
+      )}
     >
-      <div className="absolute -right-10 -top-14 h-40 w-40 rounded-full bg-primary/15 blur-3xl" />
-      <div className="absolute -bottom-16 left-24 h-44 w-44 rounded-full bg-emerald-500/10 blur-3xl" />
-      <div className="relative flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Fleet Risk Intelligence Dashboard</p>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight md:text-3xl">Control operativo y de riesgo de flota</h1>
-          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            Visualizacion ejecutiva para operaciones y HSE con foco en deteccion temprana, tendencias y accion inmediata.
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-xl font-semibold tracking-tight md:text-2xl">
+            Control operativo y riesgo de flota
+          </h1>
+          <p className="mt-0.5 max-w-2xl text-sm text-muted-foreground">
+            Monitoreo ejecutivo de eventos críticos, riesgo operativo y comportamiento de vehículos.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Badge variant="secondary" className="gap-1.5 border border-border bg-muted text-foreground">
-            <ShieldAlert className="h-3.5 w-3.5" />
+        <div className="flex flex-shrink-0 items-center gap-2">
+          <Badge variant="secondary" className="gap-1 border border-border bg-muted text-foreground text-xs">
+            <ShieldAlert className="h-3 w-3" />
             Riesgo de flota
           </Badge>
-          <Badge variant="secondary" className="gap-1.5 border border-border bg-muted text-foreground">
-            <Activity className="h-3.5 w-3.5" />
+          <Badge variant="secondary" className="gap-1 border border-border bg-muted text-foreground text-xs">
+            <Activity className="h-3 w-3" />
             Monitoreo continuo
           </Badge>
           {isFetching && (
-            <Badge variant="secondary" className="gap-1.5 border border-primary/20 bg-primary/10 text-primary">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            <Badge variant="secondary" className="gap-1 border border-primary/20 bg-primary/10 text-primary text-xs animate-in fade-in duration-200">
+              <Loader2 className="h-3 w-3 animate-spin" />
               Actualizando
             </Badge>
           )}

@@ -19,53 +19,47 @@ type HealthState = {
 function getFleetHealth(maxRisk: number): HealthState {
   if (maxRisk >= 25) {
     return {
-      label: "Critica",
+      label: "CRÍTICO",
       emoji: "!!",
       icon: ShieldX,
-      classes: "border-red-500/20 bg-red-500/10 text-red-500",
+      classes: "border-red-200 bg-red-50 text-red-700 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-400",
     }
   }
 
   if (maxRisk >= 15) {
     return {
-      label: "Atencion",
+      label: "ATENCIÓN",
       emoji: "!",
       icon: AlertTriangle,
-      classes: "border-orange-500/20 bg-orange-500/10 text-orange-500",
+      classes: "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-400",
     }
   }
 
   return {
-    label: "Estable",
+    label: "ESTABLE",
     emoji: "+",
     icon: ShieldCheck,
-    classes: "border-green-500/20 bg-green-500/10 text-green-500",
+    classes: "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-400",
   }
 }
 
 export function FleetHealthIndicator({ maxRisk, loading = false }: FleetHealthIndicatorProps) {
-  if (loading) return <Skeleton className="h-24 w-full rounded-xl" />
+  if (loading) return <Skeleton className="h-[72px] w-full rounded-xl" />
 
   const state = getFleetHealth(maxRisk)
 
   return (
     <section
       aria-label="Indicador global de salud de flota"
-      className={cn("rounded-xl border p-5 shadow-sm transition-all duration-300", state.classes)}
+      className={cn("flex w-full items-center justify-between gap-4 rounded-xl border p-4 transition-all duration-200", state.classes)}
     >
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <p className="text-xs uppercase tracking-[0.14em]">Estado de flota</p>
-          <div className="mt-1 flex items-center gap-2 text-2xl font-semibold">
-            <span aria-hidden>{state.emoji}</span>
-            <span>{state.label}</span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 rounded-lg border border-current/20 px-3 py-2 text-sm">
-          <state.icon className="h-4 w-4" />
-          <span className="font-medium">Riesgo maximo: {maxRisk.toFixed(1)}</span>
-        </div>
+      <div className="flex items-center gap-3">
+        <p className="text-[10px] font-semibold uppercase tracking-widest opacity-90">Estado de flota</p>
+        <span className="text-lg font-bold tracking-tight md:text-xl">{state.label}</span>
+      </div>
+      <div className="flex items-center gap-2 rounded-lg border border-current/20 bg-white/50 px-3 py-1.5 text-sm font-medium dark:bg-black/10">
+        <state.icon className="h-4 w-4" aria-hidden />
+        <span>Riesgo máximo: {typeof maxRisk === "number" ? maxRisk.toFixed(0) : maxRisk}</span>
       </div>
     </section>
   )

@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useMemo, useState } from "react"
 import { AlertCircle } from "lucide-react"
@@ -15,6 +15,7 @@ import { TopEventsPanel } from "@/components/dashboard/TopEventsPanel"
 import { FleetInsightsPanel } from "@/components/dashboard/FleetInsightsPanel"
 import { useDashboardData } from "@/hooks/use-dashboard-data"
 import type { DashboardRangePreset } from "@/services/dashboard-api"
+import { cn } from "@/lib/utils"
 
 function getTodayKey(): string {
   const formatter = new Intl.DateTimeFormat("en-CA", {
@@ -77,47 +78,57 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="min-h-screen space-y-6 bg-background p-4 md:p-6">
-      <DashboardHeader isFetching={isFetching && !isLoading} />
+    <main className="min-h-screen bg-background py-6">
+      <div
+        className={cn(
+          "mx-auto max-w-[1600px] space-y-6 px-4 md:px-6 transition-opacity duration-200",
+          isFetching && !isLoading && "opacity-90",
+        )}
+      >
+        <DashboardHeader isFetching={isFetching && !isLoading} />
 
-      <DateRangeSelector
-        range={range}
-        startDate={startDate}
-        endDate={endDate}
-        onChangePreset={handlePresetChange}
-        onChangeStartDate={setStartDate}
-        onChangeEndDate={setEndDate}
-      />
-
-      {error && (
-        <Alert variant="destructive" aria-live="polite">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Error al cargar dashboard</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
-
-      <FleetHealthIndicator maxRisk={summary.maxRisk} loading={isLoading} />
-
-      <DashboardKpis summary={summary} loading={isLoading} />
-
-      <TopEventsPanel distribution={distribution} recentEvents={recentEvents} loading={isLoading} />
-
-      <CriticalVehiclesPanel alerts={criticalAlerts} vehicles={topVehicles} loading={isLoading} />
-
-      <FleetRiskHeatmap items={riskMap} loading={isLoading} />
-
-      <EventsTrendChart trend={trend} avgRisk={summary.avgRisk} loading={isLoading} />
-
-      <div className="grid gap-6 xl:grid-cols-2">
-        <TopRiskVehicles vehicles={topVehicles} loading={isLoading} />
-        <FleetInsightsPanel
-          summary={summary}
-          distribution={distribution}
-          topVehicles={topVehicles}
-          trend={trend}
-          loading={isLoading}
+        <DateRangeSelector
+          range={range}
+          startDate={startDate}
+          endDate={endDate}
+          onChangePreset={handlePresetChange}
+          onChangeStartDate={setStartDate}
+          onChangeEndDate={setEndDate}
         />
+
+        {error && (
+          <Alert variant="destructive" aria-live="polite">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Error al cargar dashboard</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        <FleetHealthIndicator maxRisk={summary.maxRisk} loading={isLoading} />
+
+        <DashboardKpis summary={summary} loading={isLoading} />
+
+        {/* Grid principal: Heatmap + Tendencia | Críticos + Eventos principales */}
+        <div className="grid gap-6 xl:grid-cols-2">
+          <FleetRiskHeatmap items={riskMap} loading={isLoading} />
+          <EventsTrendChart trend={trend} avgRisk={summary.avgRisk} loading={isLoading} />
+        </div>
+        <div className="grid gap-6 xl:grid-cols-2">
+          <CriticalVehiclesPanel alerts={criticalAlerts} vehicles={topVehicles} loading={isLoading} />
+          <TopEventsPanel distribution={distribution} recentEvents={recentEvents} loading={isLoading} />
+        </div>
+
+        {/* Grid secundario: Top riesgo + Insights */}
+        <div className="grid gap-6 xl:grid-cols-2">
+          <TopRiskVehicles vehicles={topVehicles} loading={isLoading} />
+          <FleetInsightsPanel
+            summary={summary}
+            distribution={distribution}
+            topVehicles={topVehicles}
+            trend={trend}
+            loading={isLoading}
+          />
+        </div>
       </div>
     </main>
   )
