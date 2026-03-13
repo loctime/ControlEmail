@@ -1,8 +1,7 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useReducer, useRef } from "react"
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react"
 import Link from "next/link"
-import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import {
   AlertTriangle,
@@ -13,7 +12,6 @@ import {
   CheckCircle2,
   Clock,
   RefreshCw,
-  Send,
   ShieldAlert,
   TrendingUp,
   XCircle,
@@ -22,20 +20,27 @@ import { useQuery } from "@tanstack/react-query"
 import type { Matcher } from "react-day-picker"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { AsyncState } from "@/components/common/async-state"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { useDashboardData } from "@/hooks/domain/useDashboardData"
 import { dashboardApi } from "@/services/api"
 import { queryKeys } from "@/lib/query/queryKeys"
-import { getYesterdayKey, normalizeBusinessDate } from "@/lib/domain/date"
+import {
+  formatDDMMYYYY,
+  getDateKeysInMonth,
+  getDateKeysLast7Days,
+  getYesterdayKey,
+  normalizeBusinessDate,
+} from "@/lib/domain/date"
 import { cn } from "@/lib/utils"
+
+export type DashboardDatePreset = "day" | "week" | "month" | "year"
 
 // ─── Constantes ────────────────────────────────────────────────────────────────
 const STORAGE_KEY = "dashboard:selectedDate"
+const STORAGE_PRESET_KEY = "dashboard:preset"
 const MAX_RISK_VEHICLES = 10
-const MAX_PENDING_ALERTS = 8
 const STALE_TIME = 5 * 60_000
 
 // ─── Helpers de storage ────────────────────────────────────────────────────────
@@ -53,6 +58,25 @@ function writeStoredDate(date: string): void {
     localStorage.setItem(STORAGE_KEY, date)
   } catch {
     // quota / private mode — ignorar silenciosamente
+  }
+}
+
+function readStoredPreset(): DashboardDatePreset | undefined {
+  if (typeof window === "undefined") return undefined
+  try {
+    const v = localStorage.getItem(STORAGE_PRESET_KEY)
+    if (v === "day" || v === "week" || v === "month" || v === "year") return v
+    return undefined
+  } catch {
+    return undefined
+  }
+}
+
+function writeStoredPreset(preset: DashboardDatePreset): void {
+  try {
+    localStorage.setItem(STORAGE_PRESET_KEY, preset)
+  } catch {
+    // ignorar
   }
 }
 
@@ -98,10 +122,25 @@ function getRiskBarWidth(risk: number, max: number): string {
   return `${Math.min(100, (risk / max) * 100)}%`
 }
 
-function formatDateLabel(dateStr: string): string {
-  const d = new Date(`${dateStr}T00:00:00`)
-  if (Number.isNaN(d.getTime())) return dateStr
-  return format(d, "dd MMM yyyy", { locale: es })
+function formatPeriodLabel(dateStr: string, preset: DashboardDatePreset): string {
+  if (preset === "day") return formatDDMMYYYY(dateStr)
+  if (preset === "week") {
+    const keys = getDateKeysLast7Days(dateStr)
+    if (keys.length < 2) return formatDDMMYYYY(dateStr)
+    return `${formatDDMMYYYY(keys[0])} - ${formatDDMMYYYY(keys[6])}`
+  }
+  if (preset === "month") {
+    const [y, m] = dateStr.split("-")
+    if (!y || !m) return formatDDMMYYYY(dateStr)
+    const keys = getDateKeysInMonth(`${y}-${m}`)
+    if (keys.length === 0) return formatDDMMYYYY(dateStr)
+    return `${formatDDMMYYYY(keys[0])} - ${formatDDMMYYYY(keys[keys.length - 1])}`
+  }
+  if (preset === "year") {
+    const y = dateStr.slice(0, 4)
+    return `${formatDDMMYYYY(`${y}-01-01`)} - ${formatDDMMYYYY(`${y}-12-31`)}`
+  }
+  return formatDDMMYYYY(dateStr)
 }
 
 // ─── Subcomponentes ────────────────────────────────────────────────────────────
@@ -192,6 +231,7 @@ function RiskRow({ plate, alerts, maxRisk, globalMax, index }: RiskRowProps) {
 // ─── Componente principal ──────────────────────────────────────────────────────
 export default function DashboardPage() {
   const [dateState, dispatch] = useReducer(dateReducer, { status: "pending" })
+  const [preset, setPreset] = useState<DashboardDatePreset>(() => readStoredPreset() ?? "day")
   const hasRestoredRef = useRef(false)
 
   const selectedDate = dateState.status === "ready" ? dateState.date : undefined
@@ -203,6 +243,10 @@ export default function DashboardPage() {
     const stored = readStoredDate()
     if (stored) dispatch({ type: "RESTORE", date: stored })
   }, [])
+
+  useEffect(() => {
+    writeStoredPreset(preset)
+  }, [preset])
 
   // 2. Query del último día con datos
   const {
@@ -238,16 +282,11 @@ export default function DashboardPage() {
   }, [])
 
   // ─── Datos del dashboard ────────────────────────────────────────────────────
-  const { stats, riskVehicles, pendingAlerts, consistency, loading, error, refetch } =
-    useDashboardData(selectedDate, "day")
+  const { stats, riskVehicles, consistency, loading, error, refetch } =
+    useDashboardData(selectedDate, preset)
 
-  // ─── Memos de fechas ────────────────────────────────────────────────────────
-  const maxAvailableDate = useMemo(
-    () => (lastDateData?.maxDate ?? lastDateData?.date)
-      ? normalizeBusinessDate((lastDateData?.maxDate ?? lastDateData?.date)!)
-      : undefined,
-    [lastDateData?.maxDate, lastDateData?.date]
-  )
+  // ─── Memos de fechas (maxDate = ayer: nunca permitir hoy) ────────────────────
+  const maxAvailableDate = useMemo(() => getYesterdayKey(), [])
 
   const minAvailableDate = useMemo(
     () => lastDateData?.minDate ? normalizeBusinessDate(lastDateData.minDate) : undefined,
@@ -255,8 +294,8 @@ export default function DashboardPage() {
   )
 
   const selectedDateLabel = useMemo(
-    () => selectedDate ? formatDateLabel(selectedDate) : "Seleccionar fecha",
-    [selectedDate]
+    () => selectedDate ? formatPeriodLabel(selectedDate, preset) : "Seleccionar fecha",
+    [selectedDate, preset]
   )
 
   const selectedDateObj = useMemo(
@@ -265,73 +304,116 @@ export default function DashboardPage() {
   )
 
   const maxDateObj = useMemo(
-    () => maxAvailableDate ? new Date(`${maxAvailableDate}T00:00:00`) : undefined,
+    () => new Date(`${maxAvailableDate}T00:00:00`),
     [maxAvailableDate]
   )
 
-  const disabledDays: Matcher | undefined = maxDateObj ? { after: maxDateObj } : undefined
+  const disabledDays: Matcher | undefined = { after: maxDateObj }
 
   const canGoPrev = selectedDate && minAvailableDate && normalizeBusinessDate(selectedDate) > minAvailableDate
-  const canGoNext = selectedDate && maxAvailableDate && normalizeBusinessDate(selectedDate) < maxAvailableDate
+  const canGoNext = selectedDate && normalizeBusinessDate(selectedDate) < maxAvailableDate
 
   const handlePrev = useCallback(() => {
     if (!selectedDate) return
     const d = new Date(`${selectedDate}T00:00:00`)
-    d.setDate(d.getDate() - 1)
+    if (preset === "day") d.setDate(d.getDate() - 1)
+    else if (preset === "week") d.setDate(d.getDate() - 7)
+    else if (preset === "month") d.setMonth(d.getMonth() - 1)
+    else d.setFullYear(d.getFullYear() - 1)
     setDate(normalizeBusinessDate(d))
-  }, [selectedDate, setDate])
+  }, [selectedDate, preset, setDate])
 
   const handleNext = useCallback(() => {
     if (!selectedDate) return
     const d = new Date(`${selectedDate}T00:00:00`)
-    d.setDate(d.getDate() + 1)
+    if (preset === "day") d.setDate(d.getDate() + 1)
+    else if (preset === "week") d.setDate(d.getDate() + 7)
+    else if (preset === "month") d.setMonth(d.getMonth() + 1)
+    else d.setFullYear(d.getFullYear() + 1)
     setDate(normalizeBusinessDate(d))
-  }, [selectedDate, setDate])
+  }, [selectedDate, preset, setDate])
 
   const handleRefetch = useCallback(() => void refetch(), [refetch])
 
   // ─── Datos derivados ────────────────────────────────────────────────────────
-  const hasData =
-    (stats?.totalAlerts ?? 0) > 0 ||
-    riskVehicles.length > 0 ||
-    pendingAlerts.length > 0
-
   const topRiskVehicles = useMemo(() => riskVehicles.slice(0, MAX_RISK_VEHICLES), [riskVehicles])
-  const topPendingAlerts = useMemo(() => pendingAlerts.slice(0, MAX_PENDING_ALERTS), [pendingAlerts])
+  const vehiclesMonitored = riskVehicles.length
+  const vehiclesWithEvents = useMemo(
+    () => riskVehicles.filter((v) => (v.alerts ?? 0) > 0).length,
+    [riskVehicles],
+  )
+  const eventsInPeriod = useMemo(
+    () => riskVehicles.reduce((s, v) => s + (v.alerts ?? 0), 0),
+    [riskVehicles],
+  )
+  const highestRiskVehicle = topRiskVehicles[0]
+  const hasRiskData = useMemo(
+    () =>
+      (stats?.maxRisk != null && stats.maxRisk > 0) ||
+      (stats?.avgRisk != null && stats.avgRisk > 0) ||
+      (highestRiskVehicle?.maxRisk != null && highestRiskVehicle.maxRisk > 0),
+    [stats?.maxRisk, stats?.avgRisk, highestRiskVehicle?.maxRisk],
+  )
+
+  const hasData =
+    vehiclesMonitored > 0 || vehiclesWithEvents > 0 || eventsInPeriod > 0
+
   const globalMaxRisk = topRiskVehicles[0]?.maxRisk ?? 1
 
-  const kpis: KpiCardProps[] = [
-    {
-      label: "Total alertas",
-      value: stats?.totalAlerts ?? 0,
-      icon: <BarChart3 size={20} />,
-      accent: "default",
-    },
-    {
-      label: "Pendientes",
-      value: stats?.alertsPending ?? 0,
-      icon: <Clock size={20} />,
-      accent: (stats?.alertsPending ?? 0) > 0 ? "warning" : "success",
-    },
-    {
-      label: "Enviadas",
-      value: stats?.alertsSent ?? 0,
-      icon: <Send size={20} />,
-      accent: "success",
-    },
-    {
-      label: "Riesgo máximo",
-      value: stats?.maxRisk ?? 0,
-      icon: <ShieldAlert size={20} />,
-      accent: (stats?.maxRisk ?? 0) >= 15 ? "danger" : (stats?.maxRisk ?? 0) >= 8 ? "warning" : "default",
-    },
-    {
-      label: "Riesgo promedio",
-      value: stats?.avgRisk ?? 0,
-      icon: <TrendingUp size={20} />,
-      accent: "default",
-    },
-  ]
+  const kpis: KpiCardProps[] = useMemo(() => {
+    const base: KpiCardProps[] = [
+      {
+        label: "Vehículos monitoreados",
+        value: vehiclesMonitored,
+        icon: <BarChart3 size={20} />,
+        accent: "default",
+      },
+      {
+        label: "Vehículos con eventos",
+        value: vehiclesWithEvents,
+        icon: <BarChart3 size={20} />,
+        accent: "default",
+      },
+      {
+        label: "Eventos en el período",
+        value: eventsInPeriod,
+        icon: <BarChart3 size={20} />,
+        accent: "default",
+      },
+    ]
+    if (hasRiskData) {
+      if (highestRiskVehicle != null) {
+        base.push({
+          label: "Mayor riesgo (vehículo)",
+          value: highestRiskVehicle.plate,
+          suffix: String(highestRiskVehicle.maxRisk),
+          icon: <ShieldAlert size={20} />,
+          accent:
+            (highestRiskVehicle.maxRisk ?? 0) >= 15
+              ? "danger"
+              : (highestRiskVehicle.maxRisk ?? 0) >= 8
+                ? "warning"
+                : "default",
+        })
+      }
+      if (stats?.avgRisk != null) {
+        base.push({
+          label: "Riesgo promedio flota",
+          value: stats.avgRisk,
+          icon: <TrendingUp size={20} />,
+          accent: "default",
+        })
+      }
+    }
+    return base
+  }, [
+    vehiclesMonitored,
+    vehiclesWithEvents,
+    eventsInPeriod,
+    hasRiskData,
+    highestRiskVehicle,
+    stats?.avgRisk,
+  ])
 
   // ─── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -348,6 +430,25 @@ export default function DashboardPage() {
 
         {/* ── Controles de fecha ── */}
         <div className="flex flex-wrap items-center gap-2">
+          {/* Presets: DÍA | SEMANA | MES | AÑO */}
+          <div className="flex rounded-lg border border-white/10 bg-white/[0.04] p-0.5">
+            {(["day", "week", "month", "year"] as const).map((p) => (
+              <Button
+                key={p}
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "h-8 px-3 text-xs font-medium",
+                  preset === p
+                    ? "bg-white/10 text-white"
+                    : "text-white/50 hover:bg-white/5 hover:text-white/70",
+                )}
+                onClick={() => setPreset(p)}
+              >
+                {p === "day" ? "Día" : p === "week" ? "Semana" : p === "month" ? "Mes" : "Año"}
+              </Button>
+            ))}
+          </div>
           {/* Navegación prev/next */}
           <div className="flex items-center rounded-lg border border-white/10 bg-white/[0.04]">
             <Button
@@ -430,7 +531,7 @@ export default function DashboardPage() {
         <Card className="border-white/5 bg-white/[0.02]">
           <CardContent className="flex items-center gap-3 py-6 text-sm text-white/40">
             <AlertTriangle size={16} className="shrink-0 text-yellow-400/60" />
-            No hay alertas registradas para {selectedDateLabel}.
+            No hay datos para el período: {selectedDateLabel}.
           </CardContent>
         </Card>
       )}
@@ -535,48 +636,6 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
           </div>
-
-          {/* Alertas pendientes */}
-          {topPendingAlerts.length > 0 && (
-            <Card className="border-white/5 bg-white/[0.03]">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm font-semibold text-white/80">
-                    Alertas pendientes
-                  </CardTitle>
-                  <Badge
-                    variant="outline"
-                    className="border-orange-400/20 bg-orange-400/10 text-orange-400"
-                  >
-                    {pendingAlerts.length}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-1.5 sm:grid-cols-2">
-                  {topPendingAlerts.map((alert) => (
-                    <div
-                      key={alert.alertId}
-                      className="flex items-center justify-between rounded-lg border border-white/5 bg-white/[0.02] px-4 py-3 transition-colors hover:bg-white/[0.04]"
-                    >
-                      <div>
-                        <p className="font-mono text-sm font-medium tracking-wider text-white/90">
-                          {alert.plate}
-                        </p>
-                        <p className="mt-0.5 text-xs text-white/30">{alert.dateKey}</p>
-                      </div>
-                      <span className={cn(
-                        "rounded border px-2 py-0.5 text-xs font-semibold tabular-nums",
-                        getRiskColor(alert.riskScore)
-                      )}>
-                        {alert.riskScore}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
 
           {/* Navegación rápida */}
           <div className="flex flex-wrap gap-2 pt-1">

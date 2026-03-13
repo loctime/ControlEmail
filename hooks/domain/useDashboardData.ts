@@ -4,7 +4,10 @@ import { useCallback } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { dashboardApi } from "@/services/api"
 import type {
+  AdminTotalsDTO,
+  DailyBreakdownPointDTO,
   DashboardAggregatedPayload,
+  DashboardVehicleDetailDTO,
   MyAlertItemDTO,
   MyRiskItemDTO,
   MyStatsDTO,
@@ -35,6 +38,12 @@ export interface DashboardDataState {
   riskVehicles: MyRiskItemDTO[]
   pendingAlerts: MyAlertItemDTO[]
   consistency: DailyConsistencyDTO | null
+  /** SuperDashboard: per-vehicle enriched data */
+  vehicleDetails: DashboardVehicleDetailDTO[]
+  /** SuperDashboard: admin alert category totals */
+  adminTotals: AdminTotalsDTO | null
+  /** SuperDashboard: last 7 days breakdown (week response only) */
+  dailyBreakdown: DailyBreakdownPointDTO[] | null
   loading: boolean
   error: string | null
   refetch: () => Promise<void>
@@ -42,14 +51,16 @@ export interface DashboardDataState {
 
 export function useDashboardData(
   dateKey: string | undefined,
-  mode: "day" | "month" | "year",
+  mode: "day" | "week" | "month" | "year",
 ): DashboardDataState {
   const param =
     mode === "day"
       ? dateKey
-      : mode === "month"
-        ? dateKey?.slice(0, 7)
-        : dateKey?.slice(0, 4)
+      : mode === "week"
+        ? dateKey
+        : mode === "month"
+          ? dateKey?.slice(0, 7)
+          : dateKey?.slice(0, 4)
 
   const query = useQuery({
     queryKey: queryKeys.dashboard.aggregated(mode, param ?? ""),
@@ -58,6 +69,9 @@ export function useDashboardData(
       riskVehicles: MyRiskItemDTO[]
       pendingAlerts: MyAlertItemDTO[]
       consistency: DailyConsistencyDTO | null
+      vehicleDetails: DashboardVehicleDetailDTO[]
+      adminTotals: AdminTotalsDTO | null
+      dailyBreakdown: DailyBreakdownPointDTO[] | null
     }> => {
       if (!dateKey || !param) {
         return {
@@ -65,11 +79,16 @@ export function useDashboardData(
           riskVehicles: [],
           pendingAlerts: [],
           consistency: null,
+          vehicleDetails: [],
+          adminTotals: null,
+          dailyBreakdown: null,
         }
       }
       let payload: DashboardAggregatedPayload
       if (mode === "day") {
         payload = await dashboardApi.getDay(dateKey)
+      } else if (mode === "week") {
+        payload = await dashboardApi.getWeek(dateKey)
       } else if (mode === "month") {
         payload = await dashboardApi.getMonth(param)
       } else {
@@ -81,7 +100,18 @@ export function useDashboardData(
         ? payload.pendingAlerts.filter((a) => !a.alertSent)
         : []
       const consistency = payload.consistency ?? null
-      return { stats, riskVehicles, pendingAlerts, consistency }
+      const vehicleDetails = Array.isArray(payload.vehicleDetails) ? payload.vehicleDetails : []
+      const adminTotals = payload.adminTotals ?? null
+      const dailyBreakdown = Array.isArray(payload.dailyBreakdown) ? payload.dailyBreakdown : null
+      return {
+        stats,
+        riskVehicles,
+        pendingAlerts,
+        consistency,
+        vehicleDetails,
+        adminTotals,
+        dailyBreakdown,
+      }
     },
     enabled: !!dateKey && !!param,
     staleTime: STALE_TIME_MS,
@@ -96,6 +126,9 @@ export function useDashboardData(
     riskVehicles: query.data?.riskVehicles ?? [],
     pendingAlerts: query.data?.pendingAlerts ?? [],
     consistency: query.data?.consistency ?? null,
+    vehicleDetails: query.data?.vehicleDetails ?? [],
+    adminTotals: query.data?.adminTotals ?? null,
+    dailyBreakdown: query.data?.dailyBreakdown ?? null,
     loading: query.isPending,
     error:
       query.error instanceof Error

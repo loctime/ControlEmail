@@ -1,1 +1,1 @@
-export { default } from "./nuevopageparadividir"
+export { default } from "./SuperDashboardPage"

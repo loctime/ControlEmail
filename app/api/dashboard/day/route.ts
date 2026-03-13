@@ -3,6 +3,7 @@ import { getAuthUserWithPlates, authUnauthorizedResponse } from "@/lib/auth-user
 import { getDailyMetrics, getDailyConsistency } from "@/lib/firestore-read"
 import { normalizeBusinessDate } from "@/lib/domain/date"
 import type { DashboardAggregatedPayload } from "@/services/api/dashboard/types"
+import { buildVehicleDetailFromVehicle, buildAdminTotalsFromVehicles } from "@/app/api/dashboard/enrichment"
 
 function makeAlertId(dateKey: string, plate: string): string {
   return `${dateKey}_${plate}`
@@ -55,6 +56,9 @@ export async function GET(request: Request) {
         lastEventAt: v.lastEventAt,
       }))
 
+    const vehicleDetails = vehicles.map(buildVehicleDetailFromVehicle)
+    const adminTotals = buildAdminTotalsFromVehicles(vehicles)
+
     const payload: DashboardAggregatedPayload = {
       stats: {
         totalAlerts,
@@ -66,6 +70,8 @@ export async function GET(request: Request) {
       vehicles: riskVehicles,
       pendingAlerts,
       consistency,
+      vehicleDetails,
+      adminTotals,
     }
 
     return NextResponse.json(payload)

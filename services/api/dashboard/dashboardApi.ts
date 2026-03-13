@@ -16,6 +16,13 @@ export const dashboardApi = {
       { authMode: "firebase" },
     ),
 
+  /** ControlFile backend: metrics/week — 7 days ending on date */
+  getWeek: (date: string) =>
+    apiClient.get<DashboardAggregatedPayload>(
+      `/api/dashboard/week?date=${encodeURIComponent(date)}`,
+      { authMode: "firebase" },
+    ),
+
   /** ControlFile backend: metrics/monthly — 1 request, 1 Firestore read */
   getMonth: (month: string) =>
     apiClient.get<DashboardAggregatedPayload>(

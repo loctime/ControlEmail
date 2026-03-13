@@ -106,6 +106,42 @@ export function getDateKeysInMonth(month: string): string[] {
   return keys
 }
 
+/**
+ * Formatea una dateKey (YYYY-MM-DD) o Date para mostrar al usuario: DD/MM/YYYY.
+ */
+export function formatDDMMYYYY(input: Date | string): string {
+  if (input instanceof Date) {
+    const d = input
+    const day = String(d.getDate()).padStart(2, "0")
+    const month = String(d.getMonth() + 1).padStart(2, "0")
+    const year = d.getFullYear()
+    return `${day}/${month}/${year}`
+  }
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(input)
+  if (!match) return input.slice(0, 10)
+  const [, y, m, d] = match
+  return `${d}/${m}/${y}`
+}
+
+/**
+ * Devuelve las claves YYYY-MM-DD de los últimos 7 días terminando en endDate (inclusive).
+ */
+export function getDateKeysLast7Days(endDate: string): string[] {
+  const [y, m, d] = endDate.split("-").map(Number)
+  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return []
+  const keys: string[] = []
+  const end = new Date(y, m - 1, d)
+  for (let i = 6; i >= 0; i--) {
+    const date = new Date(end)
+    date.setDate(date.getDate() - i)
+    const yy = date.getFullYear()
+    const mm = String(date.getMonth() + 1).padStart(2, "0")
+    const dd = String(date.getDate()).padStart(2, "0")
+    keys.push(`${yy}-${mm}-${dd}`)
+  }
+  return keys
+}
+
 /** Devuelve todas las claves YYYY-MM-DD del año (ej. "2026" → ["2026-01-01", ..., "2026-12-31"]). */
 export function getDateKeysInYear(year: string): string[] {
   const y = Number(year)
