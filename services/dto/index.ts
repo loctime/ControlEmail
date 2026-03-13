@@ -138,8 +138,16 @@ export interface VehicleEventLegacyDTO {
 
 export interface VehiclePlateDetailDTO {
   vehicle: VehicleDoc
-  events: import("@/lib/firestore-read").VehicleEventDashboard[]
-  previousEvents: import("@/lib/firestore-read").VehicleEventDashboard[]
+  dateKey: string
+  events: import("@/lib/firestore-read").DailyAlertVehicle["events"]
+  speedIncidents: import("@/lib/firestore-read").DailyAlertVehicle["speedIncidents"]
+  summary: import("@/lib/firestore-read").DailyAlertVehicle["summary"]
+  totalEventsCount: number
+  storedEventsCount: number
+  eventsTruncated: boolean
+  truncatedEventsCount: number
+  incidentSummary?: import("@/lib/firestore-read").DailyAlertVehicle["incidentSummary"]
+  previousTotalEventsCount: number
   ranking: {
     position: number
     totalVehicles: number

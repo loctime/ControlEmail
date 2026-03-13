@@ -26,7 +26,7 @@ const chartConfig: ChartConfig = {
     color: "hsl(var(--chart-2))",
   },
   avgRisk: {
-    label: "Riesgo promedio estimado",
+    label: "Riesgo promedio",
     color: "hsl(var(--chart-4))",
   },
 }
@@ -52,20 +52,14 @@ function EventsTrendChartBase({ trend, avgRisk, loading = false }: EventsTrendCh
       sorted.pop()
     }
 
-    const maxEvents = Math.max(1, ...sorted.map((point) => point.events))
-
     return sorted.map((point) => {
       const pointRisk = (point as TrendPoint & { avgRisk?: number }).avgRisk
-      const normalizedRisk = Number.isFinite(pointRisk)
-        ? Number(pointRisk)
-        : Math.round(((point.events / maxEvents) * avgRisk + Number.EPSILON) * 100) / 100
-
       return {
         ...point,
-        avgRisk: normalizedRisk,
+        avgRisk: Number.isFinite(pointRisk) ? Number(pointRisk) : null,
       }
     })
-  }, [trend, avgRisk])
+  }, [trend])
 
   return (
     <Card className="border-border bg-card text-foreground">
@@ -83,9 +77,11 @@ function EventsTrendChartBase({ trend, avgRisk, loading = false }: EventsTrendCh
               <Badge variant="secondary" className="border border-border bg-muted text-foreground">
                 Eventos por dia
               </Badge>
-              <Badge variant="secondary" className="border border-red-500/20 bg-red-500/10 text-red-500">
-                Riesgo promedio estimado
-              </Badge>
+              {hasApiRisk && (
+                <Badge variant="secondary" className="border border-red-500/20 bg-red-500/10 text-red-500">
+                  Riesgo promedio backend
+                </Badge>
+              )}
             </div>
             <ChartContainer
               config={chartConfig}
@@ -96,7 +92,7 @@ function EventsTrendChartBase({ trend, avgRisk, loading = false }: EventsTrendCh
                 <CartesianGrid vertical={false} />
                 <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8} />
                 <YAxis yAxisId="events" tickLine={false} axisLine={false} width={34} />
-                <YAxis yAxisId="risk" orientation="right" tickLine={false} axisLine={false} width={34} />
+                {hasApiRisk && <YAxis yAxisId="risk" orientation="right" tickLine={false} axisLine={false} width={34} />}
                 <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
                 <Legend content={<ChartLegendContent />} />
                 <Line
@@ -109,24 +105,21 @@ function EventsTrendChartBase({ trend, avgRisk, loading = false }: EventsTrendCh
                   dot={false}
                   activeDot={{ r: 4 }}
                 />
-                <Line
-                  yAxisId="risk"
-                  type="monotone"
-                  dataKey="avgRisk"
-                  name="avgRisk"
-                  stroke="var(--color-avgRisk)"
-                  strokeWidth={2.2}
-                  strokeDasharray="4 3"
-                  dot={false}
-                  activeDot={{ r: 4 }}
-                />
+                {hasApiRisk && (
+                  <Line
+                    yAxisId="risk"
+                    type="monotone"
+                    dataKey="avgRisk"
+                    name="avgRisk"
+                    stroke="var(--color-avgRisk)"
+                    strokeWidth={2.2}
+                    strokeDasharray="4 3"
+                    dot={false}
+                    activeDot={{ r: 4 }}
+                  />
+                )}
               </LineChart>
             </ChartContainer>
-            {!hasApiRisk && (
-              <p className="mt-2 text-xs text-muted-foreground">
-                Riesgo promedio estimado en base a intensidad diaria de eventos.
-              </p>
-            )}
           </>
         )}
       </CardContent>

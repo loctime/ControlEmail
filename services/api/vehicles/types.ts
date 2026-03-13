@@ -1,4 +1,4 @@
-import type { VehicleDoc, VehicleEventDashboard } from "@/lib/firestore-read"
+import type { DailyAlertVehicle, VehicleDoc } from "@/lib/firestore-read"
 
 export interface MyVehiclesItemDTO {
   id: string
@@ -20,6 +20,7 @@ export interface MyAlertsVehiclesItemDTO {
   operationName: string | null
   lastEvent: string
   riskScore: number
+  totalEventsCount: number
 }
 
 export interface MyAlertsVehiclesDTO {
@@ -31,8 +32,16 @@ export type DaysBack = 7 | 30 | 90
 
 export interface VehiclePlateDetailDTO {
   vehicle: VehicleDoc
-  events: VehicleEventDashboard[]
-  previousEvents: VehicleEventDashboard[]
+  dateKey: string
+  events: DailyAlertVehicle["events"]
+  speedIncidents: DailyAlertVehicle["speedIncidents"]
+  summary: DailyAlertVehicle["summary"]
+  totalEventsCount: number
+  storedEventsCount: number
+  eventsTruncated: boolean
+  truncatedEventsCount: number
+  incidentSummary?: DailyAlertVehicle["incidentSummary"]
+  previousTotalEventsCount: number
   ranking: {
     position: number
     totalVehicles: number

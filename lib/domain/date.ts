@@ -1,3 +1,34 @@
+export const BUSINESS_TIMEZONE = "America/Argentina/Buenos_Aires"
+
+function partsToDateKey(parts: Intl.DateTimeFormatPart[]): string {
+  const year = parts.find((p) => p.type === "year")?.value ?? ""
+  const month = parts.find((p) => p.type === "month")?.value ?? ""
+  const day = parts.find((p) => p.type === "day")?.value ?? ""
+  return `${year}-${month}-${day}`
+}
+
+function businessDateFormatter(): Intl.DateTimeFormat {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: BUSINESS_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+}
+
+export function formatBusinessDate(input: Date | string): string {
+  const date = input instanceof Date ? input : new Date(input)
+  if (Number.isNaN(date.getTime())) {
+    return typeof input === "string" ? input.slice(0, 10) : ""
+  }
+  return partsToDateKey(businessDateFormatter().formatToParts(date))
+}
+
+export function parseBusinessDate(dateKey: string): Date {
+  const [year, month, day] = dateKey.split("-").map(Number)
+  return new Date(year, month - 1, day)
+}
+
 /**
  * Normaliza una fecha de negocio al formato YYYY-MM-DD.
  *
@@ -6,7 +37,7 @@
  */
 export function normalizeBusinessDate(input: Date | string): string {
   if (input instanceof Date) {
-    return input.toISOString().slice(0, 10)
+    return formatBusinessDate(input)
   }
 
   // Si ya viene en formato YYYY-MM-DD lo devolvemos tal cual.
@@ -16,7 +47,7 @@ export function normalizeBusinessDate(input: Date | string): string {
 
   const parsed = new Date(input)
   if (!Number.isNaN(parsed.getTime())) {
-    return parsed.toISOString().slice(0, 10)
+    return formatBusinessDate(parsed)
   }
 
   // Último recurso: truncar a 10 caracteres, sin inventar una fecha nueva.
@@ -24,23 +55,20 @@ export function normalizeBusinessDate(input: Date | string): string {
 }
 
 /** Zona horaria usada para dateKey en Firestore y para el día de referencia del dashboard. */
-const DASHBOARD_TIMEZONE = "America/Argentina/Buenos_Aires"
+const DASHBOARD_TIMEZONE = BUSINESS_TIMEZONE
 
 /**
  * Hoy en la zona del dashboard (Argentina), como YYYY-MM-DD.
  */
 function getTodayKeyInTimezone(): string {
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: DASHBOARD_TIMEZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  })
-  const parts = formatter.formatToParts(new Date())
-  const year = parts.find((p) => p.type === "year")?.value ?? ""
-  const month = parts.find((p) => p.type === "month")?.value ?? ""
-  const day = parts.find((p) => p.type === "day")?.value ?? ""
-  return `${year}-${month}-${day}`
+  return partsToDateKey(
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: DASHBOARD_TIMEZONE,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(new Date()),
+  )
 }
 
 /**
@@ -89,4 +117,3 @@ export function getDateKeysInYear(year: string): string[] {
   }
   return keys
 }
-

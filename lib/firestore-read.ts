@@ -938,7 +938,15 @@ export async function updateVehicleAlerts(
 
 // Daily Alerts structure for new email module
 export interface DailyAlertVehicle {
+  id: string
   plate: string
+  dateKey: string
+  brand?: string | null
+  model?: string | null
+  operationName?: string | null
+  operacion?: string | null
+  responsables: string[]
+  responsablesNormalized: string[]
   summary: {
     totalEvents: number
     criticalEvents: number
@@ -951,11 +959,65 @@ export interface DailyAlertVehicle {
     llave_sin_cargar?: number
     conductor_inactivo?: number
   }
+  incidentSummary?: {
+    totalUniqueIncidents: number
+    uniqueOperationalIncidents: number
+    uniqueTechnicalIncidents: number
+    totalSpeedIncidents: number
+    bySubtype: Record<string, number>
+    speedIncidents: string[]
+  }
+  speedIncidents: Array<{
+    incidentKey: string
+    eventCategory: string | null
+    eventSubtype: string | null
+    groupedEventsCount: number
+    maxSpeed: number | null
+    avgSpeed: number | null
+    durationSeconds: number | null
+    severity: string | null
+    location: string | null
+    plate: string
+    firstEventAt: string | null
+    lastEventAt: string | null
+    driverName: string | null
+    keyId: string | null
+    causeSubtype: string | null
+    eventIds: string[]
+  }>
   /** Risk score agregado calculado en backend. Si falta en origen, se expone como null. */
   riskScore: number | null
   alertSent: boolean
   sentAt?: string
-  events: string[]
+  events: Array<{
+    eventId: string
+    plate: string
+    type: string
+    eventSource: string | null
+    eventCategory: string | null
+    eventSubtype: string | null
+    incidentKey: string | null
+    groupedEventsCount: number | null
+    groupedSpeedIncidentKey: string | null
+    speedSeverity: string | null
+    speed: number | null
+    maxSpeed: number | null
+    hasSpeed: boolean
+    eventTimestamp: string
+    locationRaw: string | null
+    location: string | null
+    severity: string | null
+    driverName: string | null
+    keyId: string | null
+    reason: string | null
+    reasonRaw: string | null
+  }>
+  eventIdsSeen: string[]
+  totalEventsCount: number
+  storedEventsCount: number
+  eventsTruncated: boolean
+  truncatedEventsCount: number
+  speedingDrivers: string[]
   /** Ãšltimo evento conocido del dÃ­a. Si falta en origen, se expone como null. */
   lastEventAt: string | null
 }
@@ -1019,6 +1081,146 @@ function parseVehicleSummary(summary: Record<string, unknown>): DailyAlertVehicl
   }
 }
 
+function toStringOrNull(value: unknown): string | null {
+  return value == null ? null : String(value)
+}
+
+function toNumberOrNull(value: unknown): number | null {
+  if (value == null || value === "") return null
+  const numeric = Number(value)
+  return Number.isFinite(numeric) ? numeric : null
+}
+
+function parseIncidentSummary(value: unknown): DailyAlertVehicle["incidentSummary"] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined
+  const raw = value as Record<string, unknown>
+  const bySubtypeRaw =
+    raw.bySubtype && typeof raw.bySubtype === "object" && !Array.isArray(raw.bySubtype)
+      ? (raw.bySubtype as Record<string, unknown>)
+      : {}
+  const bySubtype: Record<string, number> = {}
+
+  for (const [key, subtypeValue] of Object.entries(bySubtypeRaw)) {
+    bySubtype[key] = Number(subtypeValue ?? 0)
+  }
+
+  return {
+    totalUniqueIncidents: Number(raw.totalUniqueIncidents ?? 0),
+    uniqueOperationalIncidents: Number(raw.uniqueOperationalIncidents ?? 0),
+    uniqueTechnicalIncidents: Number(raw.uniqueTechnicalIncidents ?? 0),
+    totalSpeedIncidents: Number(raw.totalSpeedIncidents ?? 0),
+    bySubtype,
+    speedIncidents: Array.isArray(raw.speedIncidents) ? raw.speedIncidents.map((item) => String(item)) : [],
+  }
+}
+
+function parseSpeedIncidents(value: unknown, fallbackPlate: string): DailyAlertVehicle["speedIncidents"] {
+  if (!Array.isArray(value)) return []
+  return value.map((item) => {
+    const raw = item && typeof item === "object" && !Array.isArray(item) ? (item as Record<string, unknown>) : {}
+    return {
+      incidentKey: String(raw.incidentKey ?? ""),
+      eventCategory: toStringOrNull(raw.eventCategory),
+      eventSubtype: toStringOrNull(raw.eventSubtype),
+      groupedEventsCount: Number(raw.groupedEventsCount ?? 0),
+      maxSpeed: toNumberOrNull(raw.maxSpeed),
+      avgSpeed: toNumberOrNull(raw.avgSpeed),
+      durationSeconds: toNumberOrNull(raw.durationSeconds),
+      severity: toStringOrNull(raw.severity),
+      location: toStringOrNull(raw.location),
+      plate: String(raw.plate ?? fallbackPlate),
+      firstEventAt: toStringOrNull(raw.firstEventAt),
+      lastEventAt: toStringOrNull(raw.lastEventAt),
+      driverName: toStringOrNull(raw.driverName),
+      keyId: toStringOrNull(raw.keyId),
+      causeSubtype: toStringOrNull(raw.causeSubtype),
+      eventIds: Array.isArray(raw.eventIds) ? raw.eventIds.map((eventId) => String(eventId)) : [],
+    }
+  })
+}
+
+function parseDailyVehicleEvents(value: unknown, fallbackPlate: string): DailyAlertVehicle["events"] {
+  if (!Array.isArray(value)) return []
+  return value
+    .map((item) => {
+      const raw = item && typeof item === "object" && !Array.isArray(item) ? (item as Record<string, unknown>) : null
+      if (!raw) return null
+      const eventTimestamp = typeof raw.eventTimestamp === "string" ? raw.eventTimestamp : ""
+      if (!eventTimestamp) return null
+
+      return {
+        eventId: String(raw.eventId ?? raw.id ?? ""),
+        plate: String(raw.plate ?? fallbackPlate),
+        type: String(raw.type ?? raw.eventCategory ?? ""),
+        eventSource: toStringOrNull(raw.eventSource),
+        eventCategory: toStringOrNull(raw.eventCategory),
+        eventSubtype: toStringOrNull(raw.eventSubtype),
+        incidentKey: toStringOrNull(raw.incidentKey),
+        groupedEventsCount: toNumberOrNull(raw.groupedEventsCount),
+        groupedSpeedIncidentKey: toStringOrNull(raw.groupedSpeedIncidentKey),
+        speedSeverity: toStringOrNull(raw.speedSeverity),
+        speed: toNumberOrNull(raw.speed),
+        maxSpeed: toNumberOrNull(raw.maxSpeed),
+        hasSpeed: Boolean(raw.hasSpeed ?? raw.speed != null),
+        eventTimestamp,
+        locationRaw: toStringOrNull(raw.locationRaw),
+        location: toStringOrNull(raw.location),
+        severity: toStringOrNull(raw.severity),
+        driverName: toStringOrNull(raw.driverName),
+        keyId: toStringOrNull(raw.keyId),
+        reason: toStringOrNull(raw.reason),
+        reasonRaw: toStringOrNull(raw.reasonRaw),
+      }
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null)
+}
+
+function parseDailyAlertVehicle(
+  plate: string,
+  dateKey: string,
+  data: Record<string, unknown>,
+): DailyAlertVehicle {
+  const summary = (data.summary ?? {}) as Record<string, unknown>
+  const events = parseDailyVehicleEvents(data.events, plate)
+  const speedIncidents = parseSpeedIncidents(data.speedIncidents, plate)
+  const totalEventsCount =
+    typeof data.totalEventsCount === "number"
+      ? Number(data.totalEventsCount)
+      : Number(summary.totalEvents ?? events.length)
+  const storedEventsCount =
+    typeof data.storedEventsCount === "number"
+      ? Number(data.storedEventsCount)
+      : events.length
+
+  return {
+    id: String(data.id ?? plate),
+    plate,
+    dateKey: String(data.dateKey ?? dateKey),
+    brand: toStringOrNull(data.brand),
+    model: toStringOrNull(data.model),
+    operationName: toStringOrNull(data.operationName),
+    operacion: toStringOrNull(data.operacion),
+    responsables: Array.isArray(data.responsables) ? data.responsables.map((item) => String(item)) : [],
+    responsablesNormalized: Array.isArray(data.responsablesNormalized)
+      ? data.responsablesNormalized.map((item) => String(item))
+      : [],
+    summary: parseVehicleSummary(summary),
+    incidentSummary: parseIncidentSummary(data.incidentSummary),
+    speedIncidents,
+    riskScore: typeof data.riskScore === "number" ? (data.riskScore as number) : null,
+    alertSent: Boolean(data.alertSent ?? false),
+    sentAt: data.sentAt ? String(data.sentAt) : undefined,
+    events,
+    eventIdsSeen: Array.isArray(data.eventIdsSeen) ? data.eventIdsSeen.map((item) => String(item)) : [],
+    totalEventsCount,
+    storedEventsCount,
+    eventsTruncated: Boolean(data.eventsTruncated ?? false),
+    truncatedEventsCount: Number(data.truncatedEventsCount ?? Math.max(totalEventsCount - storedEventsCount, 0)),
+    speedingDrivers: Array.isArray(data.speedingDrivers) ? data.speedingDrivers.map((item) => String(item)) : [],
+    lastEventAt: typeof data.lastEventAt === "string" ? (data.lastEventAt as string) : null,
+  }
+}
+
 export async function getDailyMetrics(date: string): Promise<DailyAlertsResponse> {
   const dateDocId = toDailyDocId(date)
   const basePath = `apps/emails/dailyAlerts/${dateDocId}`
@@ -1068,17 +1270,7 @@ export async function getDailyMetrics(date: string): Promise<DailyAlertsResponse
     for (const doc of docList) {
         const plate = doc.name.split("/").pop() ?? ""
         const data = parseFields(doc.fields ?? {})
-        const summary = (data.summary ?? {}) as Record<string, unknown>
-        const events = Array.isArray(data.events) ? data.events : []
-        vehicles.push({
-          plate,
-          summary: parseVehicleSummary(summary),
-          riskScore: typeof data.riskScore === "number" ? (data.riskScore as number) : null,
-          alertSent: Boolean(data.alertSent ?? false),
-          sentAt: data.sentAt ? String(data.sentAt) : undefined,
-          events,
-          lastEventAt: typeof data.lastEventAt === "string" ? (data.lastEventAt as string) : null,
-        })
+        vehicles.push(parseDailyAlertVehicle(plate, dateDocId, data))
       }
   }
   
@@ -1231,18 +1423,7 @@ export async function getDailyAlertForVehicle(
     return { alert: null, meta }
   }
   const data = parseFields(vehicleJson.fields)
-  const summary = (data.summary ?? {}) as Record<string, unknown>
-  const events = Array.isArray(data.events) ? data.events : []
-
-  const alert: DailyAlertVehicle = {
-    plate,
-    summary: parseVehicleSummary(summary),
-    riskScore: typeof data.riskScore === "number" ? (data.riskScore as number) : null,
-    alertSent: Boolean(data.alertSent ?? false),
-    sentAt: data.sentAt ? String(data.sentAt) : undefined,
-    events,
-    lastEventAt: typeof data.lastEventAt === "string" ? (data.lastEventAt as string) : null,
-  }
+  const alert = parseDailyAlertVehicle(plate, dateDocId, data)
 
   return { alert, meta }
 }

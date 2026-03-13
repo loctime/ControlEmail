@@ -22,7 +22,23 @@ export default function VehicleDashboardPage() {
   const plate = params?.plate as string
   const [daysFilter, setDaysFilter] = useState<7 | 30 | 90>(30)
 
-  const { vehicle, filteredEvents, kpis, score, riskLevel, trend, ranking, monthlyScores, loading, error } =
+  const {
+    vehicle,
+    events,
+    visibleEvents,
+    speedIncidents,
+    totalEventsCount,
+    storedEventsCount,
+    eventsTruncated,
+    kpis,
+    score,
+    riskLevel,
+    trend,
+    ranking,
+    summary,
+    loading,
+    error,
+  } =
     useVehicleData(plate, daysFilter)
 
   if (!plate) {
@@ -95,8 +111,23 @@ export default function VehicleDashboardPage() {
         {!error && (
           <>
             <VehicleKpis kpis={kpis} score={score} trend={trend} ranking={ranking} loading={loading} />
-            <VehicleCharts events={filteredEvents} monthlyScores={monthlyScores} loading={loading} />
-            <VehicleEventsTable events={filteredEvents} loading={loading} />
+            <VehicleCharts
+              totalEventsCount={totalEventsCount}
+              storedEventsCount={storedEventsCount}
+              eventsTruncated={eventsTruncated}
+              speedIncidents={speedIncidents}
+              summary={summary}
+              loading={loading}
+            />
+            <VehicleEventsTable
+              events={events}
+              speedIncidents={speedIncidents}
+              visibleEvents={visibleEvents}
+              totalEventsCount={totalEventsCount}
+              storedEventsCount={storedEventsCount}
+              eventsTruncated={eventsTruncated}
+              loading={loading}
+            />
           </>
         )}
       </div>

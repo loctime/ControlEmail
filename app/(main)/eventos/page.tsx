@@ -117,7 +117,7 @@ export default function EventosPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Resultados ({filtered.length})</CardTitle>
+          <CardTitle>Filas visibles ({filtered.length})</CardTitle>
         </CardHeader>
         <CardContent>
           <AsyncState loading={loading} error={error} empty={!loading && filtered.length === 0} onRetry={() => void refetch()} />

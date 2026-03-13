@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
-import { listVehicleEvents } from "@/lib/firestore-read"
-import { normalizeBusinessDate } from "@/lib/domain/date"
+import { getDailyMetrics, type DailyAlertVehicle } from "@/lib/firestore-read"
+import { getYesterdayKey } from "@/lib/domain/date"
 import type { VehicleEventLegacyDTO } from "@/services/dto"
 
 /** Parsea hora desde eventTimestamp (ej. "2026-03-03T13:13:46-03:00") a "HH:mm". */
@@ -10,73 +10,57 @@ function horaFromEventTimestamp(ts: string | undefined): string {
   if (match) return `${match[1].padStart(2, "0")}:${match[2]}`
   try {
     const d = new Date(ts)
-    if (!Number.isNaN(d.getTime()))
+    if (!Number.isNaN(d.getTime())) {
       return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`
+    }
   } catch {
     // ignore
   }
   return "00:00"
 }
 
-/** Mapea eventCategory/type del doc al tipo esperado por el front. */
-function mapTipo(
-  eventCategory: string,
-  doc: Awaited<ReturnType<typeof listVehicleEvents>>[0]
-): string {
-  if (doc.speed != null || doc.hasSpeed) return "exceso_velocidad"
-  const cat = (eventCategory ?? "").toLowerCase()
-  if (cat === "exceso_velocidad") return "exceso_velocidad"
-  if (cat === "contacto" || cat === "contacto_sin_identificacion") return "vehiculo_no_identificado"
-  if (cat === "desvio_ruta") return "desvio_ruta"
-  if (cat === "parada_no_autorizada") return "parada_no_autorizada"
-  if (cat === "conduccion_nocturna") return "conduccion_nocturna"
+function mapTipo(event: DailyAlertVehicle["events"][number]): string {
+  if (event.speed != null || event.hasSpeed) return "exceso_velocidad"
+  const cat = (event.eventCategory ?? event.type ?? "").toLowerCase()
+  if (cat.includes("speed") || cat.includes("exceso")) return "exceso_velocidad"
+  if (cat.includes("contact")) return "vehiculo_no_identificado"
+  if (cat.includes("driver_not_identified") || cat.includes("no identificado")) return "vehiculo_no_identificado"
+  if (cat.includes("desvio")) return "desvio_ruta"
+  if (cat.includes("parada")) return "parada_no_autorizada"
+  if (cat.includes("nocturna")) return "conduccion_nocturna"
   return "vehiculo_no_identificado"
 }
 
-/** Mapea severity del doc al estado esperado por el front. */
 function mapEstado(severity: string | undefined): "pendiente" | "en_revision" | "resuelto" | "critico" {
   const s = (severity ?? "").toLowerCase()
-  if (s === "critico") return "critico"
+  if (s === "critico" || s === "critical") return "critico"
   if (s === "resuelto") return "resuelto"
   if (s === "en_revision") return "en_revision"
   return "pendiente"
 }
 
-function eventDocToVehicleEvent(doc: Awaited<ReturnType<typeof listVehicleEvents>>[0]): VehicleEventLegacyDTO {
-  const fecha =
-    doc.dateKey ??
-    (doc.eventTimestamp
-      ? normalizeBusinessDate(doc.eventTimestamp)
-      : doc.eventDate
-        ? (doc.eventDate.includes("T") ? normalizeBusinessDate(doc.eventDate) : doc.eventDate)
-        : "")
-  const hora =
-    doc.eventTimestamp
-      ? horaFromEventTimestamp(doc.eventTimestamp)
-      : doc.eventDate
-        ? (() => {
-            const iso = doc.eventDate.includes("T") ? doc.eventDate : `${doc.eventDate}T00:00:00.000Z`
-            const date = new Date(iso)
-            return `${String(date.getUTCHours()).padStart(2, "0")}:${String(date.getUTCMinutes()).padStart(2, "0")}`
-          })()
-        : "00:00"
-  const vehiculo = [doc.brand, doc.model].filter(Boolean).join(" ") || null
-  const descripcion = doc.speed != null
-    ? `Vehículo registrado a ${doc.speed} km/h. ${doc.location ? `Ubicación: ${doc.location}.` : ""}`
-    : (doc.rawLine ?? (`Evento ${doc.eventCategory ?? "registrado"}. ${doc.location ?? ""}`.trim() || "Evento registrado."))
+function eventDocToVehicleEvent(
+  event: DailyAlertVehicle["events"][number],
+  vehicle: DailyAlertVehicle,
+): VehicleEventLegacyDTO {
+  const vehiculo = [vehicle.brand, vehicle.model].filter(Boolean).join(" ") || null
+  const descripcion =
+    event.speed != null
+      ? `Vehiculo registrado a ${event.speed} km/h. ${event.location ? `Ubicacion: ${event.location}.` : ""}`
+      : (event.reason ?? (`Evento ${(event.eventCategory ?? event.type ?? "registrado")}. ${event.location ?? ""}`.trim() || "Evento registrado."))
 
   return {
-    id: doc.eventId ?? doc.id,
-    fecha,
-    hora,
-    patente: doc.plate,
+    id: event.eventId,
+    fecha: vehicle.dateKey,
+    hora: horaFromEventTimestamp(event.eventTimestamp),
+    patente: event.plate,
     vehiculo,
-    conductor: doc.driver ?? doc.driverName ?? null,
-    tipo: mapTipo(doc.eventCategory, doc),
-    velocidad: doc.speed,
+    conductor: event.driverName ?? null,
+    tipo: mapTipo(event),
+    velocidad: event.speed ?? undefined,
     limiteVelocidad: undefined,
-    ubicacion: doc.location ?? null,
-    estado: mapEstado(doc.severity),
+    ubicacion: event.location ?? null,
+    estado: mapEstado(event.severity ?? undefined),
     descripcion,
     notas: [],
   }
@@ -87,24 +71,26 @@ export async function GET(request: Request) {
   const auth = await getAuthUserWithPlates(request)
   if (!auth) return authUnauthorizedResponse()
 
-  console.log("[api/vehicle-events] GET: leyendo eventos desde Firestore (filtro por responsable:", auth.email, ")")
+  console.log("[api/vehicle-events] GET: leyendo eventos del cierre diario (filtro por responsable:", auth.email, ")")
   try {
-    const docs = await listVehicleEvents()
-    const allowedPlates = auth.allowedPlates
-    const filteredDocs = docs.filter((d) => allowedPlates.has(d.plate))
-    console.log("[api/vehicle-events] GET: recibidos", filteredDocs.length, "eventos (filtrados)")
-    const events: VehicleEventLegacyDTO[] = filteredDocs.map(eventDocToVehicleEvent)
-    console.log("[api/vehicle-events] sample event (fecha, hora, patente):", events[0] ? {
-      fecha: events[0].fecha,
-      hora: events[0].hora,
-      patente: events[0].patente,
-    } : "sin eventos")
+    const metrics = await getDailyMetrics(getYesterdayKey())
+    const vehicles = metrics.vehicles.filter((vehicle) => auth.allowedPlates.has(vehicle.plate))
+    const events: VehicleEventLegacyDTO[] = vehicles.flatMap((vehicle) => {
+      const groupedSpeedEventIds = new Set(
+        vehicle.speedIncidents.flatMap((incident) => incident.eventIds ?? []),
+      )
+
+      return vehicle.events
+        .filter((event) => !groupedSpeedEventIds.has(event.eventId))
+        .map((event) => eventDocToVehicleEvent(event, vehicle))
+    })
+
     events.sort((a, b) => {
       const da = `${a.fecha}T${a.hora}`
       const db = `${b.fecha}T${b.hora}`
       return da > db ? -1 : da < db ? 1 : 0
     })
-    console.log("[api/vehicle-events] GET: respondiendo", events.length, "eventos")
+
     return NextResponse.json(events)
   } catch (error) {
     console.error("[api/vehicle-events] GET error:", error instanceof Error ? error.message : error)

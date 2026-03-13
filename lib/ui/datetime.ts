@@ -1,3 +1,5 @@
+import { BUSINESS_TIMEZONE } from "@/lib/domain/date"
+
 const EVENT_LOCALE = "es-AR"
 
 type TimestampInput = string | Date | null | undefined
@@ -8,11 +10,8 @@ export function parseEventTimestamp(input: TimestampInput): Date | null {
   }
   if (!input || typeof input !== "string") return null
 
-  const d = new Date(input)
-  if (Number.isNaN(d.getTime())) {
-    return null
-  }
-  return d
+  const date = new Date(input)
+  return Number.isNaN(date.getTime()) ? null : date
 }
 
 function formatWithOptions(
@@ -20,11 +19,15 @@ function formatWithOptions(
   options: Intl.DateTimeFormatOptions,
 ): string {
   const date = parseEventTimestamp(input)
-  if (!date) return "Sin fecha válida"
+  if (!date) return "Sin fecha valida"
+
   try {
-    return new Intl.DateTimeFormat(EVENT_LOCALE, options).format(date)
+    return new Intl.DateTimeFormat(EVENT_LOCALE, {
+      ...options,
+      timeZone: BUSINESS_TIMEZONE,
+    }).format(date)
   } catch {
-    return "Sin fecha válida"
+    return "Sin fecha valida"
   }
 }
 
@@ -52,4 +55,3 @@ export function formatEventTime(input: TimestampInput): string {
     minute: "2-digit",
   })
 }
-

@@ -11,6 +11,7 @@ export interface VehicleListRow {
   operationName: string | null
   lastEvent: string
   riskScore: number
+  totalEventsCount: number
   responsables: string[]
 }
 
@@ -40,6 +41,7 @@ export function useVehiclesList() {
         operationName: item.operationName ?? vehicle?.operationName ?? null,
         lastEvent: item.lastEvent,
         riskScore: item.riskScore,
+        totalEventsCount: item.totalEventsCount,
         responsables: vehicle?.responsables ?? [],
       }
     })

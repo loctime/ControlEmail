@@ -239,7 +239,7 @@ export default function DashboardPage() {
 
   // ─── Datos del dashboard ────────────────────────────────────────────────────
   const { stats, riskVehicles, pendingAlerts, consistency, loading, error, refetch } =
-    useDashboardData(selectedDate)
+    useDashboardData(selectedDate, "day")
 
   // ─── Memos de fechas ────────────────────────────────────────────────────────
   const maxAvailableDate = useMemo(

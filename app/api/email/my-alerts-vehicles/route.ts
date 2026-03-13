@@ -29,6 +29,7 @@ export async function GET(request: Request) {
         operationName: null,
         lastEvent: alert?.lastEventAt ?? vehicle?.lastEventAt ?? dateKey,
         riskScore: alert?.riskScore ?? 0,
+        totalEventsCount: alert?.totalEventsCount ?? 0,
       }
     })
 

@@ -209,17 +209,6 @@ function riskStatus(riskScore: number): "verde" | "amarillo" | "rojo" {
   return "verde"
 }
 
-function inferEventRisk(type: EventTypeKey, isCritical: boolean): number {
-  const base: Record<EventTypeKey, number> = {
-    excesos: 5,
-    no_identificados: 4,
-    contactos: 2,
-    llave_sin_cargar: 3,
-    conductor_inactivo: 4,
-  }
-  return Math.min(10, base[type] + (isCritical ? 1 : 0))
-}
-
 export async function aggregateFleetData(
   dateKeys: string[],
   allowedPlates: Set<string>,
@@ -373,12 +362,11 @@ export async function getRecentEvents(
     .slice(0, limit)
     .map((event) => {
       const eventType = normalizeEventType(event.type)
-      const isCritical = event.severity === "critico"
       return {
         timestamp: event.eventTimestamp,
         plate: normalizePlate(event.plate),
         eventType,
-        riskScore: inferEventRisk(eventType, isCritical),
+        riskScore: 0,
       }
     })
 }

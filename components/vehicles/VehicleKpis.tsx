@@ -79,7 +79,7 @@ export function VehicleKpis({ kpis, score, trend, ranking, loading }: VehicleKpi
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">{kpis.totalEventos}</div>
-          <p className="text-xs text-muted-foreground">En el período seleccionado</p>
+          <p className="text-xs text-muted-foreground">Total backend del ultimo cierre</p>
           {TrendIcon && (
             <div className={cn("flex items-center gap-1 mt-2 text-xs font-medium", trendColor)}>
               <TrendIcon className="h-3 w-3" />

@@ -31,6 +31,12 @@ export default function VehiclesPage() {
     { key: "operationName", header: "Operacion", sortable: true },
     { key: "lastEvent", header: "Ultimo evento", sortable: true },
     {
+      key: "totalEventsCount",
+      header: "Eventos",
+      sortable: true,
+      render: (row: VehicleListRow) => <span className="font-semibold">{row.totalEventsCount}</span>,
+    },
+    {
       key: "riskScore",
       header: "Risk score",
       sortable: true,
