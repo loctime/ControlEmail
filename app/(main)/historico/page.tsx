@@ -78,6 +78,14 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   SPEEDING: "Exceso de velocidad",
 }
 
+// El backend embebe el estado del conductor en el string de ubicación (ej. "Desconocido (SIN LLAVE) RP51").
+// Esta función elimina ese prefijo y devuelve solo la ubicación geográfica.
+function cleanLocation(raw: string | null | undefined): string | null {
+  if (!raw) return null
+  const cleaned = raw.replace(/^[^(]*\([^)]*\)\s*/i, "").trim()
+  return cleaned || null
+}
+
 function humanizeEventType(rawType: string): string {
   if (!rawType) return "Desconocido"
   return EVENT_TYPE_LABELS[rawType] ?? rawType
@@ -169,7 +177,7 @@ export default function HistoricoPage() {
         keyId: event.keyId ?? null,
         speed: event.speed ?? event.maxSpeed ?? null,
         eventTimestamp: event.eventTimestamp,
-        location: event.location ?? event.locationRaw ?? null,
+        location: cleanLocation(event.location ?? event.locationRaw),
         description: event.reason ?? event.rawEventType ?? null,
       }))
 

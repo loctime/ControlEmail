@@ -10,13 +10,7 @@ interface AppSidebarProps {
 }
 
 const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: Gauge },
-  { href: "/vehiculos", label: "Vehiculos", icon: Car },
-  { href: "/eventos", label: "Eventos", icon: ListChecks },
-  { href: "/pendientes", label: "Pendientes", icon: Bell },
   { href: "/historico", label: "Historico", icon: FileClock },
-  { href: "/calidad", label: "Calidad", icon: Database },
-  { href: "/configuracion", label: "Configuracion", icon: Settings },
 ]
 
 export function AppSidebar({ pendingAlertsCount = 0 }: AppSidebarProps) {
