@@ -15,16 +15,38 @@ import { useVehiclesList, type VehicleListRow } from "@/hooks/domain/useVehicles
 export default function VehiclesPage() {
   const { rows, loading, error, refetch } = useVehiclesList()
   const [search, setSearch] = useState("")
+  const [selectedOperation, setSelectedOperation] = useState<string | null>(null)
+
+  const uniqueOperations = useMemo(() => {
+    const operations = new Set<string>()
+    rows.forEach(row => {
+      if (row.operationName) {
+        operations.add(row.operationName)
+      }
+    })
+    return Array.from(operations).sort()
+  }, [rows])
 
   const filtered = useMemo(() => {
+    let filtered = rows
+    
+    // Filter by operation
+    if (selectedOperation) {
+      filtered = filtered.filter(row => row.operationName === selectedOperation)
+    }
+    
+    // Filter by search
     const q = search.toLowerCase().trim()
-    if (!q) return rows
-    return rows.filter((row) =>
-      row.plate.toLowerCase().includes(q) ||
-      (row.operationName ?? "").toLowerCase().includes(q) ||
-      row.responsables.join(" ").toLowerCase().includes(q),
-    )
-  }, [rows, search])
+    if (q) {
+      filtered = filtered.filter((row) =>
+        row.plate.toLowerCase().includes(q) ||
+        (row.operationName ?? "").toLowerCase().includes(q) ||
+        row.responsables.join(" ").toLowerCase().includes(q),
+      )
+    }
+    
+    return filtered
+  }, [rows, search, selectedOperation])
 
   const columns: DataTableColumn<VehicleListRow>[] = [
     { key: "plate", header: "Patente", sortable: true, className: "font-mono" },
@@ -86,9 +108,35 @@ export default function VehiclesPage() {
         <CardHeader>
           <CardTitle>Filtros</CardTitle>
         </CardHeader>
-        <CardContent className="flex gap-2">
-          <Input placeholder="Buscar por patente, operacion o responsable" value={search} onChange={(e) => setSearch(e.target.value)} />
-          <Button variant="outline" onClick={() => void refetch()} disabled={loading}>Actualizar</Button>
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant={selectedOperation === null ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSelectedOperation(null)}
+            >
+              Todas
+            </Button>
+            {uniqueOperations.map(operation => (
+              <Button
+                key={operation}
+                variant={selectedOperation === operation ? "default" : "outline"}
+                size="sm"
+                onClick={() => setSelectedOperation(operation)}
+              >
+                {operation}
+              </Button>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <Input 
+              placeholder="Buscar por patente, operacion o responsable" 
+              value={search} 
+              onChange={(e) => setSearch(e.target.value)} 
+              className="max-w-xs"
+            />
+            <Button variant="outline" onClick={() => void refetch()} disabled={loading}>Actualizar</Button>
+          </div>
         </CardContent>
       </Card>
 

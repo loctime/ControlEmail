@@ -27,7 +27,6 @@ const MAX_RISK_VEHICLES = 10
 export interface OperationalRiskTabProps {
   /** Fleet KPIs */
   vehiclesMonitored: number
-  vehiclesWithEvents: number
   eventsInPeriod: number
   highestRiskVehicle: MyRiskItemDTO | null
   fleetAvgRisk: number | null
@@ -49,7 +48,6 @@ export interface OperationalRiskTabProps {
 
 export function OperationalRiskTab({
   vehiclesMonitored,
-  vehiclesWithEvents,
   eventsInPeriod,
   highestRiskVehicle,
   fleetAvgRisk,
@@ -91,13 +89,7 @@ export function OperationalRiskTab({
         icon: <BarChart3 size={20} />,
         accent: "default",
       },
-      {
-        label: "Vehículos con eventos",
-        value: vehiclesWithEvents,
-        icon: <BarChart3 size={20} />,
-        accent: "default",
-      },
-      {
+            {
         label: "Eventos en el período",
         value: eventsInPeriod,
         icon: <BarChart3 size={20} />,
@@ -129,7 +121,6 @@ export function OperationalRiskTab({
     return items
   }, [
     vehiclesMonitored,
-    vehiclesWithEvents,
     eventsInPeriod,
     hasRiskData,
     highestRiskVehicle,
