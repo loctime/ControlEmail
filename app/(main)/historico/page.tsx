@@ -161,13 +161,13 @@ export default function HistoricoPage() {
         plate: event.plate,
         brand: event.brand ?? null,
         model: event.model ?? null,
-        operation: event.operationName ?? null,
+        operation: event.operationName ?? event.operacion ?? null,
         type: (event.speed != null && event.speed > 0) || (event.maxSpeed != null && event.maxSpeed > 0) || event.hasSpeed
           ? "Exceso de velocidad"
           : humanizeEventType(event.eventType || event.rawEventType || event.sourceEmailType || ""),
         driverName: event.driverName ?? null,
         keyId: event.keyId ?? null,
-        speed: event.maxSpeed ?? event.speed ?? null,
+        speed: event.speed ?? event.maxSpeed ?? null,
         eventTimestamp: event.eventTimestamp,
         location: event.location ?? event.locationRaw ?? null,
         description: event.reason ?? event.rawEventType ?? null,
@@ -209,6 +209,13 @@ export default function HistoricoPage() {
     if (selectedPlate !== "Todas" && !plateSet.has(selectedPlate)) setSelectedPlate("Todas")
     if (selectedEventType !== "Todos" && !availableEventTypes.includes(selectedEventType)) setSelectedEventType("Todos")
   }, [data, availableEventTypes, selectedPlate, selectedEventType])
+
+  const visibleCols = useMemo(() => ({
+    conductor: filteredRows.some((r) => r.driverName != null),
+    llave:     filteredRows.some((r) => r.keyId != null),
+    velocidad: filteredRows.some((r) => r.speed != null),
+    ubicacion: filteredRows.some((r) => r.location != null),
+  }), [filteredRows])
 
   const errorMessage = error
     ? error instanceof Error
@@ -350,11 +357,11 @@ export default function HistoricoPage() {
                     <TableHead>Patente + modelo</TableHead>
                     <TableHead>Operación</TableHead>
                     <TableHead>Tipo</TableHead>
-                    <TableHead>Conductor</TableHead>
-                    <TableHead>Llave</TableHead>
-                    <TableHead className="text-right">Velocidad</TableHead>
+                    {visibleCols.conductor && <TableHead>Conductor</TableHead>}
+                    {visibleCols.llave     && <TableHead>Llave</TableHead>}
+                    {visibleCols.velocidad && <TableHead className="text-right">Velocidad</TableHead>}
                     <TableHead>Fecha/Hora</TableHead>
-                    <TableHead>Ubicación</TableHead>
+                    {visibleCols.ubicacion && <TableHead>Ubicación</TableHead>}
                     <TableHead>Detalle</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -370,15 +377,17 @@ export default function HistoricoPage() {
                           {row.type}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-white/80">{row.driverName ?? "-"}</TableCell>
-                      <TableCell className="text-white/80">{row.keyId ?? "-"}</TableCell>
-                      <TableCell className="text-right font-mono text-xs text-white/90">
-                        {row.speed != null ? `${row.speed} km/h` : "-"}
-                      </TableCell>
+                      {visibleCols.conductor && <TableCell className="text-white/80">{row.driverName ?? "-"}</TableCell>}
+                      {visibleCols.llave     && <TableCell className="text-white/80">{row.keyId ?? "-"}</TableCell>}
+                      {visibleCols.velocidad && (
+                        <TableCell className="text-right font-mono text-xs text-white/90">
+                          {row.speed != null ? `${row.speed} km/h` : "-"}
+                        </TableCell>
+                      )}
                       <TableCell className="font-mono text-xs text-white/80">
                         {formatEventDateTime(row.eventTimestamp)}
                       </TableCell>
-                      <TableCell className="text-white/80">{row.location ?? "-"}</TableCell>
+                      {visibleCols.ubicacion && <TableCell className="text-white/80">{row.location ?? "-"}</TableCell>}
                       <TableCell className="max-w-[420px] whitespace-normal text-white/80">
                         {row.description ?? "-"}
                       </TableCell>

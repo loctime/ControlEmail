@@ -46,6 +46,7 @@ export interface VehicleEventItem {
   brand?: string | null
   model?: string | null
   operationName?: string | null
+  operacion?: string | null
   eventType?: string | null
   rawEventType?: string | null
   sourceEmailType?: string | null
