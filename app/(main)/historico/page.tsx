@@ -15,20 +15,107 @@ import { LastClosedDateBadge } from "@/components/common/last-closed-date-badge"
 import { cn } from "@/lib/utils"
 import { formatEventDateTime } from "@/lib/ui/datetime"
 import { vehiclesApi } from "@/services/api"
-import type { DailyAlertVehicle } from "@/lib/firestore-read"
+import type { VehicleEventsParams } from "@/services/api"
 
-export default function HistoricoPage() {
-  type HistoricoPreset = "day" | "week" | "month"
-  type VehicleDetailEvent = DailyAlertVehicle["events"][number]
-  type VehicleSpeedIncident = DailyAlertVehicle["speedIncidents"][number]
+type HistoricoPreset = "day" | "week" | "month"
 
-  const STORAGE_PRESET_KEY = "historico:preset"
-  const presetToDaysBack: Record<HistoricoPreset, 7 | 30 | 90> = {
-    day: 7,
-    week: 30,
-    month: 90,
+const STORAGE_PRESET_KEY = "historico:preset"
+
+function toDateStr(d: Date): string {
+  return d.toISOString().slice(0, 10)
+}
+
+function getYesterday(): Date {
+  const d = new Date()
+  d.setDate(d.getDate() - 1)
+  return d
+}
+
+function getDateRange(preset: HistoricoPreset): { dateFrom: string; dateTo: string } {
+  const yesterday = getYesterday()
+
+  if (preset === "day") {
+    const s = toDateStr(yesterday)
+    return { dateFrom: s, dateTo: s }
   }
 
+  if (preset === "week") {
+    const from = new Date(yesterday)
+    from.setDate(from.getDate() - 6)
+    return { dateFrom: toDateStr(from), dateTo: toDateStr(yesterday) }
+  }
+
+  // mes: mes calendario anterior completo
+  const firstOfThisMonth = new Date(yesterday.getFullYear(), yesterday.getMonth(), 1)
+  const firstOfPrevMonth = new Date(firstOfThisMonth)
+  firstOfPrevMonth.setMonth(firstOfPrevMonth.getMonth() - 1)
+  const lastOfPrevMonth = new Date(firstOfThisMonth)
+  lastOfPrevMonth.setDate(lastOfPrevMonth.getDate() - 1)
+  return { dateFrom: toDateStr(firstOfPrevMonth), dateTo: toDateStr(lastOfPrevMonth) }
+}
+
+const EVENT_TYPE_LABELS: Record<string, string> = {
+  // eventType values (lowercase, del backend /api/vehicles/events)
+  NO_KEY_DETECTED: "Exceso de velocidad",
+  exceso: "Exceso de velocidad",
+  no_identificado: "No identificado",
+  contacto: "Contacto",
+  llave_sin_cargar: "Llave sin cargar",
+  conductor_inactivo: "Conductor inactivo",
+  // sourceEmailType values
+  exceso_velocidad: "Exceso de velocidad",
+  contacto_sin_identificacion: "Contacto sin identificación",
+  llave_no_registrada: "Llave no registrada",
+  // rawEventType / uppercase técnicos
+  SPEED_EXCESS: "Exceso de velocidad",
+  DRIVER_IDENTIFICATION: "No identificado",
+  CONTACT_WITHOUT_ID: "Contacto sin identificación",
+  KEY_NOT_REGISTERED: "Llave no registrada",
+  DRIVER_NOT_IDENTIFIED: "No identificado",
+  CONTACT_NO_DRIVER: "Contacto sin conductor",
+  UNKNOWN_KEY: "Llave desconocida",
+  INACTIVE_DRIVER: "Conductor inactivo",
+  SPEEDING: "Exceso de velocidad",
+}
+
+function humanizeEventType(rawType: string): string {
+  if (!rawType) return "Desconocido"
+  return EVENT_TYPE_LABELS[rawType] ?? rawType
+}
+
+function getEventBadgeClassName(type: string): string {
+  const normalized = (type ?? "").toLowerCase()
+  const isSpeedExcess =
+    normalized === "exceso" ||
+    normalized === "exceso_velocidad" ||
+    normalized.includes("exceso") ||
+    normalized.includes("velocidad")
+  const isKeyOrContact =
+    ["llave_sin_cargar", "contacto", "contactos"].includes(normalized) ||
+    normalized.includes("llave") ||
+    normalized.includes("contact")
+
+  if (isSpeedExcess) return "border-red-400/20 bg-red-400/10 text-red-300"
+  if (isKeyOrContact) return "border-yellow-400/20 bg-yellow-400/10 text-yellow-300"
+  return "border-white/10 bg-white/5 text-white/60"
+}
+
+interface HistoricoEventRow {
+  rowId: string
+  plate: string
+  brand: string | null
+  model: string | null
+  operation: string | null
+  type: string
+  driverName: string | null
+  keyId: string | null
+  speed: number | null
+  eventTimestamp: string
+  location: string | null
+  description: string | null
+}
+
+export default function HistoricoPage() {
   const [preset, setPreset] = useState<HistoricoPreset>(() => {
     if (typeof window === "undefined") return "day"
     try {
@@ -53,135 +140,42 @@ export default function HistoricoPage() {
   }, [preset])
 
   useEffect(() => {
-    // Cambiar periodo suele invalidar una busqueda previa.
     setSearch("")
   }, [preset])
 
-  interface HistoricoEventRow {
-    rowId: string
-    plate: string
-    brand: string | null
-    model: string | null
-    operation: string | null
-    type: string
-    driverName: string | null
-    keyId: string | null
-    speed: number | null
-    eventTimestamp: string
-    location: string | null
-    description: string | null
-  }
+  const queryParams = useMemo<VehicleEventsParams>(
+    () => ({ ...getDateRange(preset), limit: 200, page: 1 }),
+    [preset],
+  )
 
-  const {
-    data,
-    isLoading,
-    error,
-    refetch,
-    isFetching,
-  } = useQuery({
-    queryKey: ["historico", preset],
+  const { data, isLoading, error, refetch, isFetching } = useQuery({
+    queryKey: ["historico-events", queryParams],
     staleTime: 60_000,
     queryFn: async () => {
-      const list = await vehiclesApi.myVehicles()
-      const plates = Array.from(new Set(list.vehicles.map((v) => v.plate).filter(Boolean))).sort()
-      const daysBack = presetToDaysBack[preset]
+      const response = await vehiclesApi.vehicleEvents(queryParams)
+      const items = response.events ?? []
+      const plates = response.plates ?? []
 
-      const vehicleDetails = await Promise.all(
-        plates.map(async (plate) => {
-          try {
-            return await vehiclesApi.vehicleDetailByPlate(plate, daysBack)
-          } catch {
-            return null
-          }
-        }),
-      )
-
-      const validDetails = vehicleDetails.filter((d): d is NonNullable<typeof d> => d != null)
-
-      const rows: HistoricoEventRow[] = []
-
-      for (const detail of validDetails) {
-        const brand = detail.vehicle.brand ?? null
-        const model = detail.vehicle.model ?? null
-
-        const normalizeTypeForUi = (rawType: string) => {
-          const n = rawType?.toLowerCase() ?? ""
-          // UI label unificado para incidentes/filtrado de exceso de velocidad.
-          if (
-            n.includes("exceso") ||
-            n.includes("velocidad") ||
-            n.includes("speed_excess") ||
-            (n.includes("speed") && n.includes("excess"))
-          ) {
-            return "exceso de velocidad"
-          }
-          return rawType
-        }
-
-        const operation =
-          (detail.vehicle as unknown as { operationName?: string | null; operacion?: string | null }).operationName ??
-          (detail.vehicle as unknown as { operationName?: string | null; operacion?: string | null }).operacion ??
-          null
-
-        const groupedSpeedEventIds = new Set(
-          (detail.speedIncidents ?? []).flatMap((incident: VehicleSpeedIncident) => incident.eventIds ?? []),
-        )
-
-        const visibleEvents = (detail.events ?? []).filter(
-          (event: VehicleDetailEvent) => !groupedSpeedEventIds.has(event.eventId),
-        )
-
-        rows.push(
-          ...visibleEvents.map((event: VehicleDetailEvent) => {
-            const eventId = event.eventId || `${event.eventTimestamp}-${event.locationRaw ?? ""}`
-            return {
-              rowId: `${detail.vehicle.plate}:${eventId}`,
-              plate: event.plate,
-              brand,
-              model,
-              operation,
-              type: normalizeTypeForUi(event.type),
-              driverName: event.driverName,
-              keyId: event.keyId,
-              speed: event.maxSpeed ?? event.speed ?? null,
-              eventTimestamp: event.eventTimestamp,
-              location: event.location ?? event.locationRaw,
-              description:
-                event.reasonRaw ??
-                event.reason ??
-                event.eventSubtype ??
-                event.eventCategory ??
-                event.type ??
-                null,
-            }
-          }),
-        )
-
-        const speedIncidents = detail.speedIncidents ?? []
-        rows.push(
-          ...speedIncidents
-            .slice()
-            .filter((incident: VehicleSpeedIncident) => Boolean(incident.lastEventAt))
-            .map((incident: VehicleSpeedIncident) => ({
-              rowId: `${detail.vehicle.plate}:INCIDENT:${incident.incidentKey}`,
-              plate: incident.plate,
-              brand,
-              model,
-              operation,
-              type: "exceso de velocidad",
-              driverName: incident.driverName,
-              keyId: incident.keyId,
-              speed: incident.maxSpeed ?? incident.avgSpeed ?? null,
-              eventTimestamp: incident.lastEventAt ?? "",
-              location: incident.location,
-              description: `Exceso de velocidad · ${incident.groupedEventsCount} eventos agrupados`,
-            })),
-        )
-      }
+      const rows: HistoricoEventRow[] = items.map((event) => ({
+        rowId: event.eventId || `${event.plate}:${event.eventTimestamp}`,
+        plate: event.plate,
+        brand: event.brand ?? null,
+        model: event.model ?? null,
+        operation: event.operationName ?? null,
+        type: (event.speed != null && event.speed > 0) || (event.maxSpeed != null && event.maxSpeed > 0) || event.hasSpeed
+          ? "Exceso de velocidad"
+          : humanizeEventType(event.eventType || event.rawEventType || event.sourceEmailType || ""),
+        driverName: event.driverName ?? null,
+        keyId: event.keyId ?? null,
+        speed: event.maxSpeed ?? event.speed ?? null,
+        eventTimestamp: event.eventTimestamp,
+        location: event.location ?? event.locationRaw ?? null,
+        description: event.reason ?? event.rawEventType ?? null,
+      }))
 
       rows.sort((a, b) => (b.eventTimestamp ?? "").localeCompare(a.eventTimestamp ?? ""))
 
-      return { plates, rows }
+      return { plates, rows, total: response.total }
     },
   })
 
@@ -216,23 +210,6 @@ export default function HistoricoPage() {
     if (selectedEventType !== "Todos" && !availableEventTypes.includes(selectedEventType)) setSelectedEventType("Todos")
   }, [data, availableEventTypes, selectedPlate, selectedEventType])
 
-  const getEventBadgeClassName = (type: string) => {
-    const normalized = type?.toLowerCase() ?? ""
-    const isSpeedExcess =
-      normalized === "exceso" ||
-      normalized === "exceso_velocidad" ||
-      normalized.includes("exceso") ||
-      normalized.includes("velocidad")
-    const isKeyOrContact =
-      ["llave_sin_cargar", "contacto", "contactos"].includes(normalized) ||
-      normalized.includes("llave") ||
-      normalized.includes("contact")
-
-    if (isSpeedExcess) return "border-red-400/20 bg-red-400/10 text-red-300"
-    if (isKeyOrContact) return "border-yellow-400/20 bg-yellow-400/10 text-yellow-300"
-    return "border-white/10 bg-white/5 text-white/60"
-  }
-
   const errorMessage = error
     ? error instanceof Error
       ? error.message
@@ -245,8 +222,13 @@ export default function HistoricoPage() {
     <div className="min-h-screen space-y-6 p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight text-white">Historico de eventos</h1>
-          <p className="mt-0.5 text-sm text-white/40">Listado completo · Todos los vehiculos</p>
+          <h1 className="text-xl font-semibold tracking-tight text-white">Histórico de eventos</h1>
+          <p className="mt-0.5 text-sm text-white/40">
+            Listado completo · Todos los vehículos
+            {data?.total != null && (
+              <span className="ml-2 text-white/30">· {data.total} evento{data.total !== 1 ? "s" : ""}</span>
+            )}
+          </p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -266,7 +248,7 @@ export default function HistoricoPage() {
 
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <div className="text-xs text-white/40 mb-2">Preset</div>
+          <div className="mb-2 text-xs text-white/40">Preset</div>
           <div className="flex rounded-lg border border-white/10 bg-white/[0.04] p-0.5">
             {(["day", "week", "month"] as const).map((p) => (
               <Button
@@ -281,7 +263,7 @@ export default function HistoricoPage() {
                 )}
                 onClick={() => setPreset(p)}
               >
-                {p === "day" ? "Dia" : p === "week" ? "Semana" : "Mes"}
+                {p === "day" ? "Día" : p === "week" ? "Semana" : "Mes"}
               </Button>
             ))}
           </div>
@@ -344,7 +326,7 @@ export default function HistoricoPage() {
         <Card className="border-white/5 bg-white/[0.02]">
           <CardContent className="flex items-center gap-3 py-6 text-sm text-white/40">
             <AlertTriangle size={16} className="shrink-0 text-yellow-400/60" />
-            No hay eventos para el periodo seleccionado.
+            No hay eventos para el período seleccionado.
           </CardContent>
         </Card>
       )}
@@ -364,15 +346,15 @@ export default function HistoricoPage() {
             <div className="overflow-x-auto rounded-lg border border-white/5">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-white/[0.02] border-white/5 hover:bg-white/[0.02]">
+                  <TableRow className="border-white/5 bg-white/[0.02] hover:bg-white/[0.02]">
                     <TableHead>Patente + modelo</TableHead>
-                    <TableHead>Operacion</TableHead>
+                    <TableHead>Operación</TableHead>
                     <TableHead>Tipo</TableHead>
                     <TableHead>Conductor</TableHead>
                     <TableHead>Llave</TableHead>
                     <TableHead className="text-right">Velocidad</TableHead>
                     <TableHead>Fecha/Hora</TableHead>
-                    <TableHead>Ubicacion</TableHead>
+                    <TableHead>Ubicación</TableHead>
                     <TableHead>Detalle</TableHead>
                   </TableRow>
                 </TableHeader>
