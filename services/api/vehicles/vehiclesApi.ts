@@ -5,7 +5,7 @@ export function getVehicleEventsHistory(params: { months: number; plate?: string
   const qs = new URLSearchParams()
   qs.set("months", String(params.months))
   if (params.plate) qs.set("plate", params.plate)
-  return apiClient.get<VehicleEventsResponse>(`/api/email/vehicles/events-history?${qs}`, { authMode: "firebase" })
+  return apiClient.get<VehicleEventsResponse>(`/api/vehicles/events-history?${qs}`)
 }
 
 export const vehiclesApi = {
