@@ -43,9 +43,6 @@ function usesMonthlyHistory(from: Date, to: Date): boolean {
   return days > 31
 }
 
-function monthsForRange(from: string, to: string): number {
-  return Math.max(1, Math.ceil(daysBetween(from, to) / 30))
-}
 
 const EVENT_TYPE_LABELS: Record<string, string> = {
   NO_KEY_DETECTED: "Exceso de velocidad",
@@ -226,7 +223,7 @@ export default function HistoricoPage() {
     staleTime: 60_000,
     queryFn: async () => {
       const response = usesMonthlyHistory(new Date(dateFrom), new Date(dateTo))
-        ? await getVehicleEventsHistory({ months: monthsForRange(dateFrom, dateTo), plate: selectedPlate !== "Todas" ? selectedPlate : undefined })
+        ? await getVehicleEventsHistory({ dateFrom, dateTo, plate: selectedPlate !== "Todas" ? selectedPlate : undefined })
         : await vehiclesApi.vehicleEvents(queryParams)
       const rows = (response.events ?? []).map(mapEventRow)
       rows.sort((a, b) => (b.eventTimestamp ?? "").localeCompare(a.eventTimestamp ?? ""))
@@ -277,7 +274,7 @@ export default function HistoricoPage() {
     setIsExporting(true)
     try {
       const response = usesMonthlyHistory(new Date(dateFrom), new Date(dateTo))
-        ? await getVehicleEventsHistory({ months: monthsForRange(dateFrom, dateTo), plate: selectedPlate !== "Todas" ? selectedPlate : undefined })
+        ? await getVehicleEventsHistory({ dateFrom, dateTo, plate: selectedPlate !== "Todas" ? selectedPlate : undefined })
         : await vehiclesApi.vehicleEvents({ dateFrom, dateTo, limit: 500, page: 1 })
       const allRows = (response.events ?? []).map(mapEventRow)
       allRows.sort((a, b) => (b.eventTimestamp ?? "").localeCompare(a.eventTimestamp ?? ""))
