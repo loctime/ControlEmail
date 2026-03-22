@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { AlertTriangle, ArrowLeft, ChevronLeft, ChevronRight, Download, RefreshCw } from "lucide-react"
+import { AlertTriangle, ArrowLeft, ChevronLeft, ChevronRight, Download, RefreshCw, X } from "lucide-react"
 import { useQuery } from "@tanstack/react-query"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -20,16 +20,37 @@ import type { VehicleEventItem, VehicleEventsParams } from "@/services/api"
 const PAGE_LIMIT = 100
 const MAX_RANGE_DAYS = 366
 
+type DatePreset = "hoy" | "semana" | "mes" | "personalizado"
+
 function toDateStr(d: Date): string {
   return d.toISOString().slice(0, 10)
 }
 
+// El sistema no procesa datos del día actual — "hoy" equivale a ayer.
+function getYesterday(): Date {
+  const d = new Date()
+  d.setDate(d.getDate() - 1)
+  return d
+}
+
 function getDefaultRange(): { dateFrom: string; dateTo: string } {
-  const yesterday = new Date()
-  yesterday.setDate(yesterday.getDate() - 1)
+  const yesterday = getYesterday()
+  return { dateFrom: toDateStr(yesterday), dateTo: toDateStr(yesterday) }
+}
+
+function getRangeForPreset(preset: Exclude<DatePreset, "personalizado">): { dateFrom: string; dateTo: string } {
+  const yesterday = getYesterday()
+  const yesterdayStr = toDateStr(yesterday)
+  if (preset === "hoy") return { dateFrom: yesterdayStr, dateTo: yesterdayStr }
+  if (preset === "semana") {
+    const from = new Date(yesterday)
+    from.setDate(from.getDate() - 6)
+    return { dateFrom: toDateStr(from), dateTo: yesterdayStr }
+  }
+  // mes — 30 días hacia atrás desde ayer
   const from = new Date(yesterday)
-  from.setDate(from.getDate() - 6)
-  return { dateFrom: toDateStr(from), dateTo: toDateStr(yesterday) }
+  from.setDate(from.getDate() - 29)
+  return { dateFrom: toDateStr(from), dateTo: yesterdayStr }
 }
 
 function daysBetween(from: string, to: string): number {
@@ -42,7 +63,6 @@ function usesMonthlyHistory(from: Date, to: Date): boolean {
   const days = Math.round((to.getTime() - from.getTime()) / msPerDay) + 1
   return days > 31
 }
-
 
 const EVENT_TYPE_LABELS: Record<string, string> = {
   NO_KEY_DETECTED: "Exceso de velocidad",
@@ -173,9 +193,17 @@ function exportToCSV(rows: HistoricoEventRow[], cols: ColFlags, filename: string
   URL.revokeObjectURL(url)
 }
 
+const DATE_PRESET_LABELS: Record<DatePreset, string> = {
+  hoy: "Hoy",
+  semana: "Última semana",
+  mes: "Último mes",
+  personalizado: "Personalizado",
+}
+
 export default function HistoricoPage() {
   const defaultRange = useMemo(() => getDefaultRange(), [])
 
+  const [datePreset, setDatePreset] = useState<DatePreset>("hoy")
   const [dateFrom, setDateFrom] = useState(defaultRange.dateFrom)
   const [dateTo, setDateTo] = useState(defaultRange.dateTo)
   const [dateError, setDateError] = useState<string | null>(null)
@@ -184,6 +212,7 @@ export default function HistoricoPage() {
 
   const [selectedPlate, setSelectedPlate] = useState<string>("Todas")
   const [selectedEventType, setSelectedEventType] = useState<string>("Todos")
+  const [selectedOperation, setSelectedOperation] = useState<string>("Todas")
   const [search, setSearch] = useState<string>("")
 
   function validateRange(from: string, to: string): boolean {
@@ -198,19 +227,45 @@ export default function HistoricoPage() {
     return true
   }
 
+  function handlePreset(preset: DatePreset) {
+    setDatePreset(preset)
+    if (preset !== "personalizado") {
+      const range = getRangeForPreset(preset)
+      setDateFrom(range.dateFrom)
+      setDateTo(range.dateTo)
+      setDateError(null)
+      setCurrentPage(1)
+    }
+  }
+
   function handleDateFromChange(val: string) {
     setDateFrom(val)
+    setDatePreset("personalizado")
     setCurrentPage(1)
     validateRange(val, dateTo)
   }
 
   function handleDateToChange(val: string) {
     setDateTo(val)
+    setDatePreset("personalizado")
     setCurrentPage(1)
     validateRange(dateFrom, val)
   }
 
+  function handleClearFilters() {
+    setSelectedPlate("Todas")
+    setSelectedEventType("Todos")
+    setSelectedOperation("Todas")
+    setSearch("")
+  }
+
   const isRangeValid = dateError === null && !!dateFrom && !!dateTo && dateFrom <= dateTo
+
+  const hasActiveFilters =
+    selectedPlate !== "Todas" ||
+    selectedEventType !== "Todos" ||
+    selectedOperation !== "Todas" ||
+    search !== ""
 
   const queryParams = useMemo<VehicleEventsParams>(
     () => ({ dateFrom, dateTo, limit: PAGE_LIMIT, page: currentPage }),
@@ -240,23 +295,34 @@ export default function HistoricoPage() {
     return Array.from(t).sort((a, b) => a.localeCompare(b))
   }, [data?.rows])
 
+  const availableOperations = useMemo(() => {
+    const ops = new Set<string>()
+    for (const row of data?.rows ?? []) {
+      const op = row.operation?.trim()
+      if (op) ops.add(op)
+    }
+    return Array.from(ops).sort((a, b) => a.localeCompare(b))
+  }, [data?.rows])
+
   const filteredRows = useMemo(() => {
     const rows = data?.rows ?? []
     const q = search.trim().toLowerCase()
     return rows.filter((row) => {
       if (selectedPlate !== "Todas" && row.plate !== selectedPlate) return false
       if (selectedEventType !== "Todos" && row.type !== selectedEventType) return false
+      if (selectedOperation !== "Todas" && row.operation !== selectedOperation) return false
       if (!q) return true
       return (row.driverName ?? "").toLowerCase().includes(q) || (row.keyId ?? "").toLowerCase().includes(q)
     })
-  }, [data?.rows, search, selectedPlate, selectedEventType])
+  }, [data?.rows, search, selectedPlate, selectedEventType, selectedOperation])
 
   useEffect(() => {
     if (!data) return
     const plateSet = new Set(data.plates)
     if (selectedPlate !== "Todas" && !plateSet.has(selectedPlate)) setSelectedPlate("Todas")
     if (selectedEventType !== "Todos" && !availableEventTypes.includes(selectedEventType)) setSelectedEventType("Todos")
-  }, [data, availableEventTypes, selectedPlate, selectedEventType])
+    if (selectedOperation !== "Todas" && !availableOperations.includes(selectedOperation)) setSelectedOperation("Todas")
+  }, [data, availableEventTypes, availableOperations, selectedPlate, selectedEventType, selectedOperation])
 
   const visibleCols = useMemo<ColFlags>(
     () => ({
@@ -283,6 +349,7 @@ export default function HistoricoPage() {
       const exportRows = allRows.filter((row) => {
         if (selectedPlate !== "Todas" && row.plate !== selectedPlate) return false
         if (selectedEventType !== "Todos" && row.type !== selectedEventType) return false
+        if (selectedOperation !== "Todas" && row.operation !== selectedOperation) return false
         if (!q) return true
         return (row.driverName ?? "").toLowerCase().includes(q) || (row.keyId ?? "").toLowerCase().includes(q)
       })
@@ -298,7 +365,7 @@ export default function HistoricoPage() {
     } finally {
       setIsExporting(false)
     }
-  }, [dateFrom, dateTo, selectedPlate, selectedEventType, search])
+  }, [dateFrom, dateTo, selectedPlate, selectedEventType, selectedOperation, search])
 
   const errorMessage = error ? (error instanceof Error ? error.message : "Error desconocido") : null
   const hasAnyRows = (data?.rows?.length ?? 0) > 0
@@ -334,93 +401,145 @@ export default function HistoricoPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap items-start gap-4">
-        {/* Date range */}
-        <div className="flex flex-col gap-1">
-          <div className="mb-1 text-xs text-white/40">Rango de fechas</div>
-          <div className="flex items-center gap-2">
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => handleDateFromChange(e.target.value)}
-              className="h-9 rounded-md border border-white/10 bg-white/[0.04] px-3 text-sm text-white/80 [color-scheme:dark] focus:border-white/20 focus:outline-none"
-            />
-            <span className="text-xs text-white/30">→</span>
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => handleDateToChange(e.target.value)}
-              className="h-9 rounded-md border border-white/10 bg-white/[0.04] px-3 text-sm text-white/80 [color-scheme:dark] focus:border-white/20 focus:outline-none"
-            />
-          </div>
-          {dateError && (
-            <p className="mt-1 flex items-center gap-1 text-xs text-red-400">
-              <AlertTriangle size={11} />
-              {dateError}
-            </p>
-          )}
+      <div className="space-y-3">
+        {/* Date preset pills */}
+        <div className="flex items-center gap-1">
+          {(["hoy", "semana", "mes", "personalizado"] as const).map((preset) => (
+            <button
+              key={preset}
+              onClick={() => handlePreset(preset)}
+              className={cn(
+                "rounded-full px-3 py-1 text-xs font-medium transition-colors",
+                datePreset === preset
+                  ? "bg-white/10 text-white ring-1 ring-white/20"
+                  : "text-white/40 hover:bg-white/5 hover:text-white/70",
+              )}
+            >
+              {DATE_PRESET_LABELS[preset]}
+            </button>
+          ))}
         </div>
 
-        {/* Other filters */}
-        <div className="flex flex-wrap items-end gap-2">
-          <Select value={selectedPlate} onValueChange={(v) => setSelectedPlate(v)}>
-            <SelectTrigger className="w-[200px] border-white/10 bg-white/[0.04] text-white/80">
-              <SelectValue placeholder="Patente" />
-            </SelectTrigger>
-            <SelectContent className="border-white/10 bg-zinc-900 text-white">
-              <SelectItem value="Todas">Todas</SelectItem>
-              {(data?.plates ?? []).map((plate) => (
-                <SelectItem key={plate} value={plate}>
-                  {plate}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="flex flex-wrap items-start gap-4">
+          {/* Date range — solo visible en modo personalizado */}
+          {datePreset === "personalizado" && (
+            <div className="flex flex-col gap-1">
+              <div className="mb-1 text-xs text-white/40">Rango de fechas</div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => handleDateFromChange(e.target.value)}
+                  className="h-9 rounded-md border border-white/10 bg-white/[0.04] px-3 text-sm text-white/80 [color-scheme:dark] focus:border-white/20 focus:outline-none"
+                />
+                <span className="text-xs text-white/30">→</span>
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => handleDateToChange(e.target.value)}
+                  className="h-9 rounded-md border border-white/10 bg-white/[0.04] px-3 text-sm text-white/80 [color-scheme:dark] focus:border-white/20 focus:outline-none"
+                />
+              </div>
+              {dateError && (
+                <p className="mt-1 flex items-center gap-1 text-xs text-red-400">
+                  <AlertTriangle size={11} />
+                  {dateError}
+                </p>
+              )}
+            </div>
+          )}
 
-          <Select value={selectedEventType} onValueChange={(v) => setSelectedEventType(v)}>
-            <SelectTrigger className="w-[220px] border-white/10 bg-white/[0.04] text-white/80">
-              <SelectValue placeholder="Tipo de evento" />
-            </SelectTrigger>
-            <SelectContent className="border-white/10 bg-zinc-900 text-white">
-              <SelectItem value="Todos">Todos</SelectItem>
-              {availableEventTypes.map((t) => (
-                <SelectItem key={t} value={t}>
-                  {t}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {/* Other filters */}
+          <div className="flex flex-wrap items-end gap-2">
+            {/* Patente */}
+            <Select value={selectedPlate} onValueChange={(v) => setSelectedPlate(v)}>
+              <SelectTrigger className="w-[160px] border-white/10 bg-white/[0.04] text-white/80">
+                <SelectValue placeholder="Patente" />
+              </SelectTrigger>
+              <SelectContent className="border-white/10 bg-zinc-900 text-white">
+                <SelectItem value="Todas">Todas las patentes</SelectItem>
+                {(data?.plates ?? []).map((plate) => (
+                  <SelectItem key={plate} value={plate}>
+                    {plate}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-          <div className="w-[260px]">
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Filtrar por conductor o llave"
-              className="border-white/10 bg-white/[0.04] text-white/80 placeholder:text-white/40"
-            />
+            {/* Tipo de evento */}
+            <Select value={selectedEventType} onValueChange={(v) => setSelectedEventType(v)}>
+              <SelectTrigger className="w-[200px] border-white/10 bg-white/[0.04] text-white/80">
+                <SelectValue placeholder="Tipo de evento" />
+              </SelectTrigger>
+              <SelectContent className="border-white/10 bg-zinc-900 text-white">
+                <SelectItem value="Todos">Todos los tipos</SelectItem>
+                {availableEventTypes.map((t) => (
+                  <SelectItem key={t} value={t}>
+                    {t}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Operación */}
+            <Select value={selectedOperation} onValueChange={(v) => setSelectedOperation(v)}>
+              <SelectTrigger className="w-[180px] border-white/10 bg-white/[0.04] text-white/80">
+                <SelectValue placeholder="Operación" />
+              </SelectTrigger>
+              <SelectContent className="border-white/10 bg-zinc-900 text-white">
+                <SelectItem value="Todas">Todas las operaciones</SelectItem>
+                {availableOperations.map((op) => (
+                  <SelectItem key={op} value={op}>
+                    {op}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Conductor / llave */}
+            <div className="w-[220px]">
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Filtrar por conductor o llave"
+                className="border-white/10 bg-white/[0.04] text-white/80 placeholder:text-white/40"
+              />
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isLoading || isFetching || !isRangeValid}
+              className="h-9 gap-1.5 border-white/10 bg-white/[0.04] text-xs text-white/60 hover:bg-white/[0.08] hover:text-white"
+              onClick={() => void refetch()}
+            >
+              <RefreshCw size={13} className={cn(isFetching && "animate-spin")} />
+              Actualizar
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isExporting || !hasAnyRows || !isRangeValid}
+              className="h-9 gap-1.5 border-white/10 bg-white/[0.04] text-xs text-white/60 hover:bg-white/[0.08] hover:text-white"
+              onClick={() => void handleExport()}
+            >
+              <Download size={13} className={cn(isExporting && "animate-pulse")} />
+              {isExporting ? "Exportando…" : "Exportar CSV"}
+            </Button>
+
+            {hasActiveFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleClearFilters}
+                className="h-9 gap-1 text-xs text-white/35 hover:bg-white/[0.04] hover:text-white/60"
+              >
+                <X size={12} />
+                Limpiar filtros
+              </Button>
+            )}
           </div>
-
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={isLoading || isFetching || !isRangeValid}
-            className="h-9 gap-1.5 border-white/10 bg-white/[0.04] text-xs text-white/60 hover:bg-white/[0.08] hover:text-white"
-            onClick={() => void refetch()}
-          >
-            <RefreshCw size={13} className={cn(isFetching && "animate-spin")} />
-            Actualizar
-          </Button>
-
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={isExporting || !hasAnyRows || !isRangeValid}
-            className="h-9 gap-1.5 border-white/10 bg-white/[0.04] text-xs text-white/60 hover:bg-white/[0.08] hover:text-white"
-            onClick={() => void handleExport()}
-          >
-            <Download size={13} className={cn(isExporting && "animate-pulse")} />
-            {isExporting ? "Exportando…" : "Exportar CSV"}
-          </Button>
         </div>
       </div>
 
