@@ -1,6 +1,13 @@
 import { apiClient } from "@/services/api/client"
 import type { DaysBack, MyAlertsVehiclesDTO, MyVehiclesDTO, VehicleEventsParams, VehicleEventsResponse, VehiclePlateDetailDTO } from "@/services/api/vehicles/types"
 
+export function getVehicleEventsHistory(params: { months: number; plate?: string }) {
+  const qs = new URLSearchParams()
+  qs.set("months", String(params.months))
+  if (params.plate) qs.set("plate", params.plate)
+  return apiClient.get<VehicleEventsResponse>(`/api/email/vehicles/events-history?${qs}`)
+}
+
 export const vehiclesApi = {
   myAlertsVehicles: () => apiClient.get<MyAlertsVehiclesDTO>("/api/email/my-alerts-vehicles"),
   myVehicles: () => apiClient.get<MyVehiclesDTO>("/api/email/my-vehicles"),

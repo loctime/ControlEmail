@@ -1,8 +1,8 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { AlertTriangle, ArrowLeft, RefreshCw } from "lucide-react"
+import { AlertTriangle, ArrowLeft, ChevronLeft, ChevronRight, Download, RefreshCw } from "lucide-react"
 import { useQuery } from "@tanstack/react-query"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -14,59 +14,49 @@ import { AsyncState } from "@/components/common/async-state"
 import { LastClosedDateBadge } from "@/components/common/last-closed-date-badge"
 import { cn } from "@/lib/utils"
 import { formatEventDateTime } from "@/lib/ui/datetime"
-import { vehiclesApi } from "@/services/api"
-import type { VehicleEventsParams } from "@/services/api"
+import { getVehicleEventsHistory, vehiclesApi } from "@/services/api/vehicles/vehiclesApi"
+import type { VehicleEventItem, VehicleEventsParams } from "@/services/api"
 
-type HistoricoPreset = "day" | "week" | "month"
-
-const STORAGE_PRESET_KEY = "historico:preset"
+const PAGE_LIMIT = 100
+const MAX_RANGE_DAYS = 366
 
 function toDateStr(d: Date): string {
   return d.toISOString().slice(0, 10)
 }
 
-function getYesterday(): Date {
-  const d = new Date()
-  d.setDate(d.getDate() - 1)
-  return d
+function getDefaultRange(): { dateFrom: string; dateTo: string } {
+  const yesterday = new Date()
+  yesterday.setDate(yesterday.getDate() - 1)
+  const from = new Date(yesterday)
+  from.setDate(from.getDate() - 6)
+  return { dateFrom: toDateStr(from), dateTo: toDateStr(yesterday) }
 }
 
-function getDateRange(preset: HistoricoPreset): { dateFrom: string; dateTo: string } {
-  const yesterday = getYesterday()
+function daysBetween(from: string, to: string): number {
+  const msPerDay = 86400000
+  return Math.round((new Date(to).getTime() - new Date(from).getTime()) / msPerDay) + 1
+}
 
-  if (preset === "day") {
-    const s = toDateStr(yesterday)
-    return { dateFrom: s, dateTo: s }
-  }
+function usesMonthlyHistory(from: Date, to: Date): boolean {
+  const msPerDay = 86400000
+  const days = Math.round((to.getTime() - from.getTime()) / msPerDay) + 1
+  return days > 31
+}
 
-  if (preset === "week") {
-    const from = new Date(yesterday)
-    from.setDate(from.getDate() - 6)
-    return { dateFrom: toDateStr(from), dateTo: toDateStr(yesterday) }
-  }
-
-  // mes: mes calendario anterior completo
-  const firstOfThisMonth = new Date(yesterday.getFullYear(), yesterday.getMonth(), 1)
-  const firstOfPrevMonth = new Date(firstOfThisMonth)
-  firstOfPrevMonth.setMonth(firstOfPrevMonth.getMonth() - 1)
-  const lastOfPrevMonth = new Date(firstOfThisMonth)
-  lastOfPrevMonth.setDate(lastOfPrevMonth.getDate() - 1)
-  return { dateFrom: toDateStr(firstOfPrevMonth), dateTo: toDateStr(lastOfPrevMonth) }
+function monthsForRange(from: string, to: string): number {
+  return Math.max(1, Math.ceil(daysBetween(from, to) / 30))
 }
 
 const EVENT_TYPE_LABELS: Record<string, string> = {
-  // eventType values (lowercase, del backend /api/vehicles/events)
   NO_KEY_DETECTED: "Exceso de velocidad",
   exceso: "Exceso de velocidad",
   no_identificado: "No identificado",
   contacto: "Contacto",
   llave_sin_cargar: "Llave sin cargar",
   conductor_inactivo: "Conductor inactivo",
-  // sourceEmailType values
   exceso_velocidad: "Exceso de velocidad",
   contacto_sin_identificacion: "Contacto sin identificación",
   llave_no_registrada: "Llave no registrada",
-  // rawEventType / uppercase técnicos
   SPEED_EXCESS: "Exceso de velocidad",
   DRIVER_IDENTIFICATION: "No identificado",
   CONTACT_WITHOUT_ID: "Contacto sin identificación",
@@ -123,67 +113,124 @@ interface HistoricoEventRow {
   description: string | null
 }
 
-export default function HistoricoPage() {
-  const [preset, setPreset] = useState<HistoricoPreset>(() => {
-    if (typeof window === "undefined") return "day"
-    try {
-      const v = localStorage.getItem(STORAGE_PRESET_KEY)
-      if (v === "day" || v === "week" || v === "month") return v
-    } catch {
-      // ignore
-    }
-    return "day"
+function mapEventRow(event: VehicleEventItem): HistoricoEventRow {
+  return {
+    rowId: event.eventId || `${event.plate}:${event.eventTimestamp}`,
+    plate: event.plate,
+    brand: event.brand ?? null,
+    model: event.model ?? null,
+    operation: event.operationName ?? event.operacion ?? null,
+    type:
+      (event.speed != null && event.speed > 0) ||
+      (event.maxSpeed != null && event.maxSpeed > 0) ||
+      event.hasSpeed
+        ? "Exceso de velocidad"
+        : humanizeEventType(event.eventType || event.rawEventType || event.sourceEmailType || ""),
+    driverName: event.driverName ?? null,
+    keyId: event.keyId ?? null,
+    speed: event.speed ?? event.maxSpeed ?? null,
+    eventTimestamp: event.eventTimestamp,
+    location: cleanLocation(event.location ?? event.locationRaw),
+    description: event.reason ?? event.rawEventType ?? null,
+  }
+}
+
+type ColFlags = { conductor: boolean; llave: boolean; velocidad: boolean; ubicacion: boolean }
+
+function exportToCSV(rows: HistoricoEventRow[], cols: ColFlags, filename: string) {
+  const headers: string[] = ["Patente", "Modelo", "Operación", "Tipo"]
+  if (cols.conductor) headers.push("Conductor")
+  if (cols.llave) headers.push("Llave")
+  if (cols.velocidad) headers.push("Velocidad (km/h)")
+  headers.push("Fecha/Hora")
+  if (cols.ubicacion) headers.push("Ubicación")
+  headers.push("Detalle")
+
+  function esc(val: string | number | null | undefined): string {
+    if (val == null) return ""
+    const s = String(val)
+    if (s.includes(",") || s.includes('"') || s.includes("\n")) return `"${s.replace(/"/g, '""')}"`
+    return s
+  }
+
+  const lines = rows.map((row) => {
+    const cells: string[] = [esc(row.plate), esc(row.model), esc(row.operation), esc(row.type)]
+    if (cols.conductor) cells.push(esc(row.driverName))
+    if (cols.llave) cells.push(esc(row.keyId))
+    if (cols.velocidad) cells.push(row.speed != null ? String(row.speed) : "")
+    cells.push(esc(formatEventDateTime(row.eventTimestamp)))
+    if (cols.ubicacion) cells.push(esc(row.location))
+    cells.push(esc(row.description))
+    return cells.join(",")
   })
+
+  const csv = "\uFEFF" + [headers.join(","), ...lines].join("\n")
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+export default function HistoricoPage() {
+  const defaultRange = useMemo(() => getDefaultRange(), [])
+
+  const [dateFrom, setDateFrom] = useState(defaultRange.dateFrom)
+  const [dateTo, setDateTo] = useState(defaultRange.dateTo)
+  const [dateError, setDateError] = useState<string | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [isExporting, setIsExporting] = useState(false)
 
   const [selectedPlate, setSelectedPlate] = useState<string>("Todas")
   const [selectedEventType, setSelectedEventType] = useState<string>("Todos")
   const [search, setSearch] = useState<string>("")
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_PRESET_KEY, preset)
-    } catch {
-      // ignore
+  function validateRange(from: string, to: string): boolean {
+    if (!from || !to) { setDateError(null); return false }
+    if (from > to) { setDateError("La fecha de inicio debe ser anterior a la de fin"); return false }
+    const days = daysBetween(from, to)
+    if (days > MAX_RANGE_DAYS) {
+      setDateError(`El rango no puede superar ${MAX_RANGE_DAYS} días (seleccionaste ${days})`)
+      return false
     }
-  }, [preset])
+    setDateError(null)
+    return true
+  }
 
-  useEffect(() => {
-    setSearch("")
-  }, [preset])
+  function handleDateFromChange(val: string) {
+    setDateFrom(val)
+    setCurrentPage(1)
+    validateRange(val, dateTo)
+  }
+
+  function handleDateToChange(val: string) {
+    setDateTo(val)
+    setCurrentPage(1)
+    validateRange(dateFrom, val)
+  }
+
+  const isRangeValid = dateError === null && !!dateFrom && !!dateTo && dateFrom <= dateTo
 
   const queryParams = useMemo<VehicleEventsParams>(
-    () => ({ ...getDateRange(preset), limit: 200, page: 1 }),
-    [preset],
+    () => ({ dateFrom, dateTo, limit: PAGE_LIMIT, page: currentPage }),
+    [dateFrom, dateTo, currentPage],
   )
 
   const { data, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ["historico-events", queryParams],
+    enabled: isRangeValid,
     staleTime: 60_000,
     queryFn: async () => {
-      const response = await vehiclesApi.vehicleEvents(queryParams)
-      const items = response.events ?? []
-      const plates = response.plates ?? []
-
-      const rows: HistoricoEventRow[] = items.map((event) => ({
-        rowId: event.eventId || `${event.plate}:${event.eventTimestamp}`,
-        plate: event.plate,
-        brand: event.brand ?? null,
-        model: event.model ?? null,
-        operation: event.operationName ?? event.operacion ?? null,
-        type: (event.speed != null && event.speed > 0) || (event.maxSpeed != null && event.maxSpeed > 0) || event.hasSpeed
-          ? "Exceso de velocidad"
-          : humanizeEventType(event.eventType || event.rawEventType || event.sourceEmailType || ""),
-        driverName: event.driverName ?? null,
-        keyId: event.keyId ?? null,
-        speed: event.speed ?? event.maxSpeed ?? null,
-        eventTimestamp: event.eventTimestamp,
-        location: cleanLocation(event.location ?? event.locationRaw),
-        description: event.reason ?? event.rawEventType ?? null,
-      }))
-
+      const response = usesMonthlyHistory(new Date(dateFrom), new Date(dateTo))
+        ? await getVehicleEventsHistory({ months: monthsForRange(dateFrom, dateTo), plate: selectedPlate !== "Todas" ? selectedPlate : undefined })
+        : await vehiclesApi.vehicleEvents(queryParams)
+      const rows = (response.events ?? []).map(mapEventRow)
       rows.sort((a, b) => (b.eventTimestamp ?? "").localeCompare(a.eventTimestamp ?? ""))
-
-      return { plates, rows, total: response.total }
+      return { plates: response.plates ?? [], rows, total: response.total }
     },
   })
 
@@ -199,15 +246,11 @@ export default function HistoricoPage() {
   const filteredRows = useMemo(() => {
     const rows = data?.rows ?? []
     const q = search.trim().toLowerCase()
-
     return rows.filter((row) => {
       if (selectedPlate !== "Todas" && row.plate !== selectedPlate) return false
       if (selectedEventType !== "Todos" && row.type !== selectedEventType) return false
       if (!q) return true
-
-      const driver = (row.driverName ?? "").toLowerCase()
-      const key = (row.keyId ?? "").toLowerCase()
-      return driver.includes(q) || key.includes(q)
+      return (row.driverName ?? "").toLowerCase().includes(q) || (row.keyId ?? "").toLowerCase().includes(q)
     })
   }, [data?.rows, search, selectedPlate, selectedEventType])
 
@@ -218,23 +261,55 @@ export default function HistoricoPage() {
     if (selectedEventType !== "Todos" && !availableEventTypes.includes(selectedEventType)) setSelectedEventType("Todos")
   }, [data, availableEventTypes, selectedPlate, selectedEventType])
 
-  const visibleCols = useMemo(() => ({
-    conductor: filteredRows.some((r) => r.driverName != null),
-    llave:     filteredRows.some((r) => r.keyId != null),
-    velocidad: filteredRows.some((r) => r.speed != null),
-    ubicacion: filteredRows.some((r) => r.location != null),
-  }), [filteredRows])
+  const visibleCols = useMemo<ColFlags>(
+    () => ({
+      conductor: filteredRows.some((r) => r.driverName != null),
+      llave: filteredRows.some((r) => r.keyId != null),
+      velocidad: filteredRows.some((r) => r.speed != null),
+      ubicacion: filteredRows.some((r) => r.location != null),
+    }),
+    [filteredRows],
+  )
 
-  const errorMessage = error
-    ? error instanceof Error
-      ? error.message
-      : "Error desconocido"
-    : null
+  const totalPages = data?.total != null ? Math.max(1, Math.ceil(data.total / PAGE_LIMIT)) : 1
+
+  const handleExport = useCallback(async () => {
+    setIsExporting(true)
+    try {
+      const response = usesMonthlyHistory(new Date(dateFrom), new Date(dateTo))
+        ? await getVehicleEventsHistory({ months: monthsForRange(dateFrom, dateTo), plate: selectedPlate !== "Todas" ? selectedPlate : undefined })
+        : await vehiclesApi.vehicleEvents({ dateFrom, dateTo, limit: 500, page: 1 })
+      const allRows = (response.events ?? []).map(mapEventRow)
+      allRows.sort((a, b) => (b.eventTimestamp ?? "").localeCompare(a.eventTimestamp ?? ""))
+
+      const q = search.trim().toLowerCase()
+      const exportRows = allRows.filter((row) => {
+        if (selectedPlate !== "Todas" && row.plate !== selectedPlate) return false
+        if (selectedEventType !== "Todos" && row.type !== selectedEventType) return false
+        if (!q) return true
+        return (row.driverName ?? "").toLowerCase().includes(q) || (row.keyId ?? "").toLowerCase().includes(q)
+      })
+
+      const exportCols: ColFlags = {
+        conductor: exportRows.some((r) => r.driverName != null),
+        llave: exportRows.some((r) => r.keyId != null),
+        velocidad: exportRows.some((r) => r.speed != null),
+        ubicacion: exportRows.some((r) => r.location != null),
+      }
+
+      exportToCSV(exportRows, exportCols, `historico_${dateFrom}_${dateTo}.csv`)
+    } finally {
+      setIsExporting(false)
+    }
+  }, [dateFrom, dateTo, selectedPlate, selectedEventType, search])
+
+  const errorMessage = error ? (error instanceof Error ? error.message : "Error desconocido") : null
   const hasAnyRows = (data?.rows?.length ?? 0) > 0
   const hasRowsAfterFilters = filteredRows.length > 0
 
   return (
     <div className="min-h-screen space-y-6 p-6">
+      {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-xl font-semibold tracking-tight text-white">Histórico de eventos</h1>
@@ -261,30 +336,36 @@ export default function HistoricoPage() {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <div className="mb-2 text-xs text-white/40">Preset</div>
-          <div className="flex rounded-lg border border-white/10 bg-white/[0.04] p-0.5">
-            {(["day", "week", "month"] as const).map((p) => (
-              <Button
-                key={p}
-                variant="ghost"
-                size="sm"
-                className={cn(
-                  "h-8 px-3 text-xs font-medium",
-                  preset === p
-                    ? "bg-white/10 text-white"
-                    : "text-white/50 hover:bg-white/5 hover:text-white/70",
-                )}
-                onClick={() => setPreset(p)}
-              >
-                {p === "day" ? "Día" : p === "week" ? "Semana" : "Mes"}
-              </Button>
-            ))}
+      {/* Filters */}
+      <div className="flex flex-wrap items-start gap-4">
+        {/* Date range */}
+        <div className="flex flex-col gap-1">
+          <div className="mb-1 text-xs text-white/40">Rango de fechas</div>
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => handleDateFromChange(e.target.value)}
+              className="h-9 rounded-md border border-white/10 bg-white/[0.04] px-3 text-sm text-white/80 [color-scheme:dark] focus:border-white/20 focus:outline-none"
+            />
+            <span className="text-xs text-white/30">→</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => handleDateToChange(e.target.value)}
+              className="h-9 rounded-md border border-white/10 bg-white/[0.04] px-3 text-sm text-white/80 [color-scheme:dark] focus:border-white/20 focus:outline-none"
+            />
           </div>
+          {dateError && (
+            <p className="mt-1 flex items-center gap-1 text-xs text-red-400">
+              <AlertTriangle size={11} />
+              {dateError}
+            </p>
+          )}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        {/* Other filters */}
+        <div className="flex flex-wrap items-end gap-2">
           <Select value={selectedPlate} onValueChange={(v) => setSelectedPlate(v)}>
             <SelectTrigger className="w-[200px] border-white/10 bg-white/[0.04] text-white/80">
               <SelectValue placeholder="Patente" />
@@ -325,19 +406,30 @@ export default function HistoricoPage() {
           <Button
             variant="outline"
             size="sm"
-            disabled={isLoading || isFetching}
+            disabled={isLoading || isFetching || !isRangeValid}
             className="h-9 gap-1.5 border-white/10 bg-white/[0.04] text-xs text-white/60 hover:bg-white/[0.08] hover:text-white"
             onClick={() => void refetch()}
           >
             <RefreshCw size={13} className={cn(isFetching && "animate-spin")} />
             Actualizar
           </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={isExporting || !hasAnyRows || !isRangeValid}
+            className="h-9 gap-1.5 border-white/10 bg-white/[0.04] text-xs text-white/60 hover:bg-white/[0.08] hover:text-white"
+            onClick={() => void handleExport()}
+          >
+            <Download size={13} className={cn(isExporting && "animate-pulse")} />
+            {isExporting ? "Exportando…" : "Exportar CSV"}
+          </Button>
         </div>
       </div>
 
       <AsyncState loading={isLoading} error={errorMessage} onRetry={() => void refetch()} />
 
-      {!isLoading && !error && !hasAnyRows && (
+      {!isLoading && !error && isRangeValid && !hasAnyRows && (
         <Card className="border-white/5 bg-white/[0.02]">
           <CardContent className="flex items-center gap-3 py-6 text-sm text-white/40">
             <AlertTriangle size={16} className="shrink-0 text-yellow-400/60" />
@@ -403,6 +495,37 @@ export default function HistoricoPage() {
                   ))}
                 </TableBody>
               </Table>
+            </div>
+
+            {/* Pagination */}
+            <div className="mt-4 flex items-center justify-between">
+              <p className="text-xs text-white/40">
+                {filteredRows.length} evento{filteredRows.length !== 1 ? "s" : ""} en esta página
+                {data?.total != null && ` · ${data.total} total`}
+                {totalPages > 1 && ` · Página ${currentPage} de ${totalPages}`}
+              </p>
+              <div className="flex items-center gap-1.5">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={currentPage <= 1 || isFetching}
+                  className="h-8 gap-1 border-white/10 bg-white/[0.04] px-2.5 text-xs text-white/60 hover:bg-white/[0.08] hover:text-white disabled:opacity-30"
+                  onClick={() => setCurrentPage((p) => p - 1)}
+                >
+                  <ChevronLeft size={13} />
+                  Anterior
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={currentPage >= totalPages || isFetching}
+                  className="h-8 gap-1 border-white/10 bg-white/[0.04] px-2.5 text-xs text-white/60 hover:bg-white/[0.08] hover:text-white disabled:opacity-30"
+                  onClick={() => setCurrentPage((p) => p + 1)}
+                >
+                  Siguiente
+                  <ChevronRight size={13} />
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>

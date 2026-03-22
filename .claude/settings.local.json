@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(xargs grep:*)"
+      "Bash(xargs grep:*)",
+      "Bash(ls -la /c/Users/User/Desktop/controlevento/app/\\\\\\(main\\\\\\)/)",
+      "Bash(find /c/Users/User/Desktop/controlevento/hooks -type f -name *.ts*)",
+      "Bash(grep -r historico /c/Users/User/Desktop/controlevento --include=*.tsx --include=*.ts --include=*.json)"
     ]
   }
 }
