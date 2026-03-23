@@ -31,16 +31,38 @@ export function AppSidebar({ role, email, collapsed = false, onToggle }: AppSide
 
   return (
     <aside
-      className={cn(
-        "hidden shrink-0 border-r bg-background lg:flex lg:flex-col overflow-hidden",
-        "transition-[width] duration-300 ease-in-out",
-        collapsed ? "w-14" : "w-64",
-      )}
+      style={{ width: collapsed ? "3.5rem" : "16rem", transition: "width 300ms ease-in-out" }}
+      className="hidden shrink-0 border-r bg-background lg:flex lg:flex-col overflow-hidden"
     >
-      {/* Logo */}
-      <div className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
-        <BarChart3 className="h-5 w-5 shrink-0" />
-        {!collapsed && <p className="truncate font-semibold">FleetGuard</p>}
+      {/* Logo + toggle */}
+      <div className="flex h-16 shrink-0 items-stretch border-b">
+        {collapsed ? (
+          /* Colapsado: botón ocupa todo el header */
+          <button
+            type="button"
+            onClick={onToggle}
+            title="Expandir"
+            className="flex w-full items-center justify-center text-muted-foreground hover:bg-muted/60"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </button>
+        ) : (
+          /* Expandido: logo + botón al costado */
+          <>
+            <div className="flex flex-1 items-center gap-2 px-4">
+              <BarChart3 className="h-5 w-5 shrink-0" />
+              <p className="truncate font-semibold">FleetGuard</p>
+            </div>
+            <button
+              type="button"
+              onClick={onToggle}
+              title="Colapsar"
+              className="flex h-full items-center justify-center border-l px-3 text-muted-foreground hover:bg-muted/60"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+          </>
+        )}
       </div>
 
       {/* Nav */}
@@ -66,29 +88,11 @@ export function AppSidebar({ role, email, collapsed = false, onToggle }: AppSide
       </nav>
 
       {/* Footer */}
-      <div className="shrink-0 border-t p-3">
-        {!collapsed && (
-          <p className="mb-2 px-3 text-xs text-muted-foreground">Panel legacy en /panel</p>
-        )}
-        <button
-          type="button"
-          onClick={onToggle}
-          title={collapsed ? "Expandir" : "Colapsar"}
-          className={cn(
-            "flex w-full items-center rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted/60",
-            collapsed ? "justify-center" : "gap-2",
-          )}
-        >
-          {collapsed
-            ? <ChevronRight className="h-4 w-4 shrink-0" />
-            : (
-              <>
-                <ChevronLeft className="h-4 w-4 shrink-0" />
-                <span>Colapsar</span>
-              </>
-            )}
-        </button>
-      </div>
+      {!collapsed && (
+        <div className="shrink-0 border-t px-3 py-4">
+          <p className="px-3 text-xs text-muted-foreground">Panel legacy en /panel</p>
+        </div>
+      )}
     </aside>
   )
 }
