@@ -1,6 +1,7 @@
 export interface AuthMeDTO {
   email: string
   uid: string
+  role: "admin" | "general" | "report" | "responsable"
 }
 
 export interface AuthLogoutResponseDTO {

@@ -9,11 +9,8 @@ import { ThemeToggle } from "@/components/theme-toggle"
 const titles: Record<string, string> = {
   "/dashboard": "Dashboard",
   "/vehiculos": "Vehiculos",
-  "/eventos": "Eventos",
-  "/pendientes": "Alertas pendientes",
   "/historico": "Historico",
-  "/calidad": "Calidad de datos",
-  "/configuracion": "Configuracion",
+  "/admin/calidad": "Calidad de datos",
 }
 
 interface TopNavbarProps {

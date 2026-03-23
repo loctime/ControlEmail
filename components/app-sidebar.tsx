@@ -2,19 +2,26 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { BarChart3, Bell, Car, Database, FileClock, Gauge, ListChecks, Settings } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
+import { BarChart3, Car, Database, FileClock, Settings } from "lucide-react"
 
-interface AppSidebarProps {
-  pendingAlertsCount?: number
-}
-
-const navItems = [
-  { href: "/historico", label: "Historico", icon: FileClock },
+const baseNavItems = [
+  { href: "/historico", label: "Historico", icon: FileClock, adminOnly: false },
 ]
 
-export function AppSidebar({ pendingAlertsCount = 0 }: AppSidebarProps) {
+const adminNavItems = [
+  { href: "/admin/calidad", label: "Calidad", icon: Database, adminOnly: true },
+  { href: "/admin/email-config", label: "Destinatarios", icon: Settings, adminOnly: true },
+  { href: "/admin/vehicle-alerts", label: "Responsables", icon: Car, adminOnly: true },
+]
+
+interface AppSidebarProps {
+  role?: string
+}
+
+export function AppSidebar({ role }: AppSidebarProps) {
   const pathname = usePathname()
+  const isAdmin = role === "admin"
+  const navItems = isAdmin ? [...baseNavItems, ...adminNavItems] : baseNavItems
 
   return (
     <aside className="hidden w-64 shrink-0 border-r bg-background lg:block">
@@ -29,15 +36,12 @@ export function AppSidebar({ pendingAlertsCount = 0 }: AppSidebarProps) {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center justify-between rounded-md px-3 py-2 text-sm ${
+              className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm ${
                 active ? "bg-muted font-medium" : "text-muted-foreground hover:bg-muted/60"
               }`}
             >
-              <span className="flex items-center gap-2">
-                <item.icon className="h-4 w-4" />
-                {item.label}
-              </span>
-              {item.href === "/pendientes" && pendingAlertsCount > 0 && <Badge>{pendingAlertsCount}</Badge>}
+              <item.icon className="h-4 w-4" />
+              {item.label}
             </Link>
           )
         })}

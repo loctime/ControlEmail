@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Plus, X } from "lucide-react"
-import { adminApi } from "@/services/api"
+import { adminApi, authApi } from "@/services/api"
+
+const REPORTS_EMAIL = "diegobertosi@gmail.com"
 
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase()
@@ -23,14 +25,19 @@ function dedupeEmails(emails: string[]): string[] {
 
 type SectionKey = "generalRecipients" | "ccRecipients" | "reportRecipients"
 
-const SECTIONS: { key: SectionKey; title: string }[] = [
+const BASE_SECTIONS: { key: SectionKey; title: string }[] = [
   { key: "generalRecipients", title: "Destinatarios generales" },
   { key: "ccRecipients", title: "Copias (CC)" },
-  { key: "reportRecipients", title: "Reportes tecnicos" },
 ]
+
+const REPORT_SECTION: { key: SectionKey; title: string } = {
+  key: "reportRecipients",
+  title: "Reportes tecnicos",
+}
 
 export default function EmailConfigPage() {
   const [loading, setLoading] = useState(true)
+  const [canSeeReports, setCanSeeReports] = useState(false)
   const [needsLogin, setNeedsLogin] = useState(false)
   const [generalRecipients, setGeneralRecipients] = useState<string[]>([])
   const [ccRecipients, setCcRecipients] = useState<string[]>([])
@@ -44,6 +51,12 @@ export default function EmailConfigPage() {
   const [saving, setSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
+
+  useEffect(() => {
+    authApi.me()
+      .then((me) => { if (me.email === REPORTS_EMAIL) setCanSeeReports(true) })
+      .catch(() => { /* sin acceso al email → no mostrar sección */ })
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -195,7 +208,7 @@ export default function EmailConfigPage() {
       )}
 
       <div className="space-y-8">
-        {SECTIONS.map(({ key, title }) => (
+        {[...BASE_SECTIONS, ...(canSeeReports ? [REPORT_SECTION] : [])].map(({ key, title }) => (
           <div key={key} className="rounded-md border bg-card p-4 shadow-sm">
             <h2 className="mb-4 text-lg font-medium">{title}</h2>
             <div className="space-y-2">

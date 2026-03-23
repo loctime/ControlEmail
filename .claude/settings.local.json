@@ -4,7 +4,10 @@
       "Bash(xargs grep:*)",
       "Bash(ls -la /c/Users/User/Desktop/controlevento/app/\\\\\\(main\\\\\\)/)",
       "Bash(find /c/Users/User/Desktop/controlevento/hooks -type f -name *.ts*)",
-      "Bash(grep -r historico /c/Users/User/Desktop/controlevento --include=*.tsx --include=*.ts --include=*.json)"
+      "Bash(grep -r historico /c/Users/User/Desktop/controlevento --include=*.tsx --include=*.ts --include=*.json)",
+      "Bash(find \"C:\\\\Users\\\\User\\\\Desktop\\\\controlevento/app/\\(main\\)/dashboard\" -type f -name \"*.tsx\" ! -path \"*/node_modules/*\")",
+      "Bash(find C:UsersUserDesktopcontrolevento/app -path */node_modules -prune -o -type f \\\\\\(-name *.ts -o -name *.tsx \\\\\\) -print)",
+      "Bash(find C:UsersUserDesktopcontrolevento -maxdepth 1 -name .env* -o -name firebase.config.*)"
     ]
   }
 }

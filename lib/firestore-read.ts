@@ -406,6 +406,74 @@ export async function getEmailAccessUserByEmail(email: string): Promise<EmailAcc
 }
 
 /**
+ * Crea o actualiza apps/emails/access/{email} según si el email debe estar activo o no.
+ *
+ * active=false:
+ * - doc no existe              → no-op
+ * - doc existe y enabled=false → no-op
+ * - doc existe y enabled=true  → PATCH solo enabled:false (no toca role)
+ *
+ * active=true:
+ * - doc no existe                                   → crea con role:"admin", enabled:true
+ * - doc existe con role "responsable"               → no-op (no se toca nada)
+ * - doc existe con role "general", "report" o null  → PATCH role:"admin" + enabled:true
+ * - doc existe con role "admin" y enabled=true      → no-op
+ * - doc existe con role "admin" y enabled=false     → PATCH solo enabled:true
+ */
+export async function upsertEmailAccess(email: string, active: boolean): Promise<void> {
+  const normalized = email.trim().toLowerCase()
+  if (!normalized) return
+
+  const projectId = getEnvOrThrow("FIREBASE_PROJECT_ID", "NEXT_PUBLIC_FIREBASE_PROJECT_ID")
+  const docPath = `apps/emails/access/${encodeURIComponent(normalized)}`
+  const documentName = `projects/${projectId}/databases/(default)/documents/${docPath}`
+
+  const existing = await getEmailAccessUserByEmail(normalized)
+
+  if (!active) {
+    if (!existing || !existing.enabled) return
+    const body = { name: documentName, fields: toFirestoreFields({ enabled: false }) }
+    const res = await firestoreRequest(
+      `documents/${docPath}?updateMask.fieldPaths=enabled`,
+      { method: "PATCH", body: JSON.stringify(body) },
+    )
+    if (!res.ok) throw new Error(`Failed to disable access for ${normalized}: ${res.status}`)
+    return
+  }
+
+  if (!existing) {
+    const body = { name: documentName, fields: toFirestoreFields({ role: "admin", enabled: true }) }
+    const res = await firestoreRequest(
+      `documents/apps/emails/access?documentId=${encodeURIComponent(normalized)}`,
+      { method: "POST", body: JSON.stringify(body) },
+    )
+    if (!res.ok) throw new Error(`Failed to create access for ${normalized}: ${res.status}`)
+    return
+  }
+
+  // Doc existe — role "responsable" nunca se toca
+  if (existing.role === "responsable") return
+
+  // role "admin" y ya habilitado → no-op
+  if (existing.role === "admin" && existing.enabled) return
+
+  // Cualquier otro caso: asegurar role:"admin" y enabled:true
+  const fieldsToUpdate: Record<string, unknown> = { enabled: true }
+  const maskPaths = ["enabled"]
+  if (existing.role !== "admin") {
+    fieldsToUpdate.role = "admin"
+    maskPaths.push("role")
+  }
+  const updateMask = maskPaths.map((p) => `updateMask.fieldPaths=${p}`).join("&")
+  const body = { name: documentName, fields: toFirestoreFields(fieldsToUpdate) }
+  const res = await firestoreRequest(
+    `documents/${docPath}?${updateMask}`,
+    { method: "PATCH", body: JSON.stringify(body) },
+  )
+  if (!res.ok) throw new Error(`Failed to update access for ${normalized}: ${res.status}`)
+}
+
+/**
  * Lista documentos de una colecciÃ³n (una pÃ¡gina).
  * La REST API espera path con segmentos reales: documents/apps/emails/vehicleEvents
  * (NO codificar barras como %2F, sino la API interpreta una sola colecciÃ³n raÃ­z y devuelve 0).

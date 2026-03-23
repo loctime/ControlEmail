@@ -10,9 +10,6 @@ export type * from "@/services/api/dashboard/types"
 export { vehiclesApi } from "@/services/api/vehicles/vehiclesApi"
 export type * from "@/services/api/vehicles/types"
 
-export { eventsApi } from "@/services/api/events/eventsApi"
-export type * from "@/services/api/events/types"
-
 export { alertsApi } from "@/services/api/alerts/alertsApi"
 export type * from "@/services/api/alerts/types"
 

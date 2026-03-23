@@ -434,9 +434,7 @@ export default function SuperDashboardPage() {
           <div className="flex flex-wrap gap-2 pt-4">
             {[
               { href: "/historico", label: "Histórico" },
-              { href: "/pendientes", label: "Pendientes" },
               { href: "/vehiculos", label: "Vehículos" },
-              { href: "/configuracion", label: "Configuración" },
             ].map(({ href, label }) => (
               <Link key={href} href={href}>
                 <Button
