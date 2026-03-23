@@ -16,7 +16,6 @@ import { cn } from "@/lib/utils"
 import { formatEventDateTime } from "@/lib/ui/datetime"
 import { getVehicleEventsHistory, vehiclesApi } from "@/services/api/vehicles/vehiclesApi"
 import type { VehicleEventItem, VehicleEventsParams } from "@/services/api"
-import { getYesterdayKey } from "@/lib/domain/date"
 
 const PAGE_LIMIT = 100
 const MAX_RANGE_DAYS = 366
@@ -34,24 +33,17 @@ function getYesterday(): Date {
   return d
 }
 
-function getDefaultRange(): { dateFrom: string; dateTo: string } {
-  const lastKey = getYesterdayKey()
-  return { dateFrom: lastKey, dateTo: lastKey }
-}
-
-function getRangeForPreset(preset: Exclude<DatePreset, "personalizado">): { dateFrom: string; dateTo: string } {
-  const lastKey = getYesterdayKey()
+function getRangeForPreset(preset: Exclude<DatePreset, "personalizado" | "ultimo">, ultimoDate: string): { dateFrom: string; dateTo: string } {
   const lastDate = getYesterday()
-  if (preset === "ultimo") return { dateFrom: lastKey, dateTo: lastKey }
   if (preset === "semana") {
     const from = new Date(lastDate)
     from.setDate(from.getDate() - 6)
-    return { dateFrom: toDateStr(from), dateTo: lastKey }
+    return { dateFrom: toDateStr(from), dateTo: ultimoDate }
   }
   // mes — 30 días hacia atrás desde el último día disponible
   const from = new Date(lastDate)
   from.setDate(from.getDate() - 29)
-  return { dateFrom: toDateStr(from), dateTo: lastKey }
+  return { dateFrom: toDateStr(from), dateTo: ultimoDate }
 }
 
 function daysBetween(from: string, to: string): number {
@@ -202,11 +194,18 @@ const DATE_PRESET_LABELS: Record<DatePreset, string> = {
 }
 
 export default function HistoricoPage() {
-  const defaultRange = useMemo(() => getDefaultRange(), [])
+  const initialDate = useMemo(() => {
+    const d = new Date()
+    d.setDate(d.getDate() - 1)
+    return toDateStr(d)
+  }, [])
+
+  const [ultimoDate, setUltimoDate] = useState(initialDate)
+  const [fallbackTried, setFallbackTried] = useState(false)
 
   const [datePreset, setDatePreset] = useState<DatePreset>("ultimo")
-  const [dateFrom, setDateFrom] = useState(defaultRange.dateFrom)
-  const [dateTo, setDateTo] = useState(defaultRange.dateTo)
+  const [dateFrom, setDateFrom] = useState(initialDate)
+  const [dateTo, setDateTo] = useState(initialDate)
   const [dateError, setDateError] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [isExporting, setIsExporting] = useState(false)
@@ -230,8 +229,13 @@ export default function HistoricoPage() {
 
   function handlePreset(preset: DatePreset) {
     setDatePreset(preset)
-    if (preset !== "personalizado") {
-      const range = getRangeForPreset(preset)
+    if (preset === "ultimo") {
+      setDateFrom(ultimoDate)
+      setDateTo(ultimoDate)
+      setDateError(null)
+      setCurrentPage(1)
+    } else if (preset !== "personalizado") {
+      const range = getRangeForPreset(preset, ultimoDate)
       setDateFrom(range.dateFrom)
       setDateTo(range.dateTo)
       setDateError(null)
@@ -316,6 +320,20 @@ export default function HistoricoPage() {
       return (row.driverName ?? "").toLowerCase().includes(q) || (row.keyId ?? "").toLowerCase().includes(q)
     })
   }, [data?.rows, search, selectedPlate, selectedEventType, selectedOperation])
+
+  // Auto-fallback: si ayer no tiene datos, intentar anteayer (máx 1 intento)
+  useEffect(() => {
+    if (isLoading || isFetching || datePreset !== "ultimo" || fallbackTried) return
+    if (data && data.rows.length === 0) {
+      const d = new Date()
+      d.setDate(d.getDate() - 2)
+      const anteayer = toDateStr(d)
+      setFallbackTried(true)
+      setUltimoDate(anteayer)
+      setDateFrom(anteayer)
+      setDateTo(anteayer)
+    }
+  }, [data, isLoading, isFetching, datePreset, fallbackTried])
 
   useEffect(() => {
     if (!data) return
