@@ -2,9 +2,11 @@
 
 import { useMemo } from "react"
 import { Badge } from "@/components/ui/badge"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { useVehicleData } from "@/components/vehicles/useVehicleData"
 import { formatEventDateTime } from "@/lib/ui/datetime"
 import { cn } from "@/lib/utils"
+import { eventTypeDescriptions } from "@/lib/data"
 import type { DailyAlertVehicle } from "@/lib/firestore-read"
 
 type VehicleDetailEvent = DailyAlertVehicle["events"][number]
@@ -254,9 +256,22 @@ export function VehicleExpandPanel({ plate }: VehicleExpandPanelProps) {
                         {formatEventDateTime(ev.eventTimestamp)}
                       </td>
                       <td className="px-3 py-2">
-                        <Badge variant="outline" className={cn(getTypeBadgeClass(ev.type), "text-[11px]")}>
-                          {humanizeType(ev.type)}
-                        </Badge>
+                        {eventTypeDescriptions[ev.type] ? (
+                          <TooltipProvider delayDuration={300}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge variant="outline" className={cn(getTypeBadgeClass(ev.type), "text-[11px]")}>
+                                  {humanizeType(ev.type)}
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>{eventTypeDescriptions[ev.type]}</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        ) : (
+                          <Badge variant="outline" className={cn(getTypeBadgeClass(ev.type), "text-[11px]")}>
+                            {humanizeType(ev.type)}
+                          </Badge>
+                        )}
                       </td>
                       <td className="px-3 py-2 text-white/60">{ev.driverName ?? "—"}</td>
                       <td className="px-3 py-2 font-mono text-white/60">{ev.keyId ?? "—"}</td>

@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { BarChart3, Car, ChevronLeft, ChevronRight, Database, FileClock, LayoutDashboard, Settings } from "lucide-react"
+import { BarChart3, Car, ChevronLeft, ChevronRight, FileClock, LayoutDashboard, Settings, Truck } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const baseNavItems = [

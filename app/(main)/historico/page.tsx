@@ -16,6 +16,8 @@ import { cn } from "@/lib/utils"
 import { formatEventDateTime } from "@/lib/ui/datetime"
 import { getVehicleEventsHistory, vehiclesApi } from "@/services/api/vehicles/vehiclesApi"
 import type { VehicleEventItem, VehicleEventsParams } from "@/services/api"
+import { eventTypeDescriptions } from "@/lib/data"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 const PAGE_LIMIT = 100
 const MAX_RANGE_DAYS = 366
@@ -115,6 +117,7 @@ interface HistoricoEventRow {
   model: string | null
   operation: string | null
   type: string
+  rawType: string
   driverName: string | null
   keyId: string | null
   speed: number | null
@@ -130,6 +133,7 @@ function mapEventRow(event: VehicleEventItem): HistoricoEventRow {
     brand: event.brand ?? null,
     model: event.model ?? null,
     operation: event.operationName ?? event.operacion ?? null,
+    rawType: event.eventType || event.rawEventType || event.sourceEmailType || "",
     type:
       (event.speed != null && event.speed > 0) ||
       (event.maxSpeed != null && event.maxSpeed > 0) ||
@@ -608,9 +612,22 @@ export default function HistoricoPage() {
                       </TableCell>
                       <TableCell className="text-white/80">{row.operation ?? "-"}</TableCell>
                       <TableCell>
-                        <Badge variant="outline" className={getEventBadgeClassName(row.type)}>
-                          {row.type}
-                        </Badge>
+                        {eventTypeDescriptions[row.rawType] ? (
+                          <TooltipProvider delayDuration={300}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge variant="outline" className={getEventBadgeClassName(row.type)}>
+                                  {row.type}
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>{eventTypeDescriptions[row.rawType]}</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        ) : (
+                          <Badge variant="outline" className={getEventBadgeClassName(row.type)}>
+                            {row.type}
+                          </Badge>
+                        )}
                       </TableCell>
                       {visibleCols.conductor && <TableCell className="text-white/80">{row.driverName ?? "-"}</TableCell>}
                       {visibleCols.llave     && <TableCell className="text-white/80">{row.keyId ?? "-"}</TableCell>}

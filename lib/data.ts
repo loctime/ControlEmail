@@ -59,14 +59,28 @@ export const eventTypeLabels: Record<EventType, string> = {
 }
 
 export const eventTypeDescriptions: Record<string, string> = {
+  // Claves snake_case (legacy)
   conductor_inactivo: "La llave pertenece a un conductor dado de baja en el sistema",
   contacto: "El vehículo se encendió sin presentar ninguna llave",
   contacto_sin_conductor: "Se detectó contacto pero no se identificó conductor",
+  contacto_sin_identificacion: "El vehículo arrancó sin que el conductor se identificara",
   exceso_velocidad: "El vehículo superó los 90 km/h",
   llave_desconocida: "La llave detectada tiene un ID ilegible o corrupto",
   llave_no_registrada: "Se usó una llave que no existe en el sistema RSV",
+  llave_sin_cargar: "La llave no tiene créditos o está sin activar",
   vehiculo_no_identificado: "El sistema no pudo clasificar el evento",
   no_identificado: "El sistema no pudo clasificar el evento",
+  // Claves UPPER_CASE (API actual)
+  CONTACT_NO_DRIVER: "Se detectó contacto pero no se identificó conductor",
+  CONTACT_WITHOUT_ID: "El vehículo arrancó sin que el conductor se identificara",
+  SPEED_EXCESS: "El vehículo superó los 90 km/h",
+  SPEEDING: "El vehículo superó los 90 km/h",
+  NO_KEY_DETECTED: "El vehículo arrancó sin presentar ninguna llave",
+  UNKNOWN_KEY: "La llave detectada tiene un ID ilegible o corrupto",
+  KEY_NOT_REGISTERED: "Se usó una llave que no existe en el sistema RSV",
+  DRIVER_NOT_IDENTIFIED: "El conductor no se identificó correctamente",
+  DRIVER_IDENTIFICATION: "El conductor no se identificó correctamente",
+  INACTIVE_DRIVER: "La llave pertenece a un conductor dado de baja en el sistema",
 }
 
 export const eventStatusLabels: Record<EventStatus, string> = {
