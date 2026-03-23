@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getVehicleByPlate, getDailyAlertForVehicle, getDailyMetrics } from "@/lib/firestore-read"
-import { getYesterdayKey } from "@/lib/domain/date"
+import { getLastClosedDateKey } from "@/lib/domain/closed-date"
 import { getSeverityFromRiskScore } from "@/lib/domain/severity"
 import { getAuthUserWithPlates, authUnauthorizedResponse } from "@/lib/auth-user"
 import { normalizePlate } from "@/lib/utils"
@@ -36,7 +36,7 @@ export async function GET(
 
     console.log("[api/vehicles/[plate]] GET:", { plate: plateUpper, daysBack })
 
-    const dateKey = getYesterdayKey()
+    const dateKey = await getLastClosedDateKey()
     const previousDateKey = offsetDateKey(dateKey, -1)
 
     const [vehicle, dailyAlert, previousDailyAlert, dailyMetrics] = await Promise.all([

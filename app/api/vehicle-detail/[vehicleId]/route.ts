@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getVehicleByPlate, getVehicleEventsByPlate, getDailyAlertForVehicle } from "@/lib/firestore-read"
-import { getYesterdayKey } from "@/lib/domain/date"
+import { getLastClosedDateKey } from "@/lib/domain/closed-date"
 import { getSeverityFromRiskScore } from "@/lib/domain/severity"
 import { getAuthUserWithPlates, authUnauthorizedResponse } from "@/lib/auth-user"
 import { normalizePlate } from "@/lib/utils"
@@ -33,7 +33,7 @@ export async function GET(
     }
 
     // Día de referencia: ayer (las alertas diarias son del día anterior).
-    const businessDate = getYesterdayKey()
+    const businessDate = await getLastClosedDateKey()
 
     // Alerta diaria y meta real desde Firestore (apps/emails/dailyAlerts/{date}/vehicles/{plate}).
     const { alert, meta } = await getDailyAlertForVehicle(businessDate, plateUpper)

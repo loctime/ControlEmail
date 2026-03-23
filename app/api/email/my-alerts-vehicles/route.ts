@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server"
 import { getAuthUserWithPlates, authUnauthorizedResponse } from "@/lib/auth-user"
 import { getDailyMetrics, listVehicles } from "@/lib/firestore-read"
-import { getYesterdayKey } from "@/lib/domain/date"
+import { getLastClosedDateKey } from "@/lib/domain/closed-date"
 
 export async function GET(request: Request) {
   const auth = await getAuthUserWithPlates(request)
   if (!auth) return authUnauthorizedResponse()
 
   try {
-    const dateKey = getYesterdayKey()
+    const dateKey = await getLastClosedDateKey()
     const [metrics, vehicles] = await Promise.all([
       getDailyMetrics(dateKey),
       listVehicles(),

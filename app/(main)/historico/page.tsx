@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils"
 import { formatEventDateTime } from "@/lib/ui/datetime"
 import { getVehicleEventsHistory, vehiclesApi } from "@/services/api/vehicles/vehiclesApi"
 import type { VehicleEventItem, VehicleEventsParams } from "@/services/api"
-import { getLastClosedDateKey } from "@/lib/domain/closed-date"
+import { getYesterdayKey } from "@/lib/domain/date"
 
 const PAGE_LIMIT = 100
 const MAX_RANGE_DAYS = 366
@@ -35,12 +35,12 @@ function getYesterday(): Date {
 }
 
 function getDefaultRange(): { dateFrom: string; dateTo: string } {
-  const lastKey = getLastClosedDateKey()
+  const lastKey = getYesterdayKey()
   return { dateFrom: lastKey, dateTo: lastKey }
 }
 
 function getRangeForPreset(preset: Exclude<DatePreset, "personalizado">): { dateFrom: string; dateTo: string } {
-  const lastKey = getLastClosedDateKey()
+  const lastKey = getYesterdayKey()
   const lastDate = getYesterday()
   if (preset === "ultimo") return { dateFrom: lastKey, dateTo: lastKey }
   if (preset === "semana") {

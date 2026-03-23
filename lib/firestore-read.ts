@@ -1345,6 +1345,44 @@ export async function getDailyMetrics(date: string): Promise<DailyAlertsResponse
   return { meta, vehicles }
 }
 
+/**
+ * Escanea los últimos maxDaysBack días (descendente) y devuelve el dateKey
+ * más reciente que tenga al menos un documento en la subcolección /vehicles.
+ * Retorna null si no encuentra ninguno.
+ */
+export async function findLastDateWithVehicleData(maxDaysBack = 30): Promise<string | null> {
+  const { getYesterdayKey } = await import("@/lib/domain/date")
+  const yesterday = getYesterdayKey()
+  const [y, m, d] = yesterday.split("-").map(Number)
+
+  for (let i = 0; i < maxDaysBack; i++) {
+    const date = new Date(y, m - 1, d - i)
+    const dateKey = [
+      date.getFullYear(),
+      String(date.getMonth() + 1).padStart(2, "0"),
+      String(date.getDate()).padStart(2, "0"),
+    ].join("-")
+
+    try {
+      // pageSize=1 para saber si existe al menos un doc sin traer todo
+      const vehiclesPath = `documents/apps/emails/dailyAlerts/${dateKey}/vehicles?pageSize=1`
+      const res = await firestoreRequest(vehiclesPath, { method: "GET" }, { quiet404: true })
+      if (res.ok) {
+        const json = (await res.json()) as { documents?: unknown[] }
+        if ((json.documents ?? []).length > 0) {
+          console.log(`[firestore-read] findLastDateWithVehicleData: found data for ${dateKey} (offset=${i})`)
+          return dateKey
+        }
+      }
+    } catch {
+      // Continuar al día anterior si hay error puntual
+    }
+  }
+
+  console.warn(`[firestore-read] findLastDateWithVehicleData: no data found in last ${maxDaysBack} days`)
+  return null
+}
+
 export async function getPendingDailyAlerts(): Promise<DailyAlertVehicle[]> {
   const { getYesterdayKey } = await import("@/lib/domain/date")
   const dateKey = getYesterdayKey()

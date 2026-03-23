@@ -80,6 +80,7 @@ export interface VehicleEventsResponse {
 export interface VehiclePlateDetailDTO {
   vehicle: VehicleDoc
   dateKey: string
+  operationName?: string | null
   events: DailyAlertVehicle["events"]
   speedIncidents: DailyAlertVehicle["speedIncidents"]
   summary: DailyAlertVehicle["summary"]

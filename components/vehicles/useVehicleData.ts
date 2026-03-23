@@ -38,6 +38,7 @@ export interface MonthlyScore {
 
 export interface VehicleDataResult {
   vehicle: VehicleDoc | null
+  operationName: string | null
   events: VehicleDetailEvent[]
   visibleEvents: VehicleDetailEvent[]
   speedIncidents: VehicleSpeedIncident[]
@@ -57,6 +58,7 @@ export interface VehicleDataResult {
 
 export function useVehicleData(plate: string, daysFilter: 7 | 30 | 90 = 30): VehicleDataResult {
   const [vehicle, setVehicle] = useState<VehicleDoc | null>(null)
+  const [operationName, setOperationName] = useState<string | null>(null)
   const [events, setEvents] = useState<VehicleDetailEvent[]>([])
   const [speedIncidents, setSpeedIncidents] = useState<VehicleSpeedIncident[]>([])
   const [ranking, setRanking] = useState<RankingData>({ position: 0, totalVehicles: 0 })
@@ -92,6 +94,7 @@ export function useVehicleData(plate: string, daysFilter: 7 | 30 | 90 = 30): Veh
         const plateUpper = plate.toUpperCase()
         const data: VehiclePlateDetailDTO = await vehiclesApi.vehicleDetailByPlate(plateUpper, daysFilter)
         setVehicle(data.vehicle)
+        setOperationName(data.operationName ?? null)
         setEvents(data.events || [])
         setSpeedIncidents(data.speedIncidents || [])
         setRanking(data.ranking || { position: 0, totalVehicles: 0 })
@@ -109,6 +112,7 @@ export function useVehicleData(plate: string, daysFilter: 7 | 30 | 90 = 30): Veh
           setError(err instanceof Error ? err.message : "Error desconocido")
         }
         setVehicle(null)
+        setOperationName(null)
         setEvents([])
         setSpeedIncidents([])
       } finally {
@@ -207,6 +211,7 @@ export function useVehicleData(plate: string, daysFilter: 7 | 30 | 90 = 30): Veh
 
   return {
     vehicle,
+    operationName,
     events,
     visibleEvents,
     speedIncidents,
