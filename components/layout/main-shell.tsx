@@ -8,6 +8,7 @@ import { authApi } from "@/services/api"
 export function MainShell({ children }: { children: ReactNode }) {
   const [subtitle, setSubtitle] = useState<string | undefined>(undefined)
   const [role, setRole] = useState<string | undefined>(undefined)
+  const [email, setEmail] = useState<string | undefined>(undefined)
 
   useEffect(() => {
     let cancelled = false
@@ -18,6 +19,7 @@ export function MainShell({ children }: { children: ReactNode }) {
         if (cancelled) return
         setSubtitle(`Sesion: ${me.email}`)
         setRole(me.role)
+        setEmail(me.email)
       })
       .catch(() => {
         if (!cancelled) setSubtitle(undefined)
@@ -35,7 +37,7 @@ export function MainShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-screen bg-background">
-      <AppSidebar role={role} />
+      <AppSidebar role={role} email={email} />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopNavbar subtitle={subtitle} onLogout={handleLogout} />
         <main className="flex-1 p-4 lg:p-6">{children}</main>

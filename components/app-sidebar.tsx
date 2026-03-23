@@ -5,22 +5,24 @@ import { usePathname } from "next/navigation"
 import { BarChart3, Car, Database, FileClock, Settings } from "lucide-react"
 
 const baseNavItems = [
-  { href: "/historico", label: "Historico", icon: FileClock, adminOnly: false },
+  { href: "/historico", label: "Historico", icon: FileClock },
 ]
 
-const adminNavItems = [
-  { href: "/admin/calidad", label: "Calidad", icon: Database, adminOnly: true },
-  { href: "/admin/email-config", label: "Destinatarios", icon: Settings, adminOnly: true },
-  { href: "/admin/vehicle-alerts", label: "Responsables", icon: Car, adminOnly: true },
-]
+const CALIDAD_EMAIL = "diegobertosi@gmail.com"
 
 interface AppSidebarProps {
   role?: string
+  email?: string
 }
 
-export function AppSidebar({ role }: AppSidebarProps) {
+export function AppSidebar({ role, email }: AppSidebarProps) {
   const pathname = usePathname()
   const isAdmin = role === "admin"
+  const adminNavItems = [
+    ...(email === CALIDAD_EMAIL ? [{ href: "/admin/calidad", label: "Calidad", icon: Database }] : []),
+    { href: "/admin/email-config", label: "Destinatarios", icon: Settings },
+    { href: "/admin/vehicle-alerts", label: "Responsables", icon: Car },
+  ]
   const navItems = isAdmin ? [...baseNavItems, ...adminNavItems] : baseNavItems
 
   return (
