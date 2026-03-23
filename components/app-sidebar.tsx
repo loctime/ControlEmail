@@ -8,22 +8,19 @@ import { cn } from "@/lib/utils"
 const baseNavItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/historico", label: "Historico", icon: FileClock },
+  { href: "/vehiculos", label: "Vehículos", icon: Truck },
 ]
-
-const CALIDAD_EMAIL = "diegobertosi@gmail.com"
 
 interface AppSidebarProps {
   role?: string
-  email?: string
   collapsed?: boolean
   onToggle?: () => void
 }
 
-export function AppSidebar({ role, email, collapsed = false, onToggle }: AppSidebarProps) {
+export function AppSidebar({ role, collapsed = false, onToggle }: AppSidebarProps) {
   const pathname = usePathname()
   const isAdmin = role === "admin"
   const adminNavItems = [
-    ...(email === CALIDAD_EMAIL ? [{ href: "/admin/calidad", label: "Calidad", icon: Database }] : []),
     { href: "/admin/email-config", label: "Destinatarios", icon: Settings },
     { href: "/admin/vehicle-alerts", label: "Responsables", icon: Car },
   ]
@@ -32,7 +29,7 @@ export function AppSidebar({ role, email, collapsed = false, onToggle }: AppSide
   return (
     <aside
       style={{ width: collapsed ? "3.5rem" : "16rem", transition: "width 300ms ease-in-out" }}
-      className="hidden shrink-0 border-r bg-background lg:flex lg:flex-col overflow-hidden"
+      className="hidden shrink-0 border-r bg-background lg:flex lg:flex-col overflow-hidden sticky top-0 h-screen"
     >
       {/* Logo + toggle */}
       <div className="flex h-16 shrink-0 items-stretch border-b">
