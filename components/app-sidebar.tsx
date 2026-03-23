@@ -66,7 +66,7 @@ export function AppSidebar({ role, email, collapsed = false, onToggle }: AppSide
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 space-y-1 p-3">
+      <nav className={cn("flex-1", collapsed ? "" : "space-y-1 p-3")}>
         {navItems.map((item) => {
           const active = pathname === item.href || pathname.startsWith(`${item.href}/`)
           return (
@@ -75,8 +75,8 @@ export function AppSidebar({ role, email, collapsed = false, onToggle }: AppSide
               href={item.href}
               title={collapsed ? item.label : undefined}
               className={cn(
-                "flex items-center rounded-md px-3 py-2 text-sm",
-                collapsed ? "justify-center" : "gap-2",
+                "flex items-center text-sm",
+                collapsed ? "w-full justify-center rounded-none py-4" : "gap-2 rounded-md px-3 py-2",
                 active ? "bg-muted font-medium" : "text-muted-foreground hover:bg-muted/60",
               )}
             >

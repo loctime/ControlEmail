@@ -293,24 +293,24 @@ export function VehicleDrawer({ plate, onClose }: VehicleDrawerProps) {
         aria-label="Detalle del vehículo"
         role="dialog"
         aria-modal="true"
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-white/[0.07] px-6 py-4">
-          <div>
+        <div className="flex items-stretch border-b border-white/[0.07]">
+          <div className="flex-1 px-6 py-4">
             <p className="text-xs text-white/40">Detalle del vehículo</p>
             <p className="font-mono text-lg font-semibold tracking-wider text-white">
               {plate ?? "—"}
             </p>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-white/40 hover:bg-white/[0.06] hover:text-white"
+          <button
+            type="button"
             onClick={onClose}
             aria-label="Cerrar"
+            className="flex items-center justify-center border-l border-white/[0.07] px-5 text-white/40 hover:bg-white/[0.06] hover:text-white"
           >
-            <X size={16} />
-          </Button>
+            <X size={20} />
+          </button>
         </div>
 
         {/* Period pills */}

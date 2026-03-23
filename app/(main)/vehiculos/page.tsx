@@ -100,7 +100,7 @@ const PAGE_SIZE = 15
 
 export default function VehiclesPage() {
   const { rows, loading, error, refetch } = useVehiclesList()
-  const { collapse } = useNav()
+  const { collapse, expand } = useNav()
 
   const [search, setSearch] = useState("")
   const [selectedOperation, setSelectedOperation] = useState<string | null>(null)
@@ -153,15 +153,23 @@ export default function VehiclesPage() {
     setDrawerPlate(opening ? plate : null)
   }
 
+  function handleCloseAll() {
+    if (!drawerPlate) return
+    setDrawerPlate(null)
+    expand()
+  }
+
   const thProps = { activeSortKey: sortKey, sortDir, onSort: handleSort }
 
   return (
-    // Outer wrapper shifts left when drawer is open — no overlay
+    // Outer wrapper: click fuera del contenido cierra el drawer y expande el nav
     <div
       className="transition-[padding-right] duration-300 ease-in-out"
       style={{ paddingRight: drawerPlate ? "480px" : "0px" }}
+      onClick={handleCloseAll}
     >
-      <div className="space-y-4 p-6">
+      {/* stopPropagation para que clicks dentro del contenido no disparen handleCloseAll */}
+      <div className="space-y-4 p-6" onClick={(e) => e.stopPropagation()}>
 
         {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-3">

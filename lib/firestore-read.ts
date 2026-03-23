@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Lectura desde Firestore (apps/emails/vehicleEvents, apps/emails/vehicles) para las API routes.
  * Usa las mismas credenciales que email-local-ingest (FIREBASE_ADMIN_* o GOOGLE_*).
  */

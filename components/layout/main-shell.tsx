@@ -40,6 +40,16 @@ export function MainShell({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  function collapseNav() {
+    setNavCollapsed(true)
+    localStorage.setItem(NAV_COLLAPSED_KEY, "true")
+  }
+
+  function expandNav() {
+    setNavCollapsed(false)
+    localStorage.setItem(NAV_COLLAPSED_KEY, "false")
+  }
+
   function toggleNav() {
     setNavCollapsed((prev) => {
       const next = !prev
@@ -54,7 +64,7 @@ export function MainShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <NavContext.Provider value={{ collapsed: navCollapsed, collapse: () => setNavCollapsed(true), toggle: toggleNav }}>
+    <NavContext.Provider value={{ collapsed: navCollapsed, collapse: collapseNav, expand: expandNav, toggle: toggleNav }}>
       <div className="flex min-h-screen bg-background">
         <AppSidebar
           role={role}
