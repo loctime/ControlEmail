@@ -73,6 +73,7 @@ export async function GET(
     const response: VehiclePlateDetailDTO = {
       vehicle,
       dateKey,
+      operationName: currentDailyVehicle?.operationName ?? null,
       events: currentDailyVehicle?.events ?? [],
       speedIncidents: currentDailyVehicle?.speedIncidents ?? [],
       summary: currentDailyVehicle?.summary ?? {

@@ -152,6 +152,7 @@ export interface VehiclePlateDetailDTO {
     position: number
     totalVehicles: number
   }
+  operationName: string | null
   /** Risk score agregado actual del vehículo (si existe). */
   riskScore?: number
   /** Severidad agregada actual derivada de riskScore. */

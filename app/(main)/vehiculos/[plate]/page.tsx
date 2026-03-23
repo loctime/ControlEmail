@@ -11,7 +11,6 @@ import { LastClosedDateBadge } from "@/components/common/last-closed-date-badge"
 import { PageContainer } from "@/components/page-container"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { AlertCircle, ArrowLeft, MapPin, User } from "lucide-react"
 import { formatEventDateTime } from "@/lib/ui/datetime"
@@ -82,7 +81,6 @@ export default function VehicleDashboardPage() {
               <SelectItem value="90">Ultimos 90 dias</SelectItem>
             </SelectContent>
           </Select>
-          <Badge variant="outline">TODO tecnico: operationName no disponible en este endpoint</Badge>
         </div>
 
         <VehicleHeader vehicle={vehicle} riskLevel={riskLevel} score={score} loading={loading} />
