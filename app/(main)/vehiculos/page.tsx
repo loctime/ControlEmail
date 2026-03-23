@@ -8,6 +8,7 @@ import { LastClosedDateBadge } from "@/components/common/last-closed-date-badge"
 import { AsyncState } from "@/components/common/async-state"
 import { VehicleDrawer } from "@/components/vehicles/VehicleDrawer"
 import { useVehiclesList, type VehicleListRow } from "@/hooks/domain/useVehiclesList"
+import { useNav } from "@/components/layout/nav-context"
 import { cn } from "@/lib/utils"
 
 // ─── Formatters ───────────────────────────────────────────────────────────────
@@ -99,6 +100,7 @@ const PAGE_SIZE = 15
 
 export default function VehiclesPage() {
   const { rows, loading, error, refetch } = useVehiclesList()
+  const { collapse } = useNav()
 
   const [search, setSearch] = useState("")
   const [selectedOperation, setSelectedOperation] = useState<string | null>(null)
@@ -146,7 +148,9 @@ export default function VehiclesPage() {
   }
 
   function handleRowClick(plate: string) {
-    setDrawerPlate((prev) => (prev === plate ? null : plate))
+    const opening = drawerPlate !== plate
+    if (opening) collapse()
+    setDrawerPlate(opening ? plate : null)
   }
 
   const thProps = { activeSortKey: sortKey, sortDir, onSort: handleSort }

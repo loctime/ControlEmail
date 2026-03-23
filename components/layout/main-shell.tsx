@@ -3,6 +3,7 @@
 import { type ReactNode, useEffect, useState } from "react"
 import { AppSidebar } from "@/components/app-sidebar"
 import { TopNavbar } from "@/components/top-navbar"
+import { NavContext } from "@/components/layout/nav-context"
 import { authApi } from "@/services/api"
 
 const NAV_COLLAPSED_KEY = "nav:collapsed"
@@ -53,17 +54,19 @@ export function MainShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <AppSidebar
-        role={role}
-        email={email}
-        collapsed={navCollapsed}
-        onToggle={toggleNav}
-      />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <TopNavbar subtitle={subtitle} onLogout={handleLogout} />
-        <main className="flex-1 p-4 lg:p-6">{children}</main>
+    <NavContext.Provider value={{ collapsed: navCollapsed, collapse: () => setNavCollapsed(true), toggle: toggleNav }}>
+      <div className="flex min-h-screen bg-background">
+        <AppSidebar
+          role={role}
+          email={email}
+          collapsed={navCollapsed}
+          onToggle={toggleNav}
+        />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <TopNavbar subtitle={subtitle} onLogout={handleLogout} />
+          <main className="flex-1 p-4 lg:p-6">{children}</main>
+        </div>
       </div>
-    </div>
+    </NavContext.Provider>
   )
 }
