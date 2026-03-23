@@ -16,12 +16,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
 import { AppButton } from "@/components/app-button"
 import { StatusBadge } from "@/components/status-badge"
+import { EventTypeBadge } from "@/components/event-type-badge"
 import type { VehicleEvent } from "@/lib/data"
-import { eventTypeLabels, eventStatusLabels } from "@/lib/data"
-import { getTypeBadgeVariant } from "@/lib/status-tokens"
+import { eventStatusLabels } from "@/lib/data"
 
 interface RecentEventsTableProps {
   events: VehicleEvent[]
@@ -70,12 +69,7 @@ export function RecentEventsTable({
                     {event.patente}
                   </TableCell>
                   <TableCell className="hidden py-3 sm:table-cell">
-                    <Badge
-                      variant={getTypeBadgeVariant(event.tipo)}
-                      className="text-sm"
-                    >
-                      {eventTypeLabels[event.tipo]}
-                    </Badge>
+                    <EventTypeBadge tipo={event.tipo} className="text-sm" />
                   </TableCell>
                   <TableCell className="py-3">
                     <StatusBadge status={event.estado} variant="event">

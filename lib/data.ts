@@ -58,6 +58,17 @@ export const eventTypeLabels: Record<EventType, string> = {
   conduccion_nocturna: "Conduccion nocturna",
 }
 
+export const eventTypeDescriptions: Record<string, string> = {
+  conductor_inactivo: "La llave pertenece a un conductor dado de baja en el sistema",
+  contacto: "El vehículo se encendió sin presentar ninguna llave",
+  contacto_sin_conductor: "Se detectó contacto pero no se identificó conductor",
+  exceso_velocidad: "El vehículo superó los 90 km/h",
+  llave_desconocida: "La llave detectada tiene un ID ilegible o corrupto",
+  llave_no_registrada: "Se usó una llave que no existe en el sistema RSV",
+  vehiculo_no_identificado: "El sistema no pudo clasificar el evento",
+  no_identificado: "El sistema no pudo clasificar el evento",
+}
+
 export const eventStatusLabels: Record<EventStatus, string> = {
   pendiente: "Pendiente",
   en_revision: "En revision",

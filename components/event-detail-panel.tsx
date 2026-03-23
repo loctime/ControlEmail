@@ -19,14 +19,13 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet"
-import { Badge } from "@/components/ui/badge"
 import { AppButton } from "@/components/app-button"
 import { StatusBadge } from "@/components/status-badge"
+import { EventTypeBadge } from "@/components/event-type-badge"
 import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import type { VehicleEvent } from "@/lib/data"
-import { eventTypeLabels, eventStatusLabels } from "@/lib/data"
-import { getTypeBadgeVariant } from "@/lib/status-tokens"
+import { eventStatusLabels } from "@/lib/data"
 
 interface EventDetailPanelProps {
   event: VehicleEvent | null
@@ -65,9 +64,7 @@ export function EventDetailPanel({
             </AppButton>
           </div>
           <div className="flex items-center gap-2 pt-1">
-            <Badge variant={getTypeBadgeVariant(event.tipo)} className="text-sm">
-              {eventTypeLabels[event.tipo]}
-            </Badge>
+            <EventTypeBadge tipo={event.tipo} className="text-sm" />
             <StatusBadge status={event.estado} variant="event">
               {eventStatusLabels[event.estado]}
             </StatusBadge>

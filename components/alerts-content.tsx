@@ -126,7 +126,7 @@ function MyAlertCard({ alert }: { alert: MyAlertItemDTO }) {
             )}
           </div>
         </div>
-        <Link href={`/vehiculos/${encodeURIComponent(alert.plate)}`}>
+        <Link href="/vehiculos">
           <Button variant="outline" size="sm">
             <ExternalLink className="mr-2 h-4 w-4" />
             Ver vehiculo

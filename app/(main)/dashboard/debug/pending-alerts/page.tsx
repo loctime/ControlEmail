@@ -60,7 +60,7 @@ export default function DebugPendingAlertsPage() {
                       type="button"
                       className="text-xs text-primary underline-offset-4 hover:underline"
                       onClick={() =>
-                        router.push(`/vehiculos/${encodeURIComponent(alert.plate)}`)
+                        router.push(`/vehiculos`)
                       }
                     >
                       Ver vehículo

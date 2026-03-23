@@ -21,12 +21,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
 import { AppButton } from "@/components/app-button"
 import { StatusBadge } from "@/components/status-badge"
+import { EventTypeBadge } from "@/components/event-type-badge"
 import type { VehicleEvent, EventType, EventStatus } from "@/lib/data"
 import { eventTypeLabels, eventStatusLabels } from "@/lib/data"
-import { getTypeBadgeVariant } from "@/lib/status-tokens"
 
 interface EventsContentProps {
   events: VehicleEvent[]
@@ -179,12 +178,7 @@ export function EventsContent({
                         {event.vehiculo}
                       </TableCell>
                       <TableCell className="py-3">
-                        <Badge
-                          variant={getTypeBadgeVariant(event.tipo)}
-                          className="whitespace-nowrap text-sm"
-                        >
-                          {eventTypeLabels[event.tipo]}
-                        </Badge>
+                        <EventTypeBadge tipo={event.tipo} className="whitespace-nowrap text-sm" />
                       </TableCell>
                       <TableCell className="hidden py-3 font-mono text-sm lg:table-cell">
                         {event.velocidad != null && event.limiteVelocidad != null
