@@ -16,11 +16,12 @@ import { cn } from "@/lib/utils"
 import { formatEventDateTime } from "@/lib/ui/datetime"
 import { getVehicleEventsHistory, vehiclesApi } from "@/services/api/vehicles/vehiclesApi"
 import type { VehicleEventItem, VehicleEventsParams } from "@/services/api"
+import { getLastClosedDateKey } from "@/lib/domain/closed-date"
 
 const PAGE_LIMIT = 100
 const MAX_RANGE_DAYS = 366
 
-type DatePreset = "hoy" | "semana" | "mes" | "personalizado"
+type DatePreset = "ultimo" | "semana" | "mes" | "personalizado"
 
 function toDateStr(d: Date): string {
   return d.toISOString().slice(0, 10)
@@ -34,23 +35,23 @@ function getYesterday(): Date {
 }
 
 function getDefaultRange(): { dateFrom: string; dateTo: string } {
-  const yesterday = getYesterday()
-  return { dateFrom: toDateStr(yesterday), dateTo: toDateStr(yesterday) }
+  const lastKey = getLastClosedDateKey()
+  return { dateFrom: lastKey, dateTo: lastKey }
 }
 
 function getRangeForPreset(preset: Exclude<DatePreset, "personalizado">): { dateFrom: string; dateTo: string } {
-  const yesterday = getYesterday()
-  const yesterdayStr = toDateStr(yesterday)
-  if (preset === "hoy") return { dateFrom: yesterdayStr, dateTo: yesterdayStr }
+  const lastKey = getLastClosedDateKey()
+  const lastDate = getYesterday()
+  if (preset === "ultimo") return { dateFrom: lastKey, dateTo: lastKey }
   if (preset === "semana") {
-    const from = new Date(yesterday)
+    const from = new Date(lastDate)
     from.setDate(from.getDate() - 6)
-    return { dateFrom: toDateStr(from), dateTo: yesterdayStr }
+    return { dateFrom: toDateStr(from), dateTo: lastKey }
   }
-  // mes — 30 días hacia atrás desde ayer
-  const from = new Date(yesterday)
+  // mes — 30 días hacia atrás desde el último día disponible
+  const from = new Date(lastDate)
   from.setDate(from.getDate() - 29)
-  return { dateFrom: toDateStr(from), dateTo: yesterdayStr }
+  return { dateFrom: toDateStr(from), dateTo: lastKey }
 }
 
 function daysBetween(from: string, to: string): number {
@@ -194,7 +195,7 @@ function exportToCSV(rows: HistoricoEventRow[], cols: ColFlags, filename: string
 }
 
 const DATE_PRESET_LABELS: Record<DatePreset, string> = {
-  hoy: "Hoy",
+  ultimo: "Último",
   semana: "Última semana",
   mes: "Último mes",
   personalizado: "Personalizado",
@@ -203,7 +204,7 @@ const DATE_PRESET_LABELS: Record<DatePreset, string> = {
 export default function HistoricoPage() {
   const defaultRange = useMemo(() => getDefaultRange(), [])
 
-  const [datePreset, setDatePreset] = useState<DatePreset>("hoy")
+  const [datePreset, setDatePreset] = useState<DatePreset>("ultimo")
   const [dateFrom, setDateFrom] = useState(defaultRange.dateFrom)
   const [dateTo, setDateTo] = useState(defaultRange.dateTo)
   const [dateError, setDateError] = useState<string | null>(null)
@@ -404,7 +405,7 @@ export default function HistoricoPage() {
       <div className="space-y-3">
         {/* Date preset pills */}
         <div className="flex items-center gap-1">
-          {(["hoy", "semana", "mes", "personalizado"] as const).map((preset) => (
+          {(["ultimo", "semana", "mes", "personalizado"] as const).map((preset) => (
             <button
               key={preset}
               onClick={() => handlePreset(preset)}

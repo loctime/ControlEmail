@@ -2,9 +2,10 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { BarChart3, Car, Database, FileClock, Settings } from "lucide-react"
+import { BarChart3, Car, Database, FileClock, LayoutDashboard, Settings } from "lucide-react"
 
 const baseNavItems = [
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/historico", label: "Historico", icon: FileClock },
 ]
 
