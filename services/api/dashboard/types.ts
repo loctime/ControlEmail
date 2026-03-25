@@ -60,6 +60,9 @@ export interface TopSpeedEventDTO {
 /** Enriched per-vehicle data for SuperDashboard (Operational Risk + Admin Alerts) */
 export interface DashboardVehicleDetailDTO {
   plate: string
+  operacion: string | null
+  responsable: string | null
+  lastEventAt: string | null
   excesos: number
   maxSpeed: number | null
   topSpeedEvent: TopSpeedEventDTO | null

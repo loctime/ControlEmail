@@ -30,9 +30,241 @@ import {
   normalizeBusinessDate,
 } from "@/lib/domain/date"
 import { cn } from "@/lib/utils"
-import type { DashboardAggregatedPayload } from "@/services/api/dashboard/types"
+import type { DashboardAggregatedPayload, DashboardVehicleDetailDTO } from "@/services/api/dashboard/types"
 
 type DashboardDatePreset = "day" | "week" | "month" | "year"
+
+// ─── Top Excesos helpers ───────────────────────────────────────────────────────
+
+type TopLimit = 5 | 10 | "todos"
+
+interface TopPlateRow {
+  plate: string
+  operacion: string | null
+  responsable: string | null
+  excesos: number
+  pct: number
+  maxSpeed: number | null
+  lastEventAt: string | null
+}
+
+interface TopOperacionRow {
+  operacion: string
+  excesos: number
+  pct: number
+  plates: number
+  maxSpeed: number | null
+  lastEventAt: string | null
+}
+
+function buildTopByPlate(details: DashboardVehicleDetailDTO[], totalExcesos: number): TopPlateRow[] {
+  return details
+    .filter((v) => v.excesos > 0)
+    .sort((a, b) => b.excesos - a.excesos)
+    .map((v) => ({
+      plate: v.plate,
+      operacion: v.operacion,
+      responsable: v.responsable,
+      excesos: v.excesos,
+      pct: totalExcesos > 0 ? Math.round((v.excesos / totalExcesos) * 100) : 0,
+      maxSpeed: v.maxSpeed,
+      lastEventAt: v.lastEventAt,
+    }))
+}
+
+function buildTopByOperacion(details: DashboardVehicleDetailDTO[], totalExcesos: number): TopOperacionRow[] {
+  const map = new Map<string, { excesos: number; plates: Set<string>; maxSpeed: number | null; lastEventAt: string | null }>()
+  for (const v of details) {
+    if (v.excesos === 0) continue
+    const key = v.operacion ?? "Sin operación"
+    const existing = map.get(key)
+    if (!existing) {
+      map.set(key, { excesos: v.excesos, plates: new Set([v.plate]), maxSpeed: v.maxSpeed, lastEventAt: v.lastEventAt })
+    } else {
+      existing.excesos += v.excesos
+      existing.plates.add(v.plate)
+      if (v.maxSpeed != null && (existing.maxSpeed == null || v.maxSpeed > existing.maxSpeed)) existing.maxSpeed = v.maxSpeed
+      if (v.lastEventAt != null && (existing.lastEventAt == null || v.lastEventAt > existing.lastEventAt)) existing.lastEventAt = v.lastEventAt
+    }
+  }
+  return Array.from(map.entries())
+    .map(([operacion, data]) => ({
+      operacion,
+      excesos: data.excesos,
+      pct: totalExcesos > 0 ? Math.round((data.excesos / totalExcesos) * 100) : 0,
+      plates: data.plates.size,
+      maxSpeed: data.maxSpeed,
+      lastEventAt: data.lastEventAt,
+    }))
+    .sort((a, b) => b.excesos - a.excesos)
+}
+
+function formatLastEvent(iso: string | null): string {
+  if (!iso) return "—"
+  try {
+    const d = new Date(iso)
+    const dd = String(d.getDate()).padStart(2, "0")
+    const mm = String(d.getMonth() + 1).padStart(2, "0")
+    const hh = String(d.getHours()).padStart(2, "0")
+    const min = String(d.getMinutes()).padStart(2, "0")
+    return `${dd}/${mm} ${hh}:${min}`
+  } catch { return "—" }
+}
+
+function applyLimit<T>(rows: T[], limit: TopLimit): T[] {
+  if (limit === "todos") return rows
+  return rows.slice(0, limit)
+}
+
+// ─── TopExcesosTable component ────────────────────────────────────────────────
+
+interface TopExcesosPlateTableProps {
+  rows: TopPlateRow[]
+  limit: TopLimit
+  onLimitChange: (l: TopLimit) => void
+  title: string
+}
+
+function TopExcesosPlateTable({ rows, limit, onLimitChange, title }: TopExcesosPlateTableProps) {
+  const visible = applyLimit(rows, limit)
+  return (
+    <Card className="border-white/5 bg-white/[0.03]">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="text-sm font-semibold text-white/80">{title}</CardTitle>
+          <div className="flex gap-1">
+            {([5, 10, "todos"] as TopLimit[]).map((l) => (
+              <Button
+                key={String(l)}
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "h-6 px-2 text-xs",
+                  limit === l ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70",
+                )}
+                onClick={() => onLimitChange(l)}
+              >
+                {l === "todos" ? "Todos" : `Top ${l}`}
+              </Button>
+            ))}
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {visible.length === 0 ? (
+          <p className="py-4 text-center text-sm text-white/30">Sin excesos en el período</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-white/5 text-left text-white/40">
+                  <th className="pb-2 font-normal">#</th>
+                  <th className="pb-2 font-normal">Patente</th>
+                  <th className="pb-2 font-normal">Operación</th>
+                  <th className="pb-2 font-normal">Responsable</th>
+                  <th className="pb-2 text-right font-normal">Excesos</th>
+                  <th className="pb-2 text-right font-normal">%</th>
+                  <th className="pb-2 text-right font-normal">Vel. máx</th>
+                  <th className="pb-2 text-right font-normal">Último evento</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visible.map((row, i) => (
+                  <tr key={row.plate} className="border-b border-white/[0.04] hover:bg-white/[0.02]">
+                    <td className="py-2 text-white/30">{i + 1}</td>
+                    <td className="py-2 font-mono text-white/90">{row.plate}</td>
+                    <td className="py-2 text-white/60">{row.operacion ?? <span className="text-white/25">—</span>}</td>
+                    <td className="py-2 max-w-[120px] truncate text-white/50" title={row.responsable ?? undefined}>
+                      {row.responsable ?? <span className="text-white/25">—</span>}
+                    </td>
+                    <td className="py-2 text-right tabular-nums text-red-400 font-medium">{row.excesos}</td>
+                    <td className="py-2 text-right tabular-nums text-white/40">{row.pct}%</td>
+                    <td className="py-2 text-right tabular-nums text-white/60">
+                      {row.maxSpeed != null ? `${row.maxSpeed} km/h` : <span className="text-white/25">—</span>}
+                    </td>
+                    <td className="py-2 text-right tabular-nums text-white/40">{formatLastEvent(row.lastEventAt)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+interface TopExcesosOperacionTableProps {
+  rows: TopOperacionRow[]
+  limit: TopLimit
+  onLimitChange: (l: TopLimit) => void
+  title: string
+}
+
+function TopExcesosOperacionTable({ rows, limit, onLimitChange, title }: TopExcesosOperacionTableProps) {
+  const visible = applyLimit(rows, limit)
+  return (
+    <Card className="border-white/5 bg-white/[0.03]">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="text-sm font-semibold text-white/80">{title}</CardTitle>
+          <div className="flex gap-1">
+            {([5, 10, "todos"] as TopLimit[]).map((l) => (
+              <Button
+                key={String(l)}
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "h-6 px-2 text-xs",
+                  limit === l ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70",
+                )}
+                onClick={() => onLimitChange(l)}
+              >
+                {l === "todos" ? "Todos" : `Top ${l}`}
+              </Button>
+            ))}
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {visible.length === 0 ? (
+          <p className="py-4 text-center text-sm text-white/30">Sin excesos en el período</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-white/5 text-left text-white/40">
+                  <th className="pb-2 font-normal">#</th>
+                  <th className="pb-2 font-normal">Operación</th>
+                  <th className="pb-2 text-right font-normal">Excesos</th>
+                  <th className="pb-2 text-right font-normal">%</th>
+                  <th className="pb-2 text-right font-normal">Patentes</th>
+                  <th className="pb-2 text-right font-normal">Vel. máx</th>
+                  <th className="pb-2 text-right font-normal">Último evento</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visible.map((row, i) => (
+                  <tr key={row.operacion} className="border-b border-white/[0.04] hover:bg-white/[0.02]">
+                    <td className="py-2 text-white/30">{i + 1}</td>
+                    <td className="py-2 text-white/80 font-medium">{row.operacion}</td>
+                    <td className="py-2 text-right tabular-nums text-red-400 font-medium">{row.excesos}</td>
+                    <td className="py-2 text-right tabular-nums text-white/40">{row.pct}%</td>
+                    <td className="py-2 text-right tabular-nums text-white/60">{row.plates}</td>
+                    <td className="py-2 text-right tabular-nums text-white/60">
+                      {row.maxSpeed != null ? `${row.maxSpeed} km/h` : <span className="text-white/25">—</span>}
+                    </td>
+                    <td className="py-2 text-right tabular-nums text-white/40">{formatLastEvent(row.lastEventAt)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
 
 const STORAGE_KEY = "dashboard:selectedDate"
 const STORAGE_PRESET_KEY = "dashboard:preset"
@@ -262,6 +494,13 @@ export default function SuperDashboardPage() {
       { label: "Conductor inactivo",   value: kpi.conductor_inactivo, pct: pct(kpi.conductor_inactivo), color: "bg-blue-500/70" },
     ]
   }, [kpi])
+
+  // Top excesos state
+  const [topPlateLimit, setTopPlateLimit] = useState<TopLimit>(5)
+  const [topOpLimit, setTopOpLimit] = useState<TopLimit>(5)
+
+  const topByPlate = useMemo(() => buildTopByPlate(vehicleDetails, kpi.excesos), [vehicleDetails, kpi.excesos])
+  const topByOperacion = useMemo(() => buildTopByOperacion(vehicleDetails, kpi.excesos), [vehicleDetails, kpi.excesos])
 
   // Table rows
   const tableRows = useMemo(() => {
@@ -596,6 +835,29 @@ export default function SuperDashboardPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* SECCIÓN 5 — Top excesos de velocidad */}
+          {kpi.excesos > 0 && (
+            <div className="space-y-4">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-white/60">
+                Top excesos de velocidad
+              </h2>
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                <TopExcesosPlateTable
+                  title="Por patente"
+                  rows={topByPlate}
+                  limit={topPlateLimit}
+                  onLimitChange={setTopPlateLimit}
+                />
+                <TopExcesosOperacionTable
+                  title="Por operación"
+                  rows={topByOperacion}
+                  limit={topOpLimit}
+                  onLimitChange={setTopOpLimit}
+                />
+              </div>
+            </div>
+          )}
 
         </div>
       )}
