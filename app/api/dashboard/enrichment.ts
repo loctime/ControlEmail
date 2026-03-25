@@ -89,10 +89,13 @@ export function mergeVehicleDetails(details: DashboardVehicleDetailDTO[]): Dashb
     if (!best) return d.lastEventAt
     return d.lastEventAt > best ? d.lastEventAt : best
   }, null)
+  // Prefer the most recent day's non-null value — newer docs have correct metadata
+  const operacion = [...details].reverse().find((d) => d.operacion != null)?.operacion ?? null
+  const responsable = [...details].reverse().find((d) => d.responsable != null)?.responsable ?? null
   return {
     plate: first.plate,
-    operacion: first.operacion ?? null,
-    responsable: first.responsable ?? null,
+    operacion,
+    responsable,
     lastEventAt,
     excesos,
     maxSpeed,
