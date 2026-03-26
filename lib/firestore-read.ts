@@ -345,6 +345,7 @@ export interface VehicleDoc {
   plate: string
   brand: string
   model: string
+  operacion: string | null
   lastLocation?: string | null
   lastEventAt?: string
   lastEventId?: string
@@ -577,6 +578,7 @@ export async function listVehicles(): Promise<VehicleDoc[]> {
       plate: String(data.plate ?? id),
       brand: String(data.brand ?? ""),
       model: String(data.model ?? ""),
+      operacion: data.operacion != null ? String(data.operacion) : null,
       lastLocation: data.lastLocation != null ? String(data.lastLocation) : null,
       lastEventAt: data.lastEventAt != null ? String(data.lastEventAt) : undefined,
       lastEventId: data.lastEventId != null ? String(data.lastEventId) : undefined,
@@ -602,6 +604,7 @@ export async function listVehicles(): Promise<VehicleDoc[]> {
           plate,
           brand: "",
           model: "",
+          operacion: null,
           responsables: [],
         })
       }
@@ -640,6 +643,7 @@ export async function getVehicleByPlate(plate: string): Promise<VehicleDoc | nul
     plate: String(data.plate ?? plate),
     brand: String(data.brand ?? ""),
     model: String(data.model ?? ""),
+    operacion: data.operacion != null ? String(data.operacion) : null,
     lastLocation: data.lastLocation != null ? String(data.lastLocation) : null,
     lastEventAt: data.lastEventAt != null ? String(data.lastEventAt) : undefined,
     lastEventId: data.lastEventId != null ? String(data.lastEventId) : undefined,

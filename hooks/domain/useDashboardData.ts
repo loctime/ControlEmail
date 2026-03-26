@@ -84,33 +84,20 @@ export function useDashboardData(
           dailyBreakdown: null,
         }
       }
-      let payload: DashboardAggregatedPayload
-      if (mode === "day") {
-        payload = await dashboardApi.getDay(dateKey)
-      } else if (mode === "week") {
-        payload = await dashboardApi.getWeek(dateKey)
-      } else if (mode === "month") {
-        payload = await dashboardApi.getMonth(param)
-      } else {
-        payload = await dashboardApi.getYear(param)
-      }
-      const stats = normalizeStats(payload)
-      const riskVehicles = Array.isArray(payload.vehicles) ? payload.vehicles : []
-      const pendingAlerts = Array.isArray(payload.pendingAlerts)
-        ? payload.pendingAlerts.filter((a) => !a.alertSent)
-        : []
-      const consistency = payload.consistency ?? null
-      const vehicleDetails = Array.isArray(payload.vehicleDetails) ? payload.vehicleDetails : []
-      const adminTotals = payload.adminTotals ?? null
-      const dailyBreakdown = Array.isArray(payload.dailyBreakdown) ? payload.dailyBreakdown : null
+
+      const payload = await dashboardApi.getEnriched(mode, param)
+      console.log(`[useDashboardData] mode=${mode}, payload.dailyBreakdown=`, payload.dailyBreakdown)
+
       return {
-        stats,
-        riskVehicles,
-        pendingAlerts,
-        consistency,
-        vehicleDetails,
-        adminTotals,
-        dailyBreakdown,
+        stats: normalizeStats(payload),
+        riskVehicles: Array.isArray(payload.vehicles) ? payload.vehicles : [],
+        pendingAlerts: Array.isArray(payload.pendingAlerts)
+          ? payload.pendingAlerts.filter((a) => !a.alertSent)
+          : [],
+        consistency: payload.consistency ?? null,
+        vehicleDetails: Array.isArray(payload.vehicleDetails) ? payload.vehicleDetails : [],
+        adminTotals: payload.adminTotals ?? null,
+        dailyBreakdown: Array.isArray(payload.dailyBreakdown) ? payload.dailyBreakdown : null,
       }
     },
     enabled: !!dateKey && !!param,

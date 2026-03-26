@@ -32,6 +32,9 @@ export function buildVehicleDetailFromVehicle(v: DailyAlertVehicle): DashboardVe
   const summary = v.summary ?? {}
   return {
     plate: v.plate,
+    operacion: v.operacion ?? v.operationName ?? null,
+    responsable: Array.isArray(v.responsables) && v.responsables.length > 0 ? v.responsables[0] : null,
+    lastEventAt: v.lastEventAt ?? null,
     excesos: summary.excesos ?? 0,
     maxSpeed: getMaxSpeed(v),
     topSpeedEvent: getTopSpeedEvent(v),
@@ -81,8 +84,18 @@ export function mergeVehicleDetails(details: DashboardVehicleDetailDTO[]): Dashb
   for (const d of details) {
     for (const name of d.speedingDrivers) driverSet.add(name)
   }
+  const lastEventAt = details.reduce<string | null>((best, d) => {
+    if (!d.lastEventAt) return best
+    if (!best) return d.lastEventAt
+    return d.lastEventAt > best ? d.lastEventAt : best
+  }, null)
+  const operacion = first.operacion ?? null
+  const responsable = first.responsable ?? null
   return {
     plate: first.plate,
+    operacion,
+    responsable,
+    lastEventAt,
     excesos,
     maxSpeed,
     topSpeedEvent,

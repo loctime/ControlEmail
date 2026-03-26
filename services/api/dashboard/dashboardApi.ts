@@ -9,6 +9,13 @@ import type {
 } from "@/services/api/dashboard/types"
 
 export const dashboardApi = {
+  /** Unified enriched endpoint — returns operacion/responsable from vehicle master */
+  getEnriched: (period: "day" | "week" | "month" | "year", date: string) =>
+    apiClient.get<DashboardAggregatedPayload>(
+      `/api/dashboard/enriched?period=${period}&date=${encodeURIComponent(date)}`,
+      { authMode: "firebase" },
+    ),
+
   /** ControlFile backend: metrics/daily — 1 request, 1 Firestore read */
   getDay: (date: string) =>
     apiClient.get<DashboardAggregatedPayload>(
