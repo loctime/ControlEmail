@@ -42,6 +42,16 @@ export async function emailApiFetch<T>(url: string, options: RequestInit = {}): 
 
   const token = await user.getIdToken()
   const fullUrl = withBaseUrl(url)
+  const isAuditDashboardEnriched =
+    url.startsWith("/api/dashboard/") &&
+    (url.startsWith("/api/dashboard/day") ||
+      url.startsWith("/api/dashboard/week") ||
+      url.startsWith("/api/dashboard/month") ||
+      url.startsWith("/api/dashboard/year"))
+
+  if (isAuditDashboardEnriched) {
+    console.log("[AUDIT-FRONT] dashboardApi fetch URL", fullUrl)
+  }
 
   const headers: HeadersInit = {
     Authorization: `Bearer ${token}`,
@@ -56,6 +66,20 @@ export async function emailApiFetch<T>(url: string, options: RequestInit = {}): 
     ...options,
     headers,
   })
+
+  if (isAuditDashboardEnriched) {
+    let body: unknown = null
+    try {
+      const text = await response.clone().text()
+      if (text) {
+        try { body = JSON.parse(text) } catch { body = text }
+      }
+    } catch {
+      body = null
+    }
+
+    console.log("[AUDIT-FRONT] dashboardApi fetch response", { status: response.status, body })
+  }
 
   const data = await parseResponseData<T>(response)
 

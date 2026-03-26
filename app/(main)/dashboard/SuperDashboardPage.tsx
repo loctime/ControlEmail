@@ -197,6 +197,23 @@ export default function SuperDashboardPage() {
   const { vehicleDetails, riskVehicles, dailyBreakdown, loading, error, refetch } =
     useDashboardData(selectedDate, preset)
 
+  useEffect(() => {
+    if (!selectedDate) return
+    console.log("[AUDIT-FRONT] SuperDashboardPage query trigger", { preset, selectedDate })
+  }, [preset, selectedDate])
+
+  useEffect(() => {
+    if (!dailyBreakdown) return
+    console.log("[AUDIT-FRONT] SuperDashboardPage dailyBreakdown", {
+      length: dailyBreakdown.length,
+      first2: dailyBreakdown.slice(0, 2),
+    })
+  }, [dailyBreakdown])
+
+  useEffect(() => {
+    console.log("[AUDIT-FRONT] SuperDashboardPage vehicleDetails length", vehicleDetails.length)
+  }, [vehicleDetails])
+
   // Previous period — compute param
   const prevApiParam = useMemo(() => {
     if (!selectedDate) return undefined
