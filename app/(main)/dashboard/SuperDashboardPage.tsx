@@ -1022,11 +1022,23 @@ export default function SuperDashboardPage() {
             {/* Columna izquierda (60%): gráfico de barras */}
             <Card className="border-white/5 bg-white/[0.03] lg:col-span-3">
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold text-white/80">
-                  {preset === "day" && "Excesos de velocidad por patente"}
-                  {preset === "week" && "Excesos de velocidad por día"}
-                  {preset === "month" && "Excesos de velocidad por semana"}
-                  {preset === "year" && "Excesos de velocidad por mes"}
+                <CardTitle className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm font-semibold text-white/80">
+                  <span>
+                    {preset === "day" && "Excesos de velocidad por patente"}
+                    {preset === "week" && "Excesos de velocidad por día"}
+                    {preset === "month" && "Excesos de velocidad por semana"}
+                    {preset === "year" && "Excesos de velocidad por mes"}
+                  </span>
+                  {preset === "week" && (
+                    <span className="text-xs font-normal text-white/45">
+                      7 días atrás desde el último dato
+                    </span>
+                  )}
+                  {preset === "month" && (
+                    <span className="text-xs font-normal text-white/45">
+                      Mes calendario según la fecha elegida
+                    </span>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent>
