@@ -62,6 +62,8 @@ export interface DashboardVehicleDetailDTO {
   plate: string
   operacion: string | null
   responsable: string | null
+  /** Todos los responsables del vehículo; si falta, usar solo `responsable`. */
+  responsables?: string[]
   lastEventAt: string | null
   excesos: number
   maxSpeed: number | null

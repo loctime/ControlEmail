@@ -27,13 +27,38 @@ function getMaxSpeed(v: DailyAlertVehicle): number | null {
   return Math.max(...incidents.map((i) => i.maxSpeed!))
 }
 
+function mergeResponsablesFromDetails(details: DashboardVehicleDetailDTO[]): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const d of details) {
+    const list =
+      d.responsables != null && d.responsables.length > 0
+        ? d.responsables
+        : d.responsable
+          ? [d.responsable]
+          : []
+    for (const r of list) {
+      const trimmed = String(r).trim()
+      const key = trimmed.toLowerCase()
+      if (!key || seen.has(key)) continue
+      seen.add(key)
+      out.push(trimmed)
+    }
+  }
+  return out
+}
+
 /** Build one DashboardVehicleDetailDTO from a single-day vehicle. */
 export function buildVehicleDetailFromVehicle(v: DailyAlertVehicle): DashboardVehicleDetailDTO {
   const summary = v.summary ?? {}
+  const responsables = Array.isArray(v.responsables)
+    ? v.responsables.map((x) => String(x).trim()).filter(Boolean)
+    : []
   return {
     plate: v.plate,
     operacion: v.operacion ?? v.operationName ?? null,
-    responsable: Array.isArray(v.responsables) && v.responsables.length > 0 ? v.responsables[0] : null,
+    responsable: responsables[0] ?? null,
+    responsables: responsables.length > 0 ? responsables : undefined,
     lastEventAt: v.lastEventAt ?? null,
     excesos: summary.excesos ?? 0,
     maxSpeed: getMaxSpeed(v),
@@ -90,11 +115,13 @@ export function mergeVehicleDetails(details: DashboardVehicleDetailDTO[]): Dashb
     return d.lastEventAt > best ? d.lastEventAt : best
   }, null)
   const operacion = first.operacion ?? null
-  const responsable = first.responsable ?? null
+  const mergedResp = mergeResponsablesFromDetails(details)
+  const responsable = mergedResp[0] ?? null
   return {
     plate: first.plate,
     operacion,
     responsable,
+    responsables: mergedResp.length > 0 ? mergedResp : undefined,
     lastEventAt,
     excesos,
     maxSpeed,

@@ -50,6 +50,7 @@ interface TopPlateRow {
 
 interface TopOperacionRow {
   operacion: string
+  responsables: string[]
   excesos: number
   pct: number
   plates: number
@@ -72,24 +73,62 @@ function buildTopByPlate(details: DashboardVehicleDetailDTO[], totalExcesos: num
     }))
 }
 
+function vehicleResponsablesList(v: DashboardVehicleDetailDTO): string[] {
+  if (v.responsables != null && v.responsables.length > 0) {
+    return v.responsables.map((r) => String(r).trim()).filter(Boolean)
+  }
+  return v.responsable ? [String(v.responsable).trim()].filter(Boolean) : []
+}
+
+type OperacionAgg = {
+  excesos: number
+  plates: Set<string>
+  maxSpeed: number | null
+  lastEventAt: string | null
+  responsableSeen: Set<string>
+  responsables: string[]
+}
+
+function appendResponsablesUnique(agg: OperacionAgg, names: string[]) {
+  for (const raw of names) {
+    const trimmed = String(raw).trim()
+    const key = trimmed.toLowerCase()
+    if (!key || agg.responsableSeen.has(key)) continue
+    agg.responsableSeen.add(key)
+    agg.responsables.push(trimmed)
+  }
+}
+
 function buildTopByOperacion(details: DashboardVehicleDetailDTO[], totalExcesos: number): TopOperacionRow[] {
-  const map = new Map<string, { excesos: number; plates: Set<string>; maxSpeed: number | null; lastEventAt: string | null }>()
+  const map = new Map<string, OperacionAgg>()
   for (const v of details) {
     if (v.excesos === 0) continue
     const key = v.operacion ?? "Sin operación"
-    const existing = map.get(key)
-    if (!existing) {
-      map.set(key, { excesos: v.excesos, plates: new Set([v.plate]), maxSpeed: v.maxSpeed, lastEventAt: v.lastEventAt })
+    const names = vehicleResponsablesList(v)
+    let agg = map.get(key)
+    if (!agg) {
+      agg = {
+        excesos: v.excesos,
+        plates: new Set([v.plate]),
+        maxSpeed: v.maxSpeed,
+        lastEventAt: v.lastEventAt,
+        responsableSeen: new Set(),
+        responsables: [],
+      }
+      appendResponsablesUnique(agg, names)
+      map.set(key, agg)
     } else {
-      existing.excesos += v.excesos
-      existing.plates.add(v.plate)
-      if (v.maxSpeed != null && (existing.maxSpeed == null || v.maxSpeed > existing.maxSpeed)) existing.maxSpeed = v.maxSpeed
-      if (v.lastEventAt != null && (existing.lastEventAt == null || v.lastEventAt > existing.lastEventAt)) existing.lastEventAt = v.lastEventAt
+      agg.excesos += v.excesos
+      agg.plates.add(v.plate)
+      if (v.maxSpeed != null && (agg.maxSpeed == null || v.maxSpeed > agg.maxSpeed)) agg.maxSpeed = v.maxSpeed
+      if (v.lastEventAt != null && (agg.lastEventAt == null || v.lastEventAt > agg.lastEventAt)) agg.lastEventAt = v.lastEventAt
+      appendResponsablesUnique(agg, names)
     }
   }
   return Array.from(map.entries())
     .map(([operacion, data]) => ({
       operacion,
+      responsables: data.responsables,
       excesos: data.excesos,
       pct: totalExcesos > 0 ? Math.round((data.excesos / totalExcesos) * 100) : 0,
       plates: data.plates.size,
@@ -109,6 +148,37 @@ function formatLastEvent(iso: string | null): string {
     const min = String(d.getMinutes()).padStart(2, "0")
     return `${dd}/${mm} ${hh}:${min}`
   } catch { return "—" }
+}
+
+/** Muestra solo el usuario antes de @ si parece email; si no, el texto tal cual. */
+function responsableShortLabel(value: string | null): string | null {
+  if (!value) return null
+  const t = value.trim()
+  const at = t.indexOf("@")
+  if (at > 0) return t.slice(0, at)
+  return t
+}
+
+function OperacionResponsablesCell({ emails }: { emails: string[] }) {
+  if (emails.length === 0) {
+    return <span className="text-white/25">—</span>
+  }
+  return (
+    <div className="flex max-w-[min(280px,45vw)] flex-wrap gap-1.5">
+      {emails.map((email, idx) => {
+        const label = responsableShortLabel(email) ?? email
+        return (
+          <span
+            key={`${email}-${idx}`}
+            className="inline-flex max-w-full rounded-md bg-white/[0.06] px-2 py-1 text-left text-[10px] leading-snug text-white/65"
+            title={email}
+          >
+            <span className="min-w-0 break-words">{label}</span>
+          </span>
+        )
+      })}
+    </div>
+  )
 }
 
 function applyLimit<T>(rows: T[], limit: TopLimit): T[] {
@@ -175,7 +245,7 @@ function TopExcesosPlateTable({ rows, limit, onLimitChange, title }: TopExcesosP
                     <td className="py-2 font-mono text-white/90">{row.plate}</td>
                     <td className="py-2 text-white/60">{row.operacion ?? <span className="text-white/25">—</span>}</td>
                     <td className="py-2 max-w-[120px] truncate text-white/50" title={row.responsable ?? undefined}>
-                      {row.responsable ?? <span className="text-white/25">—</span>}
+                      {responsableShortLabel(row.responsable) ?? <span className="text-white/25">—</span>}
                     </td>
                     <td className="py-2 text-right tabular-nums text-red-400 font-medium">{row.excesos}</td>
                     <td className="py-2 text-right tabular-nums text-white/40">{row.pct}%</td>
@@ -194,6 +264,8 @@ function TopExcesosPlateTable({ rows, limit, onLimitChange, title }: TopExcesosP
   )
 }
 
+type OperacionViewMode = "table" | "cards"
+
 interface TopExcesosOperacionTableProps {
   rows: TopOperacionRow[]
   limit: TopLimit
@@ -202,63 +274,232 @@ interface TopExcesosOperacionTableProps {
 }
 
 function TopExcesosOperacionTable({ rows, limit, onLimitChange, title }: TopExcesosOperacionTableProps) {
+  const [viewMode, setViewMode] = useState<OperacionViewMode>("table")
   const visible = applyLimit(rows, limit)
+
+  function speedClass(speed: number | null): string {
+    if (!speed) return ""
+    if (speed >= 130) return "bg-red-500/20 text-red-400"
+    if (speed >= 110) return "bg-yellow-500/20 text-yellow-400"
+    return "bg-green-500/20 text-green-400"
+  }
+
+  const deltaEl = (curr: number, prev: number | undefined) => {
+    if (prev === undefined) return null
+    const diff = curr - prev
+    if (diff === 0) return <span className="text-[10px] text-white/30">= sin cambio</span>
+    if (diff > 0) return <span className="text-[10px] text-red-400">+{diff} vs ant.</span>
+    return <span className="text-[10px] text-green-400">{diff} vs ant.</span>
+  }
+
+  const CARD_ACCENTS = ["border-t-red-500/60", "border-t-yellow-500/60", "border-t-blue-500/60", "border-t-green-500/60"]
+  const AVATAR_COLORS = [
+    "bg-blue-500/20 text-blue-300",
+    "bg-teal-500/20 text-teal-300",
+    "bg-amber-500/20 text-amber-300",
+    "bg-pink-500/20 text-pink-300",
+  ]
+
+  function initials(name: string): string {
+    const parts = name.split(/[.\s_-]/).filter(Boolean)
+    if (parts.length >= 2) return (parts[0]![0]! + parts[1]![0]!).toUpperCase()
+    return name.slice(0, 2).toUpperCase()
+  }
+
   return (
     <Card className="border-white/5 bg-white/[0.03]">
       <CardHeader className="pb-3">
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle className="text-sm font-semibold text-white/80">{title}</CardTitle>
-          <div className="flex gap-1">
-            {([5, 10, "todos"] as TopLimit[]).map((l) => (
-              <Button
-                key={String(l)}
-                variant="ghost"
-                size="sm"
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex rounded-md border border-white/10 bg-white/[0.04] p-0.5">
+              <button
+                type="button"
+                onClick={() => setViewMode("table")}
                 className={cn(
-                  "h-6 px-2 text-xs",
-                  limit === l ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70",
+                  "h-6 rounded px-2.5 text-[11px] font-medium transition-colors",
+                  viewMode === "table" ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70",
                 )}
-                onClick={() => onLimitChange(l)}
               >
-                {l === "todos" ? "Todos" : `Top ${l}`}
-              </Button>
-            ))}
+                Tabla
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("cards")}
+                className={cn(
+                  "h-6 rounded px-2.5 text-[11px] font-medium transition-colors",
+                  viewMode === "cards" ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70",
+                )}
+              >
+                Cards
+              </button>
+            </div>
+            <div className="flex gap-1">
+              {([5, 10, "todos"] as TopLimit[]).map((l) => (
+                <Button
+                  key={String(l)}
+                  variant="ghost"
+                  size="sm"
+                  className={cn(
+                    "h-6 px-2 text-xs",
+                    limit === l ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70",
+                  )}
+                  onClick={() => onLimitChange(l)}
+                >
+                  {l === "todos" ? "Todos" : `Top ${l}`}
+                </Button>
+              ))}
+            </div>
           </div>
         </div>
       </CardHeader>
+
       <CardContent>
         {visible.length === 0 ? (
           <p className="py-4 text-center text-sm text-white/30">Sin excesos en el período</p>
-        ) : (
+        ) : viewMode === "table" ? (
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-white/5 text-left text-white/40">
-                  <th className="pb-2 font-normal">#</th>
-                  <th className="pb-2 font-normal">Operación</th>
-                  <th className="pb-2 text-right font-normal">Excesos</th>
-                  <th className="pb-2 text-right font-normal">%</th>
-                  <th className="pb-2 text-right font-normal">Patentes</th>
-                  <th className="pb-2 text-right font-normal">Vel. máx</th>
-                  <th className="pb-2 text-right font-normal">Último evento</th>
+                  <th className="pb-2 align-bottom font-normal">#</th>
+                  <th className="pb-2 align-bottom font-normal">Operación</th>
+                  <th className="pb-2 align-bottom font-normal">Responsables</th>
+                  <th className="pb-2 align-bottom text-right font-normal">Excesos</th>
+                  <th className="pb-2 align-bottom text-right font-normal">%</th>
+                  <th className="pb-2 align-bottom text-right font-normal">Patentes</th>
+                  <th className="pb-2 align-bottom text-right font-normal">Vel. máx</th>
+                  <th className="pb-2 align-bottom text-right font-normal">Último evento</th>
                 </tr>
               </thead>
               <tbody>
                 {visible.map((row, i) => (
                   <tr key={row.operacion} className="border-b border-white/[0.04] hover:bg-white/[0.02]">
-                    <td className="py-2 text-white/30">{i + 1}</td>
-                    <td className="py-2 text-white/80 font-medium">{row.operacion}</td>
-                    <td className="py-2 text-right tabular-nums text-red-400 font-medium">{row.excesos}</td>
-                    <td className="py-2 text-right tabular-nums text-white/40">{row.pct}%</td>
-                    <td className="py-2 text-right tabular-nums text-white/60">{row.plates}</td>
-                    <td className="py-2 text-right tabular-nums text-white/60">
-                      {row.maxSpeed != null ? `${row.maxSpeed} km/h` : <span className="text-white/25">—</span>}
+                    <td className="py-3 align-top text-white/30">{i + 1}</td>
+                    <td className="py-3 align-top">
+                      <div className="font-medium text-white/80">{row.operacion}</div>
+                      <div className="mt-1">{deltaEl(row.excesos, undefined)}</div>
                     </td>
-                    <td className="py-2 text-right tabular-nums text-white/40">{formatLastEvent(row.lastEventAt)}</td>
+                    <td className="py-3 align-top">
+                      <OperacionResponsablesCell emails={row.responsables} />
+                    </td>
+                    <td className="py-3 align-top text-right">
+                      <div className="text-sm font-medium tabular-nums text-red-400">{row.excesos}</div>
+                      <div className="mt-1.5 ml-auto h-1 w-12 overflow-hidden rounded-full bg-white/[0.06]">
+                        <div
+                          className="h-full rounded-full bg-red-500/60"
+                          style={{ width: `${Math.max(row.pct, row.excesos > 0 ? 4 : 0)}%` }}
+                        />
+                      </div>
+                    </td>
+                    <td className="py-3 align-top text-right tabular-nums text-white/40">{row.pct}%</td>
+                    <td className="py-3 align-top text-right tabular-nums text-white/60">{row.plates}</td>
+                    <td className="py-3 align-top text-right">
+                      {row.maxSpeed != null ? (
+                        <span
+                          className={cn(
+                            "inline-block rounded px-2 py-0.5 text-xs font-medium tabular-nums",
+                            speedClass(row.maxSpeed),
+                          )}
+                        >
+                          {row.maxSpeed} km/h
+                        </span>
+                      ) : (
+                        <span className="text-white/25">—</span>
+                      )}
+                    </td>
+                    <td className="py-3 align-top text-right tabular-nums text-white/40">{formatLastEvent(row.lastEventAt)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {visible.map((row, i) => (
+              <div
+                key={row.operacion}
+                className={cn(
+                  "rounded-lg border border-white/[0.06] bg-white/[0.03] p-4 border-t-2",
+                  CARD_ACCENTS[i % CARD_ACCENTS.length],
+                )}
+              >
+                <div className="mb-3 flex items-start justify-between gap-2">
+                  <div>
+                    <div className="text-sm font-medium text-white/85">{row.operacion}</div>
+                    <div className="mt-0.5 text-[10px] text-white/35">#{i + 1} en el ranking</div>
+                  </div>
+                  {row.maxSpeed != null && (
+                    <span
+                      className={cn(
+                        "flex-shrink-0 rounded px-2 py-0.5 text-xs font-medium tabular-nums",
+                        speedClass(row.maxSpeed),
+                      )}
+                    >
+                      {row.maxSpeed} km/h
+                    </span>
+                  )}
+                </div>
+
+                <div className="mb-3 grid grid-cols-3 gap-2">
+                  {[
+                    { label: "Excesos", value: row.excesos, accent: "text-red-400" },
+                    { label: "% total", value: `${row.pct}%`, accent: "text-white/80" },
+                    { label: "Patentes", value: row.plates, accent: "text-white/80" },
+                  ].map(({ label, value, accent }) => (
+                    <div key={label} className="rounded-md bg-white/[0.04] p-2 text-center">
+                      <div className="mb-1 text-[10px] text-white/35">{label}</div>
+                      <div className={cn("text-base font-medium leading-none tabular-nums", accent)}>{value}</div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mb-3">
+                  <div className="h-1 w-full overflow-hidden rounded-full bg-white/[0.06]">
+                    <div
+                      className="h-full rounded-full bg-red-500/50 transition-all"
+                      style={{ width: `${Math.max(row.pct, row.excesos > 0 ? 2 : 0)}%` }}
+                    />
+                  </div>
+                </div>
+
+                {row.responsables.length > 0 && (
+                  <div className="border-t border-white/[0.05] pt-3">
+                    <div className="mb-2 text-[10px] font-medium uppercase tracking-wider text-white/30">
+                      Responsables
+                    </div>
+                    <div className="space-y-1.5">
+                      {row.responsables.slice(0, 3).map((email, idx) => {
+                        const label = responsableShortLabel(email) ?? email
+                        return (
+                          <div key={`${email}-${idx}`} className="flex items-center gap-2">
+                            <span className="w-3 text-[10px] text-white/25">{idx + 1}</span>
+                            <div
+                              className={cn(
+                                "flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full text-[9px] font-medium",
+                                AVATAR_COLORS[idx % AVATAR_COLORS.length],
+                              )}
+                            >
+                              {initials(label)}
+                            </div>
+                            <span className="min-w-0 flex-1 truncate text-[11px] text-white/60" title={email}>
+                              {label}
+                            </span>
+                          </div>
+                        )
+                      })}
+                      {row.responsables.length > 3 && (
+                        <div className="pl-5 text-[10px] text-white/25">+{row.responsables.length - 3} más</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <div className="mt-3 flex items-center justify-between border-t border-white/[0.05] pt-2">
+                  <span className="text-[10px] text-white/25">Último: {formatLastEvent(row.lastEventAt)}</span>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </CardContent>
