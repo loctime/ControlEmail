@@ -13,33 +13,7 @@ import type {
   MyStatsDTO,
 } from "@/services/api/dashboard/types"
 import type { DailyConsistencyDTO } from "@/services/api/quality/types"
-import type { VehicleMetadataDTO } from "@/app/api/vehicles/metadata/route"
 import { queryKeys } from "@/lib/query/queryKeys"
-
-async function fetchVehicleMetadata(plates: string[]): Promise<Map<string, VehicleMetadataDTO>> {
-  if (plates.length === 0) return new Map()
-  const qs = plates.join(",")
-  const res = await fetch(`/api/vehicles/metadata?plates=${encodeURIComponent(qs)}`)
-  if (!res.ok) return new Map()
-  const json = (await res.json()) as { metadata: VehicleMetadataDTO[] }
-  return new Map(json.metadata.map((m) => [m.plate, m]))
-}
-
-function enrichWithMetadata(
-  details: DashboardVehicleDetailDTO[],
-  metaMap: Map<string, VehicleMetadataDTO>,
-): DashboardVehicleDetailDTO[] {
-  if (metaMap.size === 0) return details
-  return details.map((v) => {
-    const meta = metaMap.get(v.plate)
-    if (!meta) return v
-    return {
-      ...v,
-      operacion: meta.operacion ?? v.operacion,
-      responsable: meta.responsable ?? v.responsable,
-    }
-  })
-}
 
 const STALE_TIME_MS = 5 * 60 * 1000
 
@@ -110,39 +84,19 @@ export function useDashboardData(
           dailyBreakdown: null,
         }
       }
-      let payload: DashboardAggregatedPayload
-      if (mode === "day") {
-        payload = await dashboardApi.getDay(dateKey)
-      } else if (mode === "week") {
-        payload = await dashboardApi.getWeek(dateKey)
-      } else if (mode === "month") {
-        payload = await dashboardApi.getMonth(param)
-      } else {
-        payload = await dashboardApi.getYear(param)
-      }
-      const stats = normalizeStats(payload)
-      const riskVehicles = Array.isArray(payload.vehicles) ? payload.vehicles : []
-      const pendingAlerts = Array.isArray(payload.pendingAlerts)
-        ? payload.pendingAlerts.filter((a) => !a.alertSent)
-        : []
-      const consistency = payload.consistency ?? null
-      const rawDetails = Array.isArray(payload.vehicleDetails) ? payload.vehicleDetails : []
-      const adminTotals = payload.adminTotals ?? null
-      const dailyBreakdown = Array.isArray(payload.dailyBreakdown) ? payload.dailyBreakdown : null
 
-      // Enrich operacion + responsable from vehicle master (always up-to-date)
-      const plates = rawDetails.map((v) => v.plate)
-      const metaMap = await fetchVehicleMetadata(plates)
-      const vehicleDetails = enrichWithMetadata(rawDetails, metaMap)
+      const payload = await dashboardApi.getEnriched(mode, param)
 
       return {
-        stats,
-        riskVehicles,
-        pendingAlerts,
-        consistency,
-        vehicleDetails,
-        adminTotals,
-        dailyBreakdown,
+        stats: normalizeStats(payload),
+        riskVehicles: Array.isArray(payload.vehicles) ? payload.vehicles : [],
+        pendingAlerts: Array.isArray(payload.pendingAlerts)
+          ? payload.pendingAlerts.filter((a) => !a.alertSent)
+          : [],
+        consistency: payload.consistency ?? null,
+        vehicleDetails: Array.isArray(payload.vehicleDetails) ? payload.vehicleDetails : [],
+        adminTotals: payload.adminTotals ?? null,
+        dailyBreakdown: Array.isArray(payload.dailyBreakdown) ? payload.dailyBreakdown : null,
       }
     },
     enabled: !!dateKey && !!param,
