@@ -16,33 +16,17 @@ export const dashboardApi = {
       { authMode: "firebase" },
     ),
 
-  /** ControlFile backend: metrics/daily — 1 request, 1 Firestore read */
-  getDay: (date: string) =>
-    apiClient.get<DashboardAggregatedPayload>(
-      `/api/dashboard/day?date=${encodeURIComponent(date)}`,
-      { authMode: "firebase" },
-    ),
+  /** Enriched: day — expects YYYY-MM-DD */
+  getDay: (dateKey: string) => dashboardApi.getEnriched("day", dateKey),
 
-  /** ControlFile backend: metrics/week — 7 days ending on date */
-  getWeek: (date: string) =>
-    apiClient.get<DashboardAggregatedPayload>(
-      `/api/dashboard/week?date=${encodeURIComponent(date)}`,
-      { authMode: "firebase" },
-    ),
+  /** Enriched: week — expects YYYY-MM-DD */
+  getWeek: (dateKey: string) => dashboardApi.getEnriched("week", dateKey),
 
-  /** ControlFile backend: metrics/monthly — 1 request, 1 Firestore read */
-  getMonth: (month: string) =>
-    apiClient.get<DashboardAggregatedPayload>(
-      `/api/dashboard/month?month=${encodeURIComponent(month)}`,
-      { authMode: "firebase" },
-    ),
+  /** Enriched: month — expects YYYY-MM */
+  getMonth: (dateKeyOrMonth: string) => dashboardApi.getEnriched("month", dateKeyOrMonth.slice(0, 7)),
 
-  /** ControlFile backend: metrics/yearly — 1 request, 1 Firestore read */
-  getYear: (year: string) =>
-    apiClient.get<DashboardAggregatedPayload>(
-      `/api/dashboard/year?year=${encodeURIComponent(year)}`,
-      { authMode: "firebase" },
-    ),
+  /** Enriched: year — expects YYYY */
+  getYear: (dateKeyOrYear: string) => dashboardApi.getEnriched("year", dateKeyOrYear.slice(0, 4)),
 
   myStats: (date: string) =>
     apiClient.get<MyStatsDTO>(`/api/email/my-stats?date=${encodeURIComponent(date)}`),

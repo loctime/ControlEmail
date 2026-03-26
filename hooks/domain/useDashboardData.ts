@@ -86,7 +86,6 @@ export function useDashboardData(
       }
 
       const payload = await dashboardApi.getEnriched(mode, param)
-      console.log(`[useDashboardData] mode=${mode}, payload.dailyBreakdown=`, payload.dailyBreakdown)
 
       return {
         stats: normalizeStats(payload),
@@ -97,7 +96,9 @@ export function useDashboardData(
         consistency: payload.consistency ?? null,
         vehicleDetails: Array.isArray(payload.vehicleDetails) ? payload.vehicleDetails : [],
         adminTotals: payload.adminTotals ?? null,
-        dailyBreakdown: Array.isArray(payload.dailyBreakdown) ? payload.dailyBreakdown : null,
+        dailyBreakdown: Array.isArray(payload.dailyBreakdown)
+          ? payload.dailyBreakdown.map((d) => ({ date: d.date, totalExcessEvents: d.totalExcessEvents }))
+          : null,
       }
     },
     enabled: !!dateKey && !!param,
