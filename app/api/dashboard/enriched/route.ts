@@ -32,11 +32,22 @@ async function enrichVehicleDetails(
       try {
         const doc = await getVehicleByPlate(v.plate)
         if (!doc) return v
-        return {
+        const docResp = Array.isArray(doc.responsables)
+          ? doc.responsables.map((x) => String(x).trim()).filter(Boolean)
+          : []
+        const base = {
           ...v,
           operacion: doc.operacion ?? v.operacion,
-          responsable: doc.responsables?.[0] ?? v.responsable,
+          responsable: docResp[0] ?? v.responsable,
         }
+        if (docResp.length > 0) {
+          return {
+            ...base,
+            responsables: docResp,
+            responsablesNormalized: docResp.map((e) => e.toLowerCase()),
+          }
+        }
+        return base
       } catch {
         return v
       }

@@ -74,10 +74,13 @@ function buildTopByPlate(details: DashboardVehicleDetailDTO[], totalExcesos: num
 }
 
 function vehicleResponsablesList(v: DashboardVehicleDetailDTO): string[] {
-  if (v.responsables != null && v.responsables.length > 0) {
+  if (v.responsablesNormalized && v.responsablesNormalized.length > 0) {
+    return v.responsablesNormalized.map((r) => String(r).trim()).filter(Boolean)
+  }
+  if (v.responsables && v.responsables.length > 0) {
     return v.responsables.map((r) => String(r).trim()).filter(Boolean)
   }
-  return v.responsable ? [String(v.responsable).trim()].filter(Boolean) : []
+  return v.responsable ? [String(v.responsable).trim()] : []
 }
 
 type OperacionAgg = {
