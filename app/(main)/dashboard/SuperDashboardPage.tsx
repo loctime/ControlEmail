@@ -476,6 +476,7 @@ export default function SuperDashboardPage() {
 
   // Bar chart data
   const chartData = useMemo(() => {
+    console.log(`[Chart] preset=${preset}, dailyBreakdown length=${dailyBreakdown?.length ?? "null"}, vehicleDetails=${vehicleDetails.length}`)
     // Preset day: mostrar top 10 patentes con más excesos
     if (preset === "day") {
       return vehicleDetails
