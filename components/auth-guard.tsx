@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { usePathname, useRouter } from "next/navigation"
-import { onIdTokenChanged } from "firebase/auth"
+import { onAuthStateChanged, onIdTokenChanged } from "firebase/auth"
 import { auth } from "@/lib/firebase-client"
 import { authApi } from "@/services/api"
 
@@ -48,24 +48,34 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     }
 
     let cancelled = false
-    authApi
-      .me()
-      .then(() => {
+
+    // /api/auth/me solo valida cookie auth_token. Hay que asegurar createSession
+    // antes del primer me() o aparece 401 (carrera con onIdTokenChanged).
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (cancelled) return
+      if (!user) {
+        router.replace(`/login?next=${encodeURIComponent(pathname)}`)
+        return
+      }
+      try {
+        const idToken = await user.getIdToken()
+        await authApi.createSession({ idToken })
+        await authApi.me()
         if (!cancelled) setChecked(true)
-      })
-      .catch((err) => {
+      } catch (err) {
         if (cancelled) return
         const status = (err as { status?: number })?.status
         if (status === 401) {
-          const toLogin = `/login?next=${encodeURIComponent(pathname)}`
-          router.replace(toLogin)
+          router.replace(`/login?next=${encodeURIComponent(pathname)}`)
           return
         }
         router.replace("/login")
-      })
+      }
+    })
 
     return () => {
       cancelled = true
+      unsubscribe()
     }
   }, [pathname, router])
 

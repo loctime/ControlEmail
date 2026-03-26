@@ -9,24 +9,22 @@ import type {
 } from "@/services/api/dashboard/types"
 
 export const dashboardApi = {
-  /** Unified enriched endpoint — returns operacion/responsable from vehicle master */
-  getEnriched: (period: "day" | "week" | "month" | "year", date: string) =>
-    apiClient.get<DashboardAggregatedPayload>(
-      `/api/dashboard/enriched?period=${period}&date=${encodeURIComponent(date)}`,
-      { authMode: "firebase" },
-    ),
+  /** GET /api/dashboard/enriched?period=&date= — único endpoint agregado enriquecido */
+  getEnriched: (period: "day" | "week" | "month" | "year", dateParam: string) => {
+    const qs = new URLSearchParams({ period, date: dateParam })
+    return apiClient.get<DashboardAggregatedPayload>(`/api/dashboard/enriched?${qs.toString()}`, {
+      authMode: "firebase",
+    })
+  },
 
-  /** Enriched: day — expects YYYY-MM-DD */
+  /** Compat: mismos params que getEnriched( "day" | …, dateParam ) */
   getDay: (dateKey: string) => dashboardApi.getEnriched("day", dateKey),
 
-  /** Enriched: week — expects YYYY-MM-DD */
   getWeek: (dateKey: string) => dashboardApi.getEnriched("week", dateKey),
 
-  /** Enriched: month — expects YYYY-MM */
-  getMonth: (dateKeyOrMonth: string) => dashboardApi.getEnriched("month", dateKeyOrMonth.slice(0, 7)),
+  getMonth: (dateKey: string) => dashboardApi.getEnriched("month", dateKey.slice(0, 7)),
 
-  /** Enriched: year — expects YYYY */
-  getYear: (dateKeyOrYear: string) => dashboardApi.getEnriched("year", dateKeyOrYear.slice(0, 4)),
+  getYear: (dateKey: string) => dashboardApi.getEnriched("year", dateKey.slice(0, 4)),
 
   myStats: (date: string) =>
     apiClient.get<MyStatsDTO>(`/api/email/my-stats?date=${encodeURIComponent(date)}`),

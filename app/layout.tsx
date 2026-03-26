@@ -13,6 +13,9 @@ export const metadata: Metadata = {
   title: "FleetGuard - Control Vehicular",
   description:
     "Sistema de gestion y seguimiento de eventos vehiculares. Monitoreo de excesos de velocidad, vehiculos no identificados y desvios operativos.",
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+  },
 }
 
 export const viewport: Viewport = {

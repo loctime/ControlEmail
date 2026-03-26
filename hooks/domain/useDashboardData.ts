@@ -17,6 +17,16 @@ import { queryKeys } from "@/lib/query/queryKeys"
 
 const STALE_TIME_MS = 5 * 60 * 1000
 
+/** `date` del query string según period (dateKey = YYYY-MM-DD) */
+function enrichedDateParam(
+  dateKey: string,
+  mode: "day" | "week" | "month" | "year",
+): string {
+  if (mode === "day" || mode === "week") return dateKey
+  if (mode === "month") return dateKey.slice(0, 7)
+  return dateKey.slice(0, 4)
+}
+
 /** Normalize aggregated stats to the shape expected by the UI (MyStatsDTO.stats) */
 function normalizeStats(
   payload: DashboardAggregatedPayload | undefined,
@@ -53,17 +63,10 @@ export function useDashboardData(
   dateKey: string | undefined,
   mode: "day" | "week" | "month" | "year",
 ): DashboardDataState {
-  const param =
-    mode === "day"
-      ? dateKey
-      : mode === "week"
-        ? dateKey
-        : mode === "month"
-          ? dateKey?.slice(0, 7)
-          : dateKey?.slice(0, 4)
+  const param = dateKey ? enrichedDateParam(dateKey, mode) : ""
 
   const query = useQuery({
-    queryKey: queryKeys.dashboard.aggregated(mode, param ?? ""),
+    queryKey: queryKeys.dashboard.aggregated(mode, param),
     queryFn: async (): Promise<{
       stats: MyStatsDTO["stats"] | null
       riskVehicles: MyRiskItemDTO[]
@@ -73,7 +76,7 @@ export function useDashboardData(
       adminTotals: AdminTotalsDTO | null
       dailyBreakdown: DailyBreakdownPointDTO[] | null
     }> => {
-      if (!dateKey || !param) {
+      if (!dateKey) {
         return {
           stats: null,
           riskVehicles: [],
@@ -85,7 +88,8 @@ export function useDashboardData(
         }
       }
 
-      const payload = await dashboardApi.getEnriched(mode, param)
+      const dateParam = enrichedDateParam(dateKey, mode)
+      const payload = await dashboardApi.getEnriched(mode, dateParam)
 
       return {
         stats: normalizeStats(payload),
@@ -96,12 +100,10 @@ export function useDashboardData(
         consistency: payload.consistency ?? null,
         vehicleDetails: Array.isArray(payload.vehicleDetails) ? payload.vehicleDetails : [],
         adminTotals: payload.adminTotals ?? null,
-        dailyBreakdown: Array.isArray(payload.dailyBreakdown)
-          ? payload.dailyBreakdown.map((d) => ({ date: d.date, totalExcessEvents: d.totalExcessEvents }))
-          : null,
+        dailyBreakdown: Array.isArray(payload.dailyBreakdown) ? payload.dailyBreakdown : null,
       }
     },
-    enabled: !!dateKey && !!param,
+    enabled: !!dateKey,
     staleTime: STALE_TIME_MS,
   })
 
