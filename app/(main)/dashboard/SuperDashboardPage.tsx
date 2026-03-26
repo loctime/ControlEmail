@@ -476,11 +476,59 @@ export default function SuperDashboardPage() {
 
   // Bar chart data
   const chartData = useMemo(() => {
-    if (!dailyBreakdown || dailyBreakdown.length === 0) return []
-    return [...dailyBreakdown]
-      .sort((a, b) => a.date.localeCompare(b.date))
-      .map((d) => ({ date: d.date, label: formatDDMMYYYY(d.date).slice(0, 5), excesos: d.totalExcessEvents }))
-  }, [dailyBreakdown])
+    // Preset day: mostrar top 10 patentes con más excesos
+    if (preset === "day") {
+      return vehicleDetails
+        .filter((v) => v.excesos > 0)
+        .sort((a, b) => b.excesos - a.excesos)
+        .slice(0, 10)
+        .map((v) => ({ plate: v.plate, label: v.plate, excesos: v.excesos }))
+    }
+
+    // Presets week: mantener comportamiento actual (excesos por día)
+    if (preset === "week") {
+      if (!dailyBreakdown || dailyBreakdown.length === 0) return []
+      return [...dailyBreakdown]
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .map((d) => ({ date: d.date, label: formatDDMMYYYY(d.date).slice(0, 5), excesos: d.totalExcessEvents }))
+    }
+
+    // Preset month: agrupar por semana
+    if (preset === "month") {
+      if (!dailyBreakdown || dailyBreakdown.length === 0) return []
+      const weeks = new Map<number, number>()
+      for (const d of dailyBreakdown) {
+        const day = parseInt(d.date.split("-")[2], 10)
+        const week = Math.ceil(day / 7)
+        const current = weeks.get(week) ?? 0
+        weeks.set(week, current + d.totalExcessEvents)
+      }
+      const result = []
+      for (let w = 1; w <= 4; w++) {
+        result.push({ week: w, label: `Sem ${w}`, excesos: weeks.get(w) ?? 0 })
+      }
+      return result
+    }
+
+    // Preset year: agrupar por mes
+    if (preset === "year") {
+      if (!dailyBreakdown || dailyBreakdown.length === 0) return []
+      const months = new Map<number, number>()
+      const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+      for (const d of dailyBreakdown) {
+        const month = parseInt(d.date.split("-")[1], 10)
+        const current = months.get(month) ?? 0
+        months.set(month, current + d.totalExcessEvents)
+      }
+      const result = []
+      for (let m = 1; m <= 12; m++) {
+        result.push({ month: m, label: monthNames[m - 1], excesos: months.get(m) ?? 0 })
+      }
+      return result
+    }
+
+    return []
+  }, [preset, vehicleDetails, dailyBreakdown])
 
   // Distribution bars
   const distribution = useMemo(() => {
@@ -707,15 +755,14 @@ export default function SuperDashboardPage() {
             <Card className="border-white/5 bg-white/[0.03] lg:col-span-3">
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-semibold text-white/80">
-                  Excesos de velocidad por día
+                  {preset === "day" && "Excesos de velocidad por patente"}
+                  {preset === "week" && "Excesos de velocidad por día"}
+                  {preset === "month" && "Excesos de velocidad por semana"}
+                  {preset === "year" && "Excesos de velocidad por mes"}
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {preset === "day" ? (
-                  <p className="py-10 text-center text-sm text-white/30">
-                    Seleccioná semana, mes o año para ver la evolución
-                  </p>
-                ) : chartData.length > 0 ? (
+                {chartData.length > 0 ? (
                   <ResponsiveContainer width="100%" height={220}>
                     <BarChart data={chartData} margin={{ left: 0, right: 8, top: 4, bottom: 4 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
