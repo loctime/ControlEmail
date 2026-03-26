@@ -90,7 +90,7 @@ export interface DashboardDataState {
   vehicleDetails: DashboardVehicleDetailDTO[]
   /** SuperDashboard: admin alert category totals */
   adminTotals: AdminTotalsDTO | null
-  /** SuperDashboard: last 7 days breakdown (week response only) */
+  /** SuperDashboard: serie diaria de excesos (semana, mes, año cuando el API la envía) */
   dailyBreakdown: DailyBreakdownPointDTO[] | null
   /** Totales del período por categoría (cuando el backend los envía en `distribution`) */
   distribution: DashboardPeriodDistributionDTO | null

@@ -119,7 +119,9 @@ async function getRawPayload(
     const dailyResults = await Promise.all(
       dateKeys.map(async (dk) => ({ dateKey: dk, metrics: await getDailyMetrics(dk) })),
     )
-    return { payload: aggregateEnriched(dailyResults, auth) }
+    return {
+      payload: aggregateEnriched(dailyResults, auth, { includeDailyBreakdown: true }),
+    }
   }
 
   if (period === "year") {
@@ -134,7 +136,9 @@ async function getRawPayload(
       )
       dailyResults.push(...batchResults)
     }
-    return { payload: aggregateEnriched(dailyResults, auth) }
+    return {
+      payload: aggregateEnriched(dailyResults, auth, { includeDailyBreakdown: true }),
+    }
   }
 
   return { error: "invalid_period" }
