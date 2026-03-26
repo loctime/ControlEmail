@@ -426,7 +426,7 @@ export default function SuperDashboardPage() {
   const setDate = useCallback((date: string) => dispatch({ type: "SET", date }), [])
 
   // Current period
-  const { vehicleDetails, riskVehicles, dailyBreakdown, loading, error, refetch } =
+  const { vehicleDetails, riskVehicles, dailyBreakdown, distribution: periodDistribution, loading, error, refetch } =
     useDashboardData(selectedDate, preset)
 
   useEffect(() => {
@@ -460,32 +460,36 @@ export default function SuperDashboardPage() {
     queryFn: async (): Promise<DashboardAggregatedPayload | null> => {
       if (!prevApiParam) return null
       try {
-        if (preset === "day") return await dashboardApi.getDay(prevApiParam)
-        if (preset === "week") return await dashboardApi.getWeek(prevApiParam)
-        if (preset === "month") return await dashboardApi.getMonth(prevApiParam)
-        return await dashboardApi.getYear(prevApiParam)
+        return await dashboardApi.getEnriched(preset, prevApiParam)
       } catch { return null }
     },
     enabled: !!prevApiParam,
     staleTime: STALE_TIME,
   })
 
-  const prevDetails = prevPayload?.vehicleDetails ?? []
+  // KPI totals (preferir `distribution` del backend cuando exista)
+  const kpi = useMemo(() => {
+    const dist = periodDistribution
+    return {
+      excesos:          dist?.excesos          ?? vehicleDetails.reduce((s, v) => s + (v.excesos ?? 0), 0),
+      llave_sin_cargar: dist?.llave_sin_cargar ?? vehicleDetails.reduce((s, v) => s + (v.llave_sin_cargar ?? 0), 0),
+      no_identificados: dist?.no_identificados ?? vehicleDetails.reduce((s, v) => s + (v.no_identificados ?? 0), 0),
+      conductor_inactivo: dist?.conductor_inactivo ?? vehicleDetails.reduce((s, v) => s + (v.conductor_inactivo ?? 0), 0),
+    }
+  }, [vehicleDetails, periodDistribution])
 
-  // KPI totals
-  const kpi = useMemo(() => ({
-    excesos:          vehicleDetails.reduce((s, v) => s + (v.excesos ?? 0), 0),
-    llave_sin_cargar: vehicleDetails.reduce((s, v) => s + (v.llave_sin_cargar ?? 0), 0),
-    no_identificados: vehicleDetails.reduce((s, v) => s + (v.no_identificados ?? 0), 0),
-    conductor_inactivo: vehicleDetails.reduce((s, v) => s + (v.conductor_inactivo ?? 0), 0),
-  }), [vehicleDetails])
-
-  const kpiPrev = useMemo(() => prevDetails.length > 0 ? ({
-    excesos:          prevDetails.reduce((s, v) => s + (v.excesos ?? 0), 0),
-    llave_sin_cargar: prevDetails.reduce((s, v) => s + (v.llave_sin_cargar ?? 0), 0),
-    no_identificados: prevDetails.reduce((s, v) => s + (v.no_identificados ?? 0), 0),
-    conductor_inactivo: prevDetails.reduce((s, v) => s + (v.conductor_inactivo ?? 0), 0),
-  }) : null, [prevDetails])
+  const kpiPrev = useMemo(() => {
+    if (!prevPayload) return null
+    const prevDetails = prevPayload.vehicleDetails ?? []
+    const dist = prevPayload.distribution
+    if (prevDetails.length === 0 && dist == null) return null
+    return {
+      excesos:          dist?.excesos          ?? prevDetails.reduce((s, v) => s + (v.excesos ?? 0), 0),
+      llave_sin_cargar: dist?.llave_sin_cargar ?? prevDetails.reduce((s, v) => s + (v.llave_sin_cargar ?? 0), 0),
+      no_identificados: dist?.no_identificados ?? prevDetails.reduce((s, v) => s + (v.no_identificados ?? 0), 0),
+      conductor_inactivo: dist?.conductor_inactivo ?? prevDetails.reduce((s, v) => s + (v.conductor_inactivo ?? 0), 0),
+    }
+  }, [prevPayload])
 
   const prevLabel = useMemo(() => ({
     day: "día ant.", week: "semana ant.", month: "mes ant.", year: "año ant.",

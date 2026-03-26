@@ -7,6 +7,7 @@ import type {
   AdminTotalsDTO,
   DailyBreakdownPointDTO,
   DashboardAggregatedPayload,
+  DashboardPeriodDistributionDTO,
   DashboardVehicleDetailDTO,
   MyAlertItemDTO,
   MyRiskItemDTO,
@@ -28,6 +29,43 @@ function enrichedDateParam(
 }
 
 /** Normalize aggregated stats to the shape expected by the UI (MyStatsDTO.stats) */
+function normalizeDistribution(
+  payload: DashboardAggregatedPayload | undefined,
+): DashboardPeriodDistributionDTO | null {
+  const d = payload?.distribution
+  if (d == null || typeof d !== "object") return null
+  return {
+    excesos: d.excesos,
+    llave_sin_cargar: d.llave_sin_cargar,
+    no_identificados: d.no_identificados,
+    contactos: d.contactos,
+    conductor_inactivo: d.conductor_inactivo,
+  }
+}
+
+/** El endpoint enrich suele devolver `vehicleDetails`, no `vehicles`. Se mapea a la forma de ranking de riesgo. */
+function riskVehiclesFromVehicleDetails(details: DashboardVehicleDetailDTO[]): MyRiskItemDTO[] {
+  return details
+    .map((v) => {
+      const alerts =
+        (v.excesos ?? 0) +
+        (v.llave_sin_cargar ?? 0) +
+        (v.no_identificados ?? 0) +
+        (v.conductor_inactivo ?? 0) +
+        (v.contactos ?? 0)
+      return {
+        plate: v.plate,
+        alerts,
+        maxRisk: v.excesos ?? 0,
+      }
+    })
+    .filter((v) => v.alerts > 0)
+    .sort(
+      (a, b) =>
+        b.maxRisk - a.maxRisk || b.alerts - a.alerts || a.plate.localeCompare(b.plate),
+    )
+}
+
 function normalizeStats(
   payload: DashboardAggregatedPayload | undefined,
 ): MyStatsDTO["stats"] | null {
@@ -54,6 +92,8 @@ export interface DashboardDataState {
   adminTotals: AdminTotalsDTO | null
   /** SuperDashboard: last 7 days breakdown (week response only) */
   dailyBreakdown: DailyBreakdownPointDTO[] | null
+  /** Totales del período por categoría (cuando el backend los envía en `distribution`) */
+  distribution: DashboardPeriodDistributionDTO | null
   loading: boolean
   error: string | null
   refetch: () => Promise<void>
@@ -75,6 +115,7 @@ export function useDashboardData(
       vehicleDetails: DashboardVehicleDetailDTO[]
       adminTotals: AdminTotalsDTO | null
       dailyBreakdown: DailyBreakdownPointDTO[] | null
+      distribution: DashboardPeriodDistributionDTO | null
     }> => {
       if (!dateKey) {
         return {
@@ -85,22 +126,26 @@ export function useDashboardData(
           vehicleDetails: [],
           adminTotals: null,
           dailyBreakdown: null,
+          distribution: null,
         }
       }
 
       const dateParam = enrichedDateParam(dateKey, mode)
       const payload = await dashboardApi.getEnriched(mode, dateParam)
 
+      const vehicleDetails = Array.isArray(payload.vehicleDetails) ? payload.vehicleDetails : []
+
       return {
         stats: normalizeStats(payload),
-        riskVehicles: Array.isArray(payload.vehicles) ? payload.vehicles : [],
+        riskVehicles: riskVehiclesFromVehicleDetails(vehicleDetails),
         pendingAlerts: Array.isArray(payload.pendingAlerts)
           ? payload.pendingAlerts.filter((a) => !a.alertSent)
           : [],
         consistency: payload.consistency ?? null,
-        vehicleDetails: Array.isArray(payload.vehicleDetails) ? payload.vehicleDetails : [],
+        vehicleDetails,
         adminTotals: payload.adminTotals ?? null,
         dailyBreakdown: Array.isArray(payload.dailyBreakdown) ? payload.dailyBreakdown : null,
+        distribution: normalizeDistribution(payload),
       }
     },
     enabled: !!dateKey,
@@ -119,6 +164,7 @@ export function useDashboardData(
     vehicleDetails: query.data?.vehicleDetails ?? [],
     adminTotals: query.data?.adminTotals ?? null,
     dailyBreakdown: query.data?.dailyBreakdown ?? null,
+    distribution: query.data?.distribution ?? null,
     loading: query.isPending,
     error:
       query.error instanceof Error

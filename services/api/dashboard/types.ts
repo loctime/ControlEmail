@@ -81,6 +81,15 @@ export interface AdminTotalsDTO {
   conductor_inactivo: number
 }
 
+/** Totales del período en respuesta enrich (pueden no coincidir con la suma por vehículo) */
+export interface DashboardPeriodDistributionDTO {
+  excesos?: number
+  llave_sin_cargar?: number
+  no_identificados?: number
+  contactos?: number
+  conductor_inactivo?: number
+}
+
 /** Per-day point for RiskTrendChart (week response only) */
 export interface DailyBreakdownPointDTO {
   date: string
@@ -93,6 +102,8 @@ export interface DashboardAggregatedPayload {
   vehicles?: MyRiskItemDTO[]
   pendingAlerts?: MyAlertItemDTO[]
   consistency?: DailyConsistencyDTO | null
+  /** Totales por categoría del período (si el backend los expone aparte de vehicleDetails) */
+  distribution?: DashboardPeriodDistributionDTO | null
   /** SuperDashboard: per-vehicle enriched data */
   vehicleDetails?: DashboardVehicleDetailDTO[]
   /** SuperDashboard: admin alert category totals */
