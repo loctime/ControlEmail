@@ -13,7 +13,33 @@ import type {
   MyStatsDTO,
 } from "@/services/api/dashboard/types"
 import type { DailyConsistencyDTO } from "@/services/api/quality/types"
+import type { VehicleMetadataDTO } from "@/app/api/vehicles/metadata/route"
 import { queryKeys } from "@/lib/query/queryKeys"
+
+async function fetchVehicleMetadata(plates: string[]): Promise<Map<string, VehicleMetadataDTO>> {
+  if (plates.length === 0) return new Map()
+  const qs = plates.join(",")
+  const res = await fetch(`/api/vehicles/metadata?plates=${encodeURIComponent(qs)}`)
+  if (!res.ok) return new Map()
+  const json = (await res.json()) as { metadata: VehicleMetadataDTO[] }
+  return new Map(json.metadata.map((m) => [m.plate, m]))
+}
+
+function enrichWithMetadata(
+  details: DashboardVehicleDetailDTO[],
+  metaMap: Map<string, VehicleMetadataDTO>,
+): DashboardVehicleDetailDTO[] {
+  if (metaMap.size === 0) return details
+  return details.map((v) => {
+    const meta = metaMap.get(v.plate)
+    if (!meta) return v
+    return {
+      ...v,
+      operacion: meta.operacion ?? v.operacion,
+      responsable: meta.responsable ?? v.responsable,
+    }
+  })
+}
 
 const STALE_TIME_MS = 5 * 60 * 1000
 
@@ -100,9 +126,15 @@ export function useDashboardData(
         ? payload.pendingAlerts.filter((a) => !a.alertSent)
         : []
       const consistency = payload.consistency ?? null
-      const vehicleDetails = Array.isArray(payload.vehicleDetails) ? payload.vehicleDetails : []
+      const rawDetails = Array.isArray(payload.vehicleDetails) ? payload.vehicleDetails : []
       const adminTotals = payload.adminTotals ?? null
       const dailyBreakdown = Array.isArray(payload.dailyBreakdown) ? payload.dailyBreakdown : null
+
+      // Enrich operacion + responsable from vehicle master (always up-to-date)
+      const plates = rawDetails.map((v) => v.plate)
+      const metaMap = await fetchVehicleMetadata(plates)
+      const vehicleDetails = enrichWithMetadata(rawDetails, metaMap)
+
       return {
         stats,
         riskVehicles,
