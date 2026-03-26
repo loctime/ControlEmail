@@ -86,6 +86,7 @@ export function useDashboardData(
       }
 
       const payload = await dashboardApi.getEnriched(mode, param)
+      console.log(`[useDashboardData] mode=${mode}, payload.dailyBreakdown=`, payload.dailyBreakdown)
 
       return {
         stats: normalizeStats(payload),
