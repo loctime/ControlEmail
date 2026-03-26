@@ -505,9 +505,10 @@ export default function SuperDashboardPage() {
       }
       const result = []
       for (let w = 1; w <= 4; w++) {
-        result.push({ week: w, label: `Sem ${w}`, excesos: weeks.get(w) ?? 0 })
+        const excesos = weeks.get(w) ?? 0
+        if (excesos > 0) result.push({ week: w, label: `Sem ${w}`, excesos })
       }
-      return result
+      return result.length > 0 ? result : dailyBreakdown.map((d) => ({ date: d.date, label: formatDDMMYYYY(d.date).slice(0, 5), excesos: d.totalExcessEvents }))
     }
 
     // Preset year: agrupar por mes
@@ -522,9 +523,10 @@ export default function SuperDashboardPage() {
       }
       const result = []
       for (let m = 1; m <= 12; m++) {
-        result.push({ month: m, label: monthNames[m - 1], excesos: months.get(m) ?? 0 })
+        const excesos = months.get(m) ?? 0
+        if (excesos > 0) result.push({ month: m, label: monthNames[m - 1], excesos })
       }
-      return result
+      return result.length > 0 ? result : dailyBreakdown.map((d) => ({ date: d.date, label: formatDDMMYYYY(d.date).slice(0, 5), excesos: d.totalExcessEvents }))
     }
 
     return []
