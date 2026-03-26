@@ -1103,7 +1103,30 @@ export default function SuperDashboardPage() {
             </Card>
           </div>
 
-          {/* SECCIÓN 4 — Tabla */}
+          {/* SECCIÓN 4 — Top excesos de velocidad */}
+          {kpi.excesos > 0 && (
+            <div className="space-y-4">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-white/60">
+                Top excesos de velocidad
+              </h2>
+              <div className="grid grid-cols-1 gap-4">
+                <TopExcesosPlateTable
+                  title="Por patente"
+                  rows={topByPlate}
+                  limit={topPlateLimit}
+                  onLimitChange={setTopPlateLimit}
+                />
+                <TopExcesosOperacionTable
+                  title="Por operación"
+                  rows={topByOperacion}
+                  limit={topOpLimit}
+                  onLimitChange={setTopOpLimit}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* SECCIÓN 5 — Tabla */}
           <Card className="border-white/5 bg-white/[0.03]">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold text-white/80">
@@ -1150,29 +1173,6 @@ export default function SuperDashboardPage() {
               )}
             </CardContent>
           </Card>
-
-          {/* SECCIÓN 5 — Top excesos de velocidad */}
-          {kpi.excesos > 0 && (
-            <div className="space-y-4">
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-white/60">
-                Top excesos de velocidad
-              </h2>
-              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                <TopExcesosPlateTable
-                  title="Por patente"
-                  rows={topByPlate}
-                  limit={topPlateLimit}
-                  onLimitChange={setTopPlateLimit}
-                />
-                <TopExcesosOperacionTable
-                  title="Por operación"
-                  rows={topByOperacion}
-                  limit={topOpLimit}
-                  onLimitChange={setTopOpLimit}
-                />
-              </div>
-            </div>
-          )}
 
         </div>
       )}
