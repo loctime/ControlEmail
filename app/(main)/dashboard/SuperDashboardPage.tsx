@@ -24,7 +24,6 @@ import { dashboardApi } from "@/services/api"
 import { queryKeys } from "@/lib/query/queryKeys"
 import {
   formatDDMMYYYY,
-  getDateKeysInMonth,
   getDateKeysLast7Days,
   getYesterdayKey,
   normalizeBusinessDate,
@@ -550,6 +549,12 @@ function dateReducer(state: DateState, action: DateAction): DateState {
   }
 }
 
+/** Nombres de mes en español para la etiqueta del filtro (preset Mes). */
+const PERIOD_MONTH_NAMES_ES = [
+  "ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO",
+  "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE",
+] as const
+
 function formatPeriodLabel(dateStr: string, preset: DashboardDatePreset): string {
   if (preset === "day") return formatDDMMYYYY(dateStr)
   if (preset === "week") {
@@ -558,15 +563,18 @@ function formatPeriodLabel(dateStr: string, preset: DashboardDatePreset): string
     return `${formatDDMMYYYY(keys[0])} - ${formatDDMMYYYY(keys[6])}`
   }
   if (preset === "month") {
-    const [y, m] = dateStr.split("-")
-    if (!y || !m) return formatDDMMYYYY(dateStr)
-    const keys = getDateKeysInMonth(`${y}-${m}`)
-    if (keys.length === 0) return formatDDMMYYYY(dateStr)
-    return `${formatDDMMYYYY(keys[0])} - ${formatDDMMYYYY(keys[keys.length - 1])}`
+    const [yStr, mStr] = dateStr.split("-")
+    const y = Number(yStr)
+    const m = Number(mStr)
+    if (!Number.isFinite(y) || !Number.isFinite(m) || m < 1 || m > 12) {
+      return formatDDMMYYYY(dateStr)
+    }
+    return `${PERIOD_MONTH_NAMES_ES[m - 1]} ${y}`
   }
   if (preset === "year") {
     const y = dateStr.slice(0, 4)
-    return `${formatDDMMYYYY(`${y}-01-01`)} - ${formatDDMMYYYY(`${y}-12-31`)}`
+    if (!/^\d{4}$/.test(y)) return formatDDMMYYYY(dateStr)
+    return y
   }
   return formatDDMMYYYY(dateStr)
 }
