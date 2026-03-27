@@ -98,7 +98,11 @@ function resolveIncidentFields(
   return { keyId, driverName }
 }
 
-/** Top 5 combinaciones llave/conductor para un vehículo (paridad con backend Express). */
+/**
+ * Todas las combinaciones llave/conductor para un vehículo (sin recorte).
+ * Importante para agregar por operación: un `.slice(0, 5)` aquí descartaba excesos
+ * que luego no entraban al top por vehículo pero sí sumaban al total de la operación.
+ */
 export function buildTopDriversKeysByVehicle(v: DailyAlertVehicle): TopDriverKeyDTO[] {
   const speedIncidents = Array.isArray(v?.speedIncidents) ? v.speedIncidents : []
   const grouped = new Map<string, number>()
@@ -130,7 +134,6 @@ export function buildTopDriversKeysByVehicle(v: DailyAlertVehicle): TopDriverKey
       }
     })
     .sort((a, b) => b.excesos - a.excesos)
-    .slice(0, 5)
 }
 
 /** Unir listas de top (ej. varios días del mismo vehículo) sumando excesos por llave/conductor/patente. */
@@ -164,10 +167,9 @@ export function mergeVehicleTopDriversKeys(lists: TopDriverKeyDTO[][]): TopDrive
       return { ...base, excesos: Number(excesos) || 0 }
     })
     .sort((a, b) => b.excesos - a.excesos)
-    .slice(0, 5)
 }
 
-/** Agregado por operación (top 3), paridad con backend Express. */
+/** Agregado por operación (top 3 para UI); incluye total atribuido en el ranking completo. */
 export function buildTopDriversKeysByOperation(
   vehicleDetails: DashboardVehicleDetailDTO[],
 ): TopDriversKeysByOperationDTO[] {
@@ -192,9 +194,8 @@ export function buildTopDriversKeysByOperation(
     }
   }
 
-  return Array.from(operationMap.entries()).map(([operationName, opGrouped]) => ({
-    operationName,
-    topDriversKeys: Array.from(opGrouped.entries())
+  return Array.from(operationMap.entries()).map(([operationName, opGrouped]) => {
+    const allRows = Array.from(opGrouped.entries())
       .map(([compositeKey, excessCount]) => {
         const parts = compositeKey.split("__")
         const driverName = parts[0] ?? "—"
@@ -214,6 +215,13 @@ export function buildTopDriversKeysByOperation(
         }
       })
       .sort((a, b) => b.excesos - a.excesos)
-      .slice(0, 3),
-  }))
+
+    const topDriversKeysAttributedTotal = allRows.reduce((s, r) => s + r.excesos, 0)
+
+    return {
+      operationName,
+      topDriversKeys: allRows.slice(0, 3),
+      topDriversKeysAttributedTotal,
+    }
+  })
 }

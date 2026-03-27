@@ -61,6 +61,8 @@ interface TopOperacionRow {
   maxSpeed: number | null
   lastEventAt: string | null
   topDriversKeys: TopDriverKeyDTO[]
+  /** Suma de excesos en todas las combinaciones del ranking llave/conductor (API), no solo las 3 filas mostradas. */
+  topDriversAttributedTotal: number | null
 }
 
 function buildTopByPlate(details: DashboardVehicleDetailDTO[], totalExcesos: number): TopPlateRow[] {
@@ -138,10 +140,12 @@ function buildTopByOperacion(
     }
   }
   const topDriversByOperationMap = new Map(
-    topDriversKeysByOperation.map((item) => [item.operationName, item.topDriversKeys ?? []]),
+    topDriversKeysByOperation.map((item) => [item.operationName, item]),
   )
   return Array.from(map.entries())
-    .map(([operacion, data]) => ({
+    .map(([operacion, data]) => {
+      const opTop = topDriversByOperationMap.get(operacion)
+      return {
       operacion,
       responsables: data.responsables,
       excesos: data.excesos,
@@ -149,8 +153,13 @@ function buildTopByOperacion(
       plates: data.plates.size,
       maxSpeed: data.maxSpeed,
       lastEventAt: data.lastEventAt,
-      topDriversKeys: topDriversByOperationMap.get(operacion) ?? [],
-    }))
+      topDriversKeys: opTop?.topDriversKeys ?? [],
+      topDriversAttributedTotal:
+        opTop?.topDriversKeysAttributedTotal != null
+          ? opTop.topDriversKeysAttributedTotal
+          : null,
+      }
+    })
     .sort((a, b) => b.excesos - a.excesos)
 }
 
@@ -261,6 +270,32 @@ function TopExcesosPlateTable({ rows, limit, onLimitChange, title }: TopExcesosP
 }
 
 type OperacionViewMode = "table" | "cards"
+
+/** Explica la diferencia entre el total de excesos de la operación y las filas del top llave/conductor. */
+function TopLlavesConductoresFootnote({ row }: { row: TopOperacionRow }) {
+  if (row.topDriversKeys.length === 0) return null
+  const shownSum = row.topDriversKeys.reduce((s, i) => s + i.excesos, 0)
+  const attributed =
+    row.topDriversAttributedTotal != null ? row.topDriversAttributedTotal : shownSum
+  const otherRanked = Math.max(0, attributed - shownSum)
+  const outsideRanked = Math.max(0, row.excesos - attributed)
+  if (otherRanked === 0 && outsideRanked === 0) return null
+  return (
+    <div className="mt-2 space-y-1 border-t border-white/[0.05] pt-2">
+      {otherRanked > 0 && (
+        <p className="text-[10px] leading-snug text-white/35">
+          +{otherRanked} excesos en otras combinaciones llave/conductor (no entran en el top 3 de la lista).
+        </p>
+      )}
+      {outsideRanked > 0 && (
+        <p className="text-[10px] leading-snug text-white/35">
+          {outsideRanked} excesos del total operación no aparecen en este ranking: suelen ser eventos que no se
+          agrupan en incidentes de velocidad con llave/conductor, o datos incompletos en esos incidentes.
+        </p>
+      )}
+    </div>
+  )
+}
 
 interface TopExcesosOperacionTableProps {
   rows: TopOperacionRow[]
@@ -395,6 +430,7 @@ function TopExcesosOperacionTable({ rows, limit, onLimitChange, title }: TopExce
                               <div className="text-[10px] text-white/45">{topDriverSubtitle(item)}</div>
                             </div>
                           ))}
+                          <TopLlavesConductoresFootnote row={row} />
                         </div>
                       )}
                     </td>
@@ -482,22 +518,28 @@ function TopExcesosOperacionTable({ rows, limit, onLimitChange, title }: TopExce
                   <div className="mb-2 text-[10px] font-medium uppercase tracking-wider text-white/30">
                     Top llaves/conductores
                   </div>
+                  <p className="mb-2 text-[10px] leading-snug text-white/30">
+                    Solo las 3 combinaciones con más excesos. No suman el total de la operación.
+                  </p>
                   {row.topDriversKeys.length === 0 ? (
                     <div className="text-[11px] text-white/25">Sin datos</div>
                   ) : (
-                    <div className="space-y-2">
-                      {row.topDriversKeys.map((item, idx) => (
-                        <div key={`${item.keyLabel}-${item.driverName}-${idx}`} className="flex items-start gap-2">
-                          <span className="w-4 text-[10px] text-white/25">{idx + 1}.</span>
-                          <div className="min-w-0">
-                            <div className="truncate text-[11px] text-white/80" title={topDriverTitle(item)}>
-                              {isUnassignedKey(item) ? "⚠️" : "🔑"} {topDriverTitle(item)}
+                    <>
+                      <div className="space-y-2">
+                        {row.topDriversKeys.map((item, idx) => (
+                          <div key={`${item.keyLabel}-${item.driverName}-${idx}`} className="flex items-start gap-2">
+                            <span className="w-4 text-[10px] text-white/25">{idx + 1}.</span>
+                            <div className="min-w-0">
+                              <div className="truncate text-[11px] text-white/80" title={topDriverTitle(item)}>
+                                {isUnassignedKey(item) ? "⚠️" : "🔑"} {topDriverTitle(item)}
+                              </div>
+                              <div className="text-[10px] text-white/45">{topDriverSubtitle(item)}</div>
                             </div>
-                            <div className="text-[10px] text-white/45">{topDriverSubtitle(item)}</div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                      <TopLlavesConductoresFootnote row={row} />
+                    </>
                   )}
                 </div>
 

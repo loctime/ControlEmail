@@ -68,6 +68,8 @@ export interface TopDriverKeyDTO {
 export interface TopDriversKeysByOperationDTO {
   operationName: string
   topDriversKeys: TopDriverKeyDTO[]
+  /** Suma de excesos en todas las combinaciones llave/conductor de la operación (no solo el top 3 mostrado). */
+  topDriversKeysAttributedTotal?: number
 }
 
   /** Enriched per-vehicle data for SuperDashboard (Operational Risk + Admin Alerts) */
