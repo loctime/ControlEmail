@@ -391,6 +391,7 @@ function TopLlavesConductoresBlock({
   const colTemplate = "minmax(0,2fr) minmax(0,2fr) minmax(0,1fr) 52px 56px"
 
   function displayKeyLabel(label: string): string {
+    if (/^sin llave/i.test(label)) return "Sin llave"
     return label.replace(/^llave\s+/i, "")
   }
 
