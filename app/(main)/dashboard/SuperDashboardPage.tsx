@@ -313,24 +313,28 @@ function TopLlavesConductoresFootnote({
 
 type TopLlavesVariant = "table" | "cards"
 
-function TopLlavesConductoresBlock({ row, variant }: { row: TopOperacionRow; variant: TopLlavesVariant }) {
+function TopLlavesConductoresBlock({
+  row,
+  variant,
+  lastEventLabel,
+}: {
+  row: TopOperacionRow
+  variant: TopLlavesVariant
+  lastEventLabel?: string
+}) {
   const [expanded, setExpanded] = useState(false)
   const full = row.topDriversKeysAll
-  const canExpand =
-    full != null && full.length > row.topDriversKeys.length
+  const canExpand = full != null && full.length > row.topDriversKeys.length
   const keys = expanded && full ? full : row.topDriversKeys
-
-  function topDriverTitle(item: TopDriverKeyDTO): string {
-    const driverName = item.driverName?.trim() || "—"
-    return `${item.keyLabel} - ${driverName}`
-  }
-
-  function topDriverSubtitle(item: TopDriverKeyDTO): string {
-    return `${item.plate ?? "-"} • ${item.excesos} excesos`
-  }
 
   function isUnassignedKey(item: TopDriverKeyDTO): boolean {
     return item.keyNumber == null || item.keyLabel.trim().toLowerCase() === "sin llave asignada"
+  }
+
+  function itemPctClass(pct: number): string {
+    if (pct >= 40) return "bg-red-500/20 text-red-400"
+    if (pct >= 20) return "bg-yellow-500/20 text-yellow-400"
+    return "bg-green-500/20 text-green-400"
   }
 
   if (keys.length === 0) {
@@ -341,69 +345,103 @@ function TopLlavesConductoresBlock({ row, variant }: { row: TopOperacionRow; var
     )
   }
 
-  return (
-    <div className={variant === "cards" ? "space-y-2" : "space-y-1.5"}>
-      {variant === "table" && canExpand && !expanded && (
-        <p className="text-[10px] leading-snug text-white/30">
-          Primeras 3 combinaciones.{" "}
-          <span className="text-white/45">Expandí con «Ver más».</span>
-        </p>
-      )}
-      {variant === "cards" && (
-        <>
-          <div className="mb-2 text-[10px] font-medium uppercase tracking-wider text-white/30">
-            Top llaves/conductores
-          </div>
-          <p className="mb-2 text-[10px] leading-snug text-white/30">
-            {expanded
-              ? `Mostrando las ${keys.length} combinaciones ordenadas por excesos.`
-              : "Solo las 3 combinaciones con más excesos. Usá «Ver más» para ver el listado completo."}
+  if (variant === "table") {
+    function topDriverTitle(item: TopDriverKeyDTO): string {
+      const driverName = item.driverName?.trim() || "—"
+      return `${item.keyLabel} - ${driverName}`
+    }
+    function topDriverSubtitle(item: TopDriverKeyDTO): string {
+      return `${item.plate ?? "-"} • ${item.excesos} excesos`
+    }
+    return (
+      <div className="space-y-1.5">
+        {canExpand && !expanded && (
+          <p className="text-[10px] leading-snug text-white/30">
+            Primeras 3 combinaciones.{" "}
+            <span className="text-white/45">Expandí con «Ver más».</span>
           </p>
-        </>
-      )}
-      {variant === "table" ? (
-        <>
-          {keys.map((item, idx) => (
-            <div key={`${item.keyLabel}-${item.driverName}-${item.plate}-${idx}`} className="leading-tight">
-              <div className="text-[11px] text-white/80">
-                {isUnassignedKey(item) ? "⚠️" : "🔑"} {topDriverTitle(item)}
-              </div>
-              <div className="text-[10px] text-white/45">{topDriverSubtitle(item)}</div>
+        )}
+        {keys.map((item, idx) => (
+          <div key={`${item.keyLabel}-${item.driverName}-${item.plate}-${idx}`} className="leading-tight">
+            <div className="text-[11px] text-white/80">
+              {isUnassignedKey(item) ? "⚠️" : "🔑"} {topDriverTitle(item)}
             </div>
-          ))}
-        </>
-      ) : (
-        <div className="space-y-2">
-          {keys.map((item, idx) => (
+            <div className="text-[10px] text-white/45">{topDriverSubtitle(item)}</div>
+          </div>
+        ))}
+        <TopLlavesConductoresFootnote row={row} expanded={expanded} displayKeys={keys} />
+        {canExpand && (
+          <div className="pt-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-[11px] text-primary hover:bg-primary/10 dark:text-white/70 dark:hover:bg-white/10"
+              onClick={() => setExpanded((e) => !e)}
+            >
+              {expanded ? "Ver menos" : `Ver más (${full!.length - row.topDriversKeys.length} más)`}
+            </Button>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Cards variant — table-format grid
+  const colTemplate = "minmax(0,2fr) minmax(0,2fr) minmax(0,1fr) 48px 52px"
+  return (
+    <div>
+      <div className="mb-1 text-[10px] font-medium uppercase tracking-wider text-white/30">
+        Top conductores / llaves
+      </div>
+      <div className="mb-1 grid text-[10px] text-white/25" style={{ gridTemplateColumns: colTemplate }}>
+        <span>Llave</span>
+        <span className="px-1">Conductor</span>
+        <span>Patente</span>
+        <span className="text-right">Exc.</span>
+        <span className="text-right">%</span>
+      </div>
+      <div>
+        {keys.map((item, idx) => {
+          const itemPct = row.excesos > 0 ? Math.round((item.excesos / row.excesos) * 100) : 0
+          return (
             <div
               key={`${item.keyLabel}-${item.driverName}-${item.plate}-${idx}`}
-              className="flex items-start gap-2"
+              className="grid items-center border-b border-white/[0.04] py-1.5 last:border-0"
+              style={{ gridTemplateColumns: colTemplate }}
             >
-              <span className="w-4 text-[10px] text-white/25">{idx + 1}.</span>
-              <div className="min-w-0">
-                <div className="truncate text-[11px] text-white/80" title={topDriverTitle(item)}>
-                  {isUnassignedKey(item) ? "⚠️" : "🔑"} {topDriverTitle(item)}
-                </div>
-                <div className="text-[10px] text-white/45">{topDriverSubtitle(item)}</div>
-              </div>
+              <span className="truncate pr-1 text-[11px] text-white/80" title={item.keyLabel}>
+                {isUnassignedKey(item) ? "⚠️" : "🔑"} {item.keyLabel}
+              </span>
+              <span className="truncate px-1 text-[11px] text-white/50" title={item.driverName?.trim() || "—"}>
+                {item.driverName?.trim() || "—"}
+              </span>
+              <span className="truncate text-[11px] text-white/55">{item.plate || "—"}</span>
+              <span className="text-right text-[11px] font-medium tabular-nums text-white/70">{item.excesos}</span>
+              <span className="flex justify-end">
+                <span className={cn("inline-block rounded px-1.5 py-0.5 text-[10px] font-medium tabular-nums", itemPctClass(itemPct))}>
+                  {itemPct}%
+                </span>
+              </span>
             </div>
-          ))}
-        </div>
-      )}
+          )
+        })}
+      </div>
       <TopLlavesConductoresFootnote row={row} expanded={expanded} displayKeys={keys} />
-      {canExpand && (
-        <div className="pt-1">
+      <div className="mt-2 flex items-center justify-between border-t border-white/[0.05] pt-2">
+        <span className="text-[10px] text-white/25">{lastEventLabel ?? ""}</span>
+        {canExpand && (
           <Button
             type="button"
             variant="ghost"
             size="sm"
-            className="h-7 px-2 text-[11px] text-primary hover:bg-primary/10 dark:text-white/70 dark:hover:bg-white/10"
+            className="h-6 px-2 text-[10px] text-white/50 hover:bg-white/[0.05] hover:text-white/70"
             onClick={() => setExpanded((e) => !e)}
           >
-            {expanded ? "Ver menos" : `Ver más (${full!.length - row.topDriversKeys.length} más)`}
+            {expanded ? "Ver menos ∧" : `Ver ${full!.length - row.topDriversKeys.length} más ⌄`}
           </Button>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }
@@ -560,15 +598,18 @@ function TopExcesosOperacionTable({ rows, limit, onLimitChange, title }: TopExce
                   CARD_ACCENTS[i % CARD_ACCENTS.length],
                 )}
               >
-                <div className="mb-3 flex items-start justify-between gap-2">
-                  <div>
-                    <div className="text-sm font-medium text-white/85">{row.operacion}</div>
-                    <div className="mt-0.5 text-[10px] text-white/35">#{i + 1} en el ranking</div>
-                  </div>
+                {/* Header line 1: name + ranking badge + speed */}
+                <div className="mb-0.5 flex items-center gap-2">
+                  <span className="min-w-0 flex-1 truncate text-sm font-semibold text-white/85">
+                    {row.operacion}
+                  </span>
+                  <span className="shrink-0 rounded bg-white/[0.06] px-1.5 py-0.5 text-[10px] text-white/40">
+                    🏆 #{i + 1}
+                  </span>
                   {row.maxSpeed != null && (
                     <span
                       className={cn(
-                        "flex-shrink-0 rounded px-2 py-0.5 text-xs font-medium tabular-nums",
+                        "shrink-0 rounded px-2 py-0.5 text-xs font-medium tabular-nums",
                         speedClass(row.maxSpeed),
                       )}
                     >
@@ -576,36 +617,16 @@ function TopExcesosOperacionTable({ rows, limit, onLimitChange, title }: TopExce
                     </span>
                   )}
                 </div>
-
-                <div className="mb-3 grid grid-cols-3 gap-2">
-                  {[
-                    { label: "Excesos", value: row.excesos, accent: "text-red-400" },
-                    { label: "% total", value: `${row.pct}%`, accent: "text-white/80" },
-                    { label: "Patentes", value: row.plates, accent: "text-white/80" },
-                  ].map(({ label, value, accent }) => (
-                    <div key={label} className="rounded-md bg-white/[0.04] p-2 text-center">
-                      <div className="mb-1 text-[10px] text-white/35">{label}</div>
-                      <div className={cn("text-base font-medium leading-none tabular-nums", accent)}>{value}</div>
-                    </div>
-                  ))}
+                {/* Header line 2: KPIs */}
+                <div className="mb-3 text-[10px] text-white/35">
+                  {row.pct}% del total&nbsp;·&nbsp;{row.excesos} excesos&nbsp;·&nbsp;{row.plates} patentes
                 </div>
 
-                <div className="mb-3">
-                  <div className="h-1 w-full overflow-hidden rounded-full bg-white/[0.06]">
-                    <div
-                      className="h-full rounded-full bg-red-500/50 transition-all"
-                      style={{ width: `${Math.max(row.pct, row.excesos > 0 ? 2 : 0)}%` }}
-                    />
-                  </div>
-                </div>
-
-                <div className="border-t border-white/[0.05] pt-3">
-                  <TopLlavesConductoresBlock row={row} variant="cards" />
-                </div>
-
-                <div className="mt-3 flex items-center justify-between border-t border-white/[0.05] pt-2">
-                  <span className="text-[10px] text-white/25">Último: {formatLastEvent(row.lastEventAt)}</span>
-                </div>
+                <TopLlavesConductoresBlock
+                  row={row}
+                  variant="cards"
+                  lastEventLabel={`Último: ${formatLastEvent(row.lastEventAt)}`}
+                />
               </div>
             ))}
           </div>
