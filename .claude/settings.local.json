@@ -10,7 +10,8 @@
       "Bash(find C:UsersUserDesktopcontrolevento -maxdepth 1 -name .env* -o -name firebase.config.*)",
       "Bash(grep -r \"Conductor inactivo\\\\|Contacto\\\\|Exceso de velocidad\\\\|Llave\\\\|tipo\" C:UsersUserDesktopcontrolevento/components C:UsersUserDesktopcontrolevento/app --include=*.tsx --include=*.ts -l)",
       "Bash(ls \"C:\\\\Users\\\\User\\\\Desktop\\\\controlevento\\\\app\\\\\\(main\\)\\\\vehiculos\"\")",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }

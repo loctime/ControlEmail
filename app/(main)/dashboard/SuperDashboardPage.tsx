@@ -36,7 +36,6 @@ import type {
   TopDriversKeysByOperationDTO,
 } from "@/services/api/dashboard/types"
 import { OperacionPieChart } from "@/components/dashboard/OperacionPieChart"
-import { OperacionDetailPanel } from "@/components/dashboard/OperacionDetailPanel"
 
 type DashboardDatePreset = "day" | "week" | "month" | "year"
 
@@ -533,6 +532,15 @@ function OperacionCard({
   )
 }
 
+function speedClass(speed: number | null): string {
+  if (!speed) return ""
+  if (speed >= 130) return "bg-red-500/20 text-red-400"
+  if (speed >= 110) return "bg-yellow-500/20 text-yellow-400"
+  return "bg-green-500/20 text-green-400"
+}
+
+const CARD_ACCENTS = ["border-t-red-500/60", "border-t-yellow-500/60", "border-t-blue-500/60", "border-t-green-500/60"]
+
 interface TopExcesosOperacionTableProps {
   rows: TopOperacionRow[]
   limit: TopLimit
@@ -543,13 +551,6 @@ interface TopExcesosOperacionTableProps {
 function TopExcesosOperacionTable({ rows, limit, onLimitChange, title }: TopExcesosOperacionTableProps) {
   const visible = applyLimit(rows, limit)
 
-  function speedClass(speed: number | null): string {
-    if (!speed) return ""
-    if (speed >= 130) return "bg-red-500/20 text-red-400"
-    if (speed >= 110) return "bg-yellow-500/20 text-yellow-400"
-    return "bg-green-500/20 text-green-400"
-  }
-
   const deltaEl = (curr: number, prev: number | undefined) => {
     if (prev === undefined) return null
     const diff = curr - prev
@@ -557,8 +558,6 @@ function TopExcesosOperacionTable({ rows, limit, onLimitChange, title }: TopExce
     if (diff > 0) return <span className="text-[10px] text-red-400">+{diff} vs ant.</span>
     return <span className="text-[10px] text-green-400">{diff} vs ant.</span>
   }
-
-  const CARD_ACCENTS = ["border-t-red-500/60", "border-t-yellow-500/60", "border-t-blue-500/60", "border-t-green-500/60"]
 
   return (
     <Card className="border-white/5 bg-white/[0.03]">
@@ -1242,18 +1241,18 @@ export default function SuperDashboardPage() {
                     />
                   </div>
                   <div className="lg:col-span-2">
-                    <OperacionDetailPanel
-                      row={
-                        selectedOperacionForChart
-                          ? topByOperacion.find((r) => r.operacion === selectedOperacionForChart) || null
-                          : null
-                      }
-                      rank={
-                        selectedOperacionForChart
-                          ? topByOperacion.findIndex((r) => r.operacion === selectedOperacionForChart) + 1
-                          : undefined
-                      }
-                    />
+                    {selectedOperacionForChart ? (
+                      <OperacionCard
+                        row={topByOperacion.find((r) => r.operacion === selectedOperacionForChart)!}
+                        rank={topByOperacion.findIndex((r) => r.operacion === selectedOperacionForChart) + 1}
+                        accent={CARD_ACCENTS[(topByOperacion.findIndex((r) => r.operacion === selectedOperacionForChart)) % CARD_ACCENTS.length]}
+                        speedClass={speedClass}
+                      />
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-white/30 text-sm">
+                        Selecciona una operación
+                      </div>
+                    )}
                   </div>
                 </div>
               </CardContent>

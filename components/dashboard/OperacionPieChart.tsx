@@ -58,12 +58,12 @@ export function OperacionPieChart({
   }
 
   return (
-    <div className={cn("w-full", className)}>
+    <div className={cn("w-full -ml-4", className)}>
       <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
+        <PieChart margin={{ left: 0, right: 0, top: 0, bottom: 0 }}>
           <Pie
             data={data}
-            cx="50%"
+            cx="45%"
             cy="50%"
             labelLine={false}
             label={({ pct }) => `${pct}%`}
