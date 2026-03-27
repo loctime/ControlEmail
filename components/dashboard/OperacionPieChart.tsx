@@ -19,6 +19,15 @@ interface OperacionPieChartProps {
 const CHART_COLORS = ["#ef4444", "#f97316", "#eab308", "#22c55e", "#3b82f6"]
 const CHART_COLORS_LIGHT = ["#fca5a5", "#fed7aa", "#fef08a", "#86efac", "#93c5fd"]
 
+const MAX_LABEL_NAME_LEN = 28
+
+function pieSliceLabel(entry: { name: string; pct: number }) {
+  const { name, pct } = entry
+  const shown =
+    name.length > MAX_LABEL_NAME_LEN ? `${name.slice(0, MAX_LABEL_NAME_LEN - 1)}…` : name
+  return `${shown} (${pct}%)`
+}
+
 export function OperacionPieChart({
   rows,
   selectedOperacion,
@@ -47,10 +56,14 @@ export function OperacionPieChart({
     if (active && payload && payload.length) {
       const { name, value, pct } = payload[0].payload
       return (
-        <div className="rounded-md bg-black/80 px-3 py-2 text-xs border border-white/10">
-          <p className="font-medium text-white">{name}</p>
-          <p className="text-white/80">{value} excesos</p>
-          <p className="text-white/60">{pct}%</p>
+        <div
+          className={cn(
+            "z-50 rounded-md border border-border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md",
+          )}
+        >
+          <p className="font-medium text-foreground">{name}</p>
+          <p className="text-muted-foreground">{value} excesos</p>
+          <p className="text-muted-foreground">{pct}%</p>
         </div>
       )
     }
@@ -60,13 +73,13 @@ export function OperacionPieChart({
   return (
     <div className={cn("w-full -ml-4", className)}>
       <ResponsiveContainer width="100%" height="100%">
-        <PieChart margin={{ left: 0, right: 0, top: 0, bottom: 0 }}>
+        <PieChart margin={{ left: 8, right: 12, top: 20, bottom: 20 }}>
           <Pie
             data={data}
             cx="45%"
             cy="50%"
-            labelLine={false}
-            label={({ pct }) => `${pct}%`}
+            labelLine={{ stroke: "rgba(255,255,255,0.25)", strokeWidth: 1 }}
+            label={({ name, pct }) => pieSliceLabel({ name, pct })}
             outerRadius={100}
             fill="#8884d8"
             dataKey="value"
