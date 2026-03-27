@@ -22,7 +22,7 @@ Redesign the light mode color palette in `app/globals.css` to use professional g
 | Variable | Current | New | Rationale |
 |----------|---------|-----|-----------|
 | `--background` | `210 20% 98%` | `210 5% 95%` | Grayish background instead of pure white—slightly darker for contrast |
-| `--foreground` | `220 20% 10%` | `220 15% 20%` | Dark gray text (not pure black) for readability |
+| `--foreground` | `220 20% 10%` | `0 0% 0%` | Pure black text for maximum readability |
 | `--card` | `0 0% 100%` | `210 10% 97%` | Subtle gray tint on cards, higher contrast |
 | `--popover` | `0 0% 100%` | `210 10% 97%` | Matches card styling |
 | `--secondary` | `210 15% 93%` | `220 12% 88%` | Darker secondary elements |
@@ -39,7 +39,7 @@ Redesign the light mode color palette in `app/globals.css` to use professional g
 | Variable | Current | New |
 |----------|---------|-----|
 | `--sidebar-background` | `220 20% 10%` | `220 12% 88%` | Light gray instead of dark (sidebar is light mode too) |
-| `--sidebar-foreground` | `210 15% 80%` | `220 15% 25%` | Dark text on light sidebar |
+| `--sidebar-foreground` | `210 15% 80%` | `0 0% 0%` | Black text on light sidebar |
 | `--sidebar-primary` | `215 90% 55%` | `215 90% 55%` | Keep bright blue for active states |
 | `--sidebar-accent` | `220 18% 16%` | `220 12% 80%` | Light gray for hover states |
 | `--sidebar-border` | `220 15% 18%` | `220 15% 82%` | Visible borders |
