@@ -35,6 +35,8 @@ import type {
   TopDriverKeyDTO,
   TopDriversKeysByOperationDTO,
 } from "@/services/api/dashboard/types"
+import { OperacionPieChart } from "@/components/dashboard/OperacionPieChart"
+import { OperacionDetailPanel } from "@/components/dashboard/OperacionDetailPanel"
 
 type DashboardDatePreset = "day" | "week" | "month" | "year"
 
@@ -734,6 +736,7 @@ function KpiCard({ label, value, prev, accentClass, prevLabel }: KpiCardProps) {
 export default function SuperDashboardPage() {
   const [dateState, dispatch] = useReducer(dateReducer, { status: "pending" })
   const [preset, setPreset] = useState<DashboardDatePreset>(() => readStoredPreset() ?? "day")
+  const [selectedOperacionForChart, setSelectedOperacionForChart] = useState<string | null>(null)
   const hasRestoredRef = useRef(false)
 
   const selectedDate = dateState.status === "ready" ? dateState.date : undefined
@@ -1219,6 +1222,43 @@ export default function SuperDashboardPage() {
               </CardContent>
             </Card>
           </div>
+
+          {/* SECCIÓN 3b — Gráfico de distribución de excesos por operación */}
+          {kpi.excesos > 0 && (
+            <Card className="border-white/5 bg-white/[0.03]">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-semibold text-white/80">
+                  Distribución de excesos por operación
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
+                  <div className="lg:col-span-3">
+                    <OperacionPieChart
+                      rows={topByOperacion.slice(0, 10)}
+                      selectedOperacion={selectedOperacionForChart}
+                      onOperacionSelect={setSelectedOperacionForChart}
+                      className="h-80"
+                    />
+                  </div>
+                  <div className="lg:col-span-2">
+                    <OperacionDetailPanel
+                      row={
+                        selectedOperacionForChart
+                          ? topByOperacion.find((r) => r.operacion === selectedOperacionForChart) || null
+                          : null
+                      }
+                      rank={
+                        selectedOperacionForChart
+                          ? topByOperacion.findIndex((r) => r.operacion === selectedOperacionForChart) + 1
+                          : undefined
+                      }
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* SECCIÓN 4 — Top excesos de velocidad */}
           {kpi.excesos > 0 && (
