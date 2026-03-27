@@ -388,13 +388,18 @@ function TopLlavesConductoresBlock({
   }
 
   // Cards variant — table-format grid
-  const colTemplate = "minmax(0,2fr) minmax(0,2fr) minmax(0,1fr) 48px 52px"
+  const colTemplate = "minmax(0,2fr) minmax(0,2fr) minmax(0,1fr) 52px 56px"
+
+  function displayKeyLabel(label: string): string {
+    return label.replace(/^llave\s+/i, "")
+  }
+
   return (
     <div>
-      <div className="mb-1 text-[10px] font-medium uppercase tracking-wider text-white/30">
+      <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-white/30">
         Top conductores / llaves
       </div>
-      <div className="mb-1 grid text-[10px] text-white/25" style={{ gridTemplateColumns: colTemplate }}>
+      <div className="mb-1.5 grid text-[11px] text-white/25" style={{ gridTemplateColumns: colTemplate }}>
         <span>Llave</span>
         <span className="px-1">Conductor</span>
         <span>Patente</span>
@@ -407,19 +412,19 @@ function TopLlavesConductoresBlock({
           return (
             <div
               key={`${item.keyLabel}-${item.driverName}-${item.plate}-${idx}`}
-              className="grid items-center border-b border-white/[0.04] py-1.5 last:border-0"
+              className="grid items-center border-b border-white/[0.04] py-2 last:border-0"
               style={{ gridTemplateColumns: colTemplate }}
             >
-              <span className="truncate pr-1 text-[11px] text-white/80" title={item.keyLabel}>
-                {isUnassignedKey(item) ? "⚠️" : "🔑"} {item.keyLabel}
+              <span className="truncate pr-1 text-xs text-white/80" title={item.keyLabel}>
+                {isUnassignedKey(item) ? "⚠️" : "🔑"} {displayKeyLabel(item.keyLabel)}
               </span>
-              <span className="truncate px-1 text-[11px] text-white/50" title={item.driverName?.trim() || "—"}>
+              <span className="truncate px-1 text-xs text-white/50" title={item.driverName?.trim() || "—"}>
                 {item.driverName?.trim() || "—"}
               </span>
-              <span className="truncate text-[11px] text-white/55">{item.plate || "—"}</span>
-              <span className="text-right text-[11px] font-medium tabular-nums text-white/70">{item.excesos}</span>
+              <span className="truncate text-xs text-white/55">{item.plate || "—"}</span>
+              <span className="text-right text-xs font-medium tabular-nums text-white/70">{item.excesos}</span>
               <span className="flex justify-end">
-                <span className={cn("inline-block rounded px-1.5 py-0.5 text-[10px] font-medium tabular-nums", itemPctClass(itemPct))}>
+                <span className={cn("inline-block rounded px-1.5 py-0.5 text-[11px] font-medium tabular-nums", itemPctClass(itemPct))}>
                   {itemPct}%
                 </span>
               </span>
@@ -428,14 +433,14 @@ function TopLlavesConductoresBlock({
         })}
       </div>
       <TopLlavesConductoresFootnote row={row} expanded={expanded} displayKeys={keys} />
-      <div className="mt-2 flex items-center justify-between border-t border-white/[0.05] pt-2">
-        <span className="text-[10px] text-white/25">{lastEventLabel ?? ""}</span>
+      <div className="mt-2.5 flex items-center justify-between border-t border-white/[0.05] pt-2.5">
+        <span className="text-[11px] text-white/25">{lastEventLabel ?? ""}</span>
         {canExpand && (
           <Button
             type="button"
             variant="ghost"
             size="sm"
-            className="h-6 px-2 text-[10px] text-white/50 hover:bg-white/[0.05] hover:text-white/70"
+            className="h-6 px-2 text-[11px] text-white/50 hover:bg-white/[0.05] hover:text-white/70"
             onClick={() => setExpanded((e) => !e)}
           >
             {expanded ? "Ver menos ∧" : `Ver ${full!.length - row.topDriversKeys.length} más ⌄`}
@@ -589,27 +594,27 @@ function TopExcesosOperacionTable({ rows, limit, onLimitChange, title }: TopExce
             </table>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {visible.map((row, i) => (
               <div
                 key={row.operacion}
                 className={cn(
-                  "rounded-lg border border-white/[0.06] bg-white/[0.03] p-4 border-t-2",
+                  "rounded-lg border border-white/[0.06] bg-white/[0.03] p-5 border-t-2",
                   CARD_ACCENTS[i % CARD_ACCENTS.length],
                 )}
               >
                 {/* Header line 1: name + ranking badge + speed */}
-                <div className="mb-0.5 flex items-center gap-2">
-                  <span className="min-w-0 flex-1 truncate text-sm font-semibold text-white/85">
+                <div className="mb-1 flex items-center gap-2">
+                  <span className="min-w-0 flex-1 truncate text-base font-semibold text-white/90">
                     {row.operacion}
                   </span>
-                  <span className="shrink-0 rounded bg-white/[0.06] px-1.5 py-0.5 text-[10px] text-white/40">
+                  <span className="shrink-0 rounded bg-white/[0.06] px-2 py-0.5 text-xs text-white/45">
                     🏆 #{i + 1}
                   </span>
                   {row.maxSpeed != null && (
                     <span
                       className={cn(
-                        "shrink-0 rounded px-2 py-0.5 text-xs font-medium tabular-nums",
+                        "shrink-0 rounded px-2 py-0.5 text-sm font-medium tabular-nums",
                         speedClass(row.maxSpeed),
                       )}
                     >
@@ -618,7 +623,7 @@ function TopExcesosOperacionTable({ rows, limit, onLimitChange, title }: TopExce
                   )}
                 </div>
                 {/* Header line 2: KPIs */}
-                <div className="mb-3 text-[10px] text-white/35">
+                <div className="mb-4 text-xs text-white/40">
                   {row.pct}% del total&nbsp;·&nbsp;{row.excesos} excesos&nbsp;·&nbsp;{row.plates} patentes
                 </div>
 
