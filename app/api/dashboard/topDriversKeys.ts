@@ -311,6 +311,7 @@ export function buildTopDriversKeysByOperation(
     return {
       operationName,
       topDriversKeys: allRows.slice(0, 3),
+      topDriversKeysAll: allRows,
       topDriversKeysAttributedTotal,
     }
   })
