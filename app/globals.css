@@ -147,3 +147,30 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer base {
+  /* Light-mode compatibility for legacy dark-only utility classes. */
+  :is(html.light, html:not(.dark)) [class*="text-white"] {
+    color: hsl(var(--foreground)) !important;
+  }
+
+  :is(html.light, html:not(.dark)) [class*="text-white/25"],
+  :is(html.light, html:not(.dark)) [class*="text-white/30"],
+  :is(html.light, html:not(.dark)) [class*="text-white/35"],
+  :is(html.light, html:not(.dark)) [class*="text-white/40"],
+  :is(html.light, html:not(.dark)) [class*="text-white/45"] {
+    color: hsl(var(--muted-foreground)) !important;
+  }
+
+  :is(html.light, html:not(.dark)) [class*="placeholder:text-white"]::placeholder {
+    color: hsl(var(--muted-foreground)) !important;
+  }
+
+  :is(html.light, html:not(.dark)) [class*="border-white"] {
+    border-color: hsl(var(--border)) !important;
+  }
+
+  :is(html.light, html:not(.dark)) [class*="bg-white/"] {
+    background-color: hsl(var(--secondary)) !important;
+  }
+}
