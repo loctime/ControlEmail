@@ -1,4 +1,5 @@
 import type { DailyAlertVehicle } from "@/lib/firestore-read"
+import { isSpeedExcessEvent } from "@/shared/eventClassification"
 import type {
   DashboardVehicleDetailDTO,
   TopDriverKeyDTO,
@@ -65,46 +66,6 @@ function buildEventLookups(events: DailyAlertVehicle["events"] | undefined) {
 }
 
 type SpeedIncident = DailyAlertVehicle["speedIncidents"][number]
-type DailyEvent = DailyAlertVehicle["events"][number]
-
-/**
- * Exceso de velocidad: V2 (SPEEDING / SPEED_EXCESS), legacy snake_case, emails/parser,
- * y heurística alineada a historico/page (incluye subcadenas "exceso", "velocidad", "speed").
- */
-function isSpeedExcessEvent(event: DailyEvent | undefined): boolean {
-  if (!event || typeof event !== "object") return false
-
-  const blobs = [
-    event.type,
-    event.eventCategory,
-    event.eventSubtype,
-    event.reason,
-    event.reasonRaw,
-  ]
-    .filter((x) => x != null && String(x).trim() !== "")
-    .map((x) => String(x).toLowerCase())
-
-  for (const t of blobs) {
-    if (
-      t === "exceso" ||
-      t === "exceso_velocidad" ||
-      t === "speeding" ||
-      t === "speed_excess" ||
-      t.includes("exceso") ||
-      t.includes("velocidad") ||
-      t.includes("speed")
-    ) {
-      return true
-    }
-  }
-
-  return (
-    event.eventCategory === "SPEEDING" ||
-    event.eventSubtype === "SPEED_EXCESS" ||
-    event.eventCategory === "exceso_velocidad" ||
-    event.type === "exceso"
-  )
-}
 
 function resolveIncidentFields(
   incident: SpeedIncident,
