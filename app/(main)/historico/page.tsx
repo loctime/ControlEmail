@@ -105,8 +105,12 @@ function getEventBadgeClassName(type: string): string {
     normalized.includes("llave") ||
     normalized.includes("contact")
 
-  if (isSpeedExcess) return "border-red-400/20 bg-red-400/10 text-red-300"
-  if (isKeyOrContact) return "border-yellow-400/20 bg-yellow-400/10 text-yellow-300"
+  if (isSpeedExcess) {
+    return "border-red-500/40 bg-red-500/15 text-red-700 dark:border-red-400/20 dark:bg-red-400/10 dark:text-red-300"
+  }
+  if (isKeyOrContact) {
+    return "border-yellow-500/50 bg-yellow-500/20 text-yellow-800 dark:border-yellow-400/20 dark:bg-yellow-400/10 dark:text-yellow-300"
+  }
   return "border-white/10 bg-white/5 text-white/60"
 }
 
@@ -434,8 +438,8 @@ export default function HistoricoPage() {
               className={cn(
                 "rounded-full px-3 py-1 text-xs font-medium transition-colors",
                 datePreset === preset
-                  ? "bg-white/10 text-white ring-1 ring-white/20"
-                  : "text-white/40 hover:bg-white/5 hover:text-white/70",
+                  ? "border border-primary/40 bg-primary/20 text-primary ring-1 ring-primary/20 dark:border-white/20 dark:bg-white/10 dark:text-white dark:ring-white/20"
+                  : "text-muted-foreground hover:bg-secondary hover:text-foreground dark:text-white/40 dark:hover:bg-white/5 dark:hover:text-white/70",
               )}
             >
               {DATE_PRESET_LABELS[preset]}

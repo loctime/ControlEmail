@@ -212,7 +212,9 @@ function TopExcesosPlateTable({ rows, limit, onLimitChange, title }: TopExcesosP
                 size="sm"
                 className={cn(
                   "h-6 px-2 text-xs",
-                  limit === l ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70",
+                  limit === l
+                    ? "border border-primary/30 bg-primary/15 text-primary dark:border-white/20 dark:bg-white/10 dark:text-white"
+                    : "text-muted-foreground hover:bg-secondary hover:text-foreground dark:text-white/40 dark:hover:bg-white/5 dark:hover:text-white/70",
                 )}
                 onClick={() => onLimitChange(l)}
               >
@@ -320,7 +322,9 @@ function TopExcesosOperacionTable({ rows, limit, onLimitChange, title }: TopExce
                 onClick={() => setViewMode("table")}
                 className={cn(
                   "h-6 rounded px-2.5 text-[11px] font-medium transition-colors",
-                  viewMode === "table" ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70",
+                  viewMode === "table"
+                    ? "border border-primary/30 bg-primary/15 text-primary dark:border-white/20 dark:bg-white/10 dark:text-white"
+                    : "text-muted-foreground hover:bg-secondary hover:text-foreground dark:text-white/40 dark:hover:text-white/70",
                 )}
               >
                 Tabla
@@ -330,7 +334,9 @@ function TopExcesosOperacionTable({ rows, limit, onLimitChange, title }: TopExce
                 onClick={() => setViewMode("cards")}
                 className={cn(
                   "h-6 rounded px-2.5 text-[11px] font-medium transition-colors",
-                  viewMode === "cards" ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70",
+                  viewMode === "cards"
+                    ? "border border-primary/30 bg-primary/15 text-primary dark:border-white/20 dark:bg-white/10 dark:text-white"
+                    : "text-muted-foreground hover:bg-secondary hover:text-foreground dark:text-white/40 dark:hover:text-white/70",
                 )}
               >
                 Cards
@@ -344,7 +350,9 @@ function TopExcesosOperacionTable({ rows, limit, onLimitChange, title }: TopExce
                   size="sm"
                   className={cn(
                     "h-6 px-2 text-xs",
-                    limit === l ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70",
+                    limit === l
+                      ? "border border-primary/30 bg-primary/15 text-primary dark:border-white/20 dark:bg-white/10 dark:text-white"
+                      : "text-muted-foreground hover:bg-secondary hover:text-foreground dark:text-white/40 dark:hover:bg-white/5 dark:hover:text-white/70",
                   )}
                   onClick={() => onLimitChange(l)}
                 >
@@ -902,7 +910,9 @@ export default function SuperDashboardPage() {
                 size="sm"
                 className={cn(
                   "h-8 px-3 text-xs font-medium",
-                  preset === p ? "bg-white/10 text-white" : "text-white/50 hover:bg-white/5 hover:text-white/70",
+                  preset === p
+                    ? "border border-primary/40 bg-primary/20 text-primary shadow-sm dark:border-white/20 dark:bg-white/10 dark:text-white"
+                    : "text-muted-foreground hover:bg-secondary hover:text-foreground dark:text-white/50 dark:hover:bg-white/5 dark:hover:text-white/70",
                 )}
                 onClick={() => setPreset(p)}
               >
@@ -1056,12 +1066,12 @@ export default function SuperDashboardPage() {
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
                       <XAxis
                         dataKey="label"
-                        tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 11 }}
+                        tick={{ fill: "hsl(var(--muted-foreground) / 0.85)", fontSize: 11 }}
                         tickLine={false}
                         axisLine={false}
                       />
                       <YAxis
-                        tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 11 }}
+                        tick={{ fill: "hsl(var(--muted-foreground) / 0.85)", fontSize: 11 }}
                         tickLine={false}
                         axisLine={false}
                         width={28}
