@@ -452,6 +452,85 @@ function TopLlavesConductoresBlock({
   )
 }
 
+function OperacionCard({
+  row,
+  rank,
+  accent,
+  speedClass,
+}: {
+  row: TopOperacionRow
+  rank: number
+  accent: string
+  speedClass: (speed: number | null) => string
+}) {
+  const [showAllResp, setShowAllResp] = useState(false)
+  const names = row.responsables.map((r) => r.replace(/@\S+/g, "").trim()).filter(Boolean)
+  const visibleNames = showAllResp ? names : names.slice(0, 2)
+  const hidden = names.length - 2
+
+  return (
+    <div className={cn("rounded-lg border border-white/[0.06] bg-white/[0.03] p-5 border-t-2", accent)}>
+      {/* Header line 1: name + ranking badge + speed */}
+      <div className="mb-1 flex items-center gap-2">
+        <span className="min-w-0 flex-1 truncate text-base font-semibold text-white/90">{row.operacion}</span>
+        <span className="shrink-0 rounded bg-white/[0.06] px-2 py-0.5 text-xs text-white/45">🏆 #{rank}</span>
+        {row.maxSpeed != null && (
+          <span className={cn("shrink-0 rounded px-2 py-0.5 text-sm font-medium tabular-nums", speedClass(row.maxSpeed))}>
+            {row.maxSpeed} km/h
+          </span>
+        )}
+      </div>
+      {/* Header line 2: responsables */}
+      {names.length > 0 && (
+        <div className="mb-1 text-xs text-white/50">
+          {visibleNames.join(", ")}
+          {!showAllResp && hidden > 0 && (
+            <>
+              <span className="text-white/30"> +{hidden} más </span>
+              <button
+                type="button"
+                onClick={() => setShowAllResp(true)}
+                className="text-white/40 underline underline-offset-2 hover:text-white/60"
+              >
+                ver
+              </button>
+            </>
+          )}
+          {showAllResp && (
+            <>
+              {" "}
+              <button
+                type="button"
+                onClick={() => setShowAllResp(false)}
+                className="text-white/40 underline underline-offset-2 hover:text-white/60"
+              >
+                ver menos
+              </button>
+            </>
+          )}
+        </div>
+      )}
+      {/* Header line 3: KPIs */}
+      <div className="mb-4 mt-2 flex items-center gap-2">
+        <span className="rounded-md bg-red-500/15 px-2 py-1 text-sm font-semibold tabular-nums text-red-400">
+          {row.excesos} excesos
+        </span>
+        <span className="rounded-md bg-white/[0.06] px-2 py-1 text-sm font-medium tabular-nums text-white/60">
+          {row.pct}% de eventos
+        </span>
+        <span className="rounded-md bg-white/[0.06] px-2 py-1 text-sm font-medium tabular-nums text-white/60">
+          {row.plates} patentes
+        </span>
+      </div>
+      <TopLlavesConductoresBlock
+        row={row}
+        variant="cards"
+        lastEventLabel={`Último: ${formatLastEvent(row.lastEventAt)}`}
+      />
+    </div>
+  )
+}
+
 interface TopExcesosOperacionTableProps {
   rows: TopOperacionRow[]
   limit: TopLimit
@@ -460,7 +539,6 @@ interface TopExcesosOperacionTableProps {
 }
 
 function TopExcesosOperacionTable({ rows, limit, onLimitChange, title }: TopExcesosOperacionTableProps) {
-  const [viewMode, setViewMode] = useState<OperacionViewMode>("table")
   const visible = applyLimit(rows, limit)
 
   function speedClass(speed: number | null): string {
@@ -485,34 +563,7 @@ function TopExcesosOperacionTable({ rows, limit, onLimitChange, title }: TopExce
       <CardHeader className="pb-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle className="text-sm font-semibold text-white/80">{title}</CardTitle>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex rounded-md border border-white/10 bg-white/[0.04] p-0.5">
-              <button
-                type="button"
-                onClick={() => setViewMode("table")}
-                className={cn(
-                  "h-6 rounded px-2.5 text-[11px] font-medium transition-colors",
-                  viewMode === "table"
-                    ? "border border-primary/30 bg-primary/15 text-primary dark:border-white/20 dark:bg-white/10 dark:text-white"
-                    : "text-muted-foreground hover:bg-secondary hover:text-foreground dark:text-white/40 dark:hover:text-white/70",
-                )}
-              >
-                Tabla
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode("cards")}
-                className={cn(
-                  "h-6 rounded px-2.5 text-[11px] font-medium transition-colors",
-                  viewMode === "cards"
-                    ? "border border-primary/30 bg-primary/15 text-primary dark:border-white/20 dark:bg-white/10 dark:text-white"
-                    : "text-muted-foreground hover:bg-secondary hover:text-foreground dark:text-white/40 dark:hover:text-white/70",
-                )}
-              >
-                Cards
-              </button>
-            </div>
-            <div className="flex gap-1">
+          <div className="flex gap-1">
               {([5, 10, "todos"] as TopLimit[]).map((l) => (
                 <Button
                   key={String(l)}
@@ -531,109 +582,21 @@ function TopExcesosOperacionTable({ rows, limit, onLimitChange, title }: TopExce
               ))}
             </div>
           </div>
-        </div>
       </CardHeader>
 
       <CardContent>
         {visible.length === 0 ? (
           <p className="py-4 text-center text-sm text-white/30">Sin excesos en el período</p>
-        ) : viewMode === "table" ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-white/5 text-left text-white/40">
-                  <th className="pb-2 align-bottom font-normal">#</th>
-                  <th className="pb-2 align-bottom font-normal">Operación</th>
-                  <th className="pb-2 align-bottom font-normal">Top llaves/conductores</th>
-                  <th className="pb-2 align-bottom text-right font-normal">Excesos</th>
-                  <th className="pb-2 align-bottom text-right font-normal">%</th>
-                  <th className="pb-2 align-bottom text-right font-normal">Patentes</th>
-                  <th className="pb-2 align-bottom text-right font-normal">Vel. máx</th>
-                  <th className="pb-2 align-bottom text-right font-normal">Último evento</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visible.map((row, i) => (
-                  <tr key={row.operacion} className="border-b border-white/[0.04] hover:bg-white/[0.02]">
-                    <td className="py-3 align-top text-white/30">{i + 1}</td>
-                    <td className="py-3 align-top">
-                      <div className="font-medium text-white/80">{row.operacion}</div>
-                      <div className="mt-1">{deltaEl(row.excesos, undefined)}</div>
-                    </td>
-                    <td className="py-3 align-top">
-                      <TopLlavesConductoresBlock row={row} variant="table" />
-                    </td>
-                    <td className="py-3 align-top text-right">
-                      <div className="text-sm font-medium tabular-nums text-red-400">{row.excesos}</div>
-                      <div className="mt-1.5 ml-auto h-1 w-12 overflow-hidden rounded-full bg-white/[0.06]">
-                        <div
-                          className="h-full rounded-full bg-red-500/60"
-                          style={{ width: `${Math.max(row.pct, row.excesos > 0 ? 4 : 0)}%` }}
-                        />
-                      </div>
-                    </td>
-                    <td className="py-3 align-top text-right tabular-nums text-white/40">{row.pct}%</td>
-                    <td className="py-3 align-top text-right tabular-nums text-white/60">{row.plates}</td>
-                    <td className="py-3 align-top text-right">
-                      {row.maxSpeed != null ? (
-                        <span
-                          className={cn(
-                            "inline-block rounded px-2 py-0.5 text-xs font-medium tabular-nums",
-                            speedClass(row.maxSpeed),
-                          )}
-                        >
-                          {row.maxSpeed} km/h
-                        </span>
-                      ) : (
-                        <span className="text-white/25">—</span>
-                      )}
-                    </td>
-                    <td className="py-3 align-top text-right tabular-nums text-white/40">{formatLastEvent(row.lastEventAt)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {visible.map((row, i) => (
-              <div
+              <OperacionCard
                 key={row.operacion}
-                className={cn(
-                  "rounded-lg border border-white/[0.06] bg-white/[0.03] p-5 border-t-2",
-                  CARD_ACCENTS[i % CARD_ACCENTS.length],
-                )}
-              >
-                {/* Header line 1: name + ranking badge + speed */}
-                <div className="mb-1 flex items-center gap-2">
-                  <span className="min-w-0 flex-1 truncate text-base font-semibold text-white/90">
-                    {row.operacion}
-                  </span>
-                  <span className="shrink-0 rounded bg-white/[0.06] px-2 py-0.5 text-xs text-white/45">
-                    🏆 #{i + 1}
-                  </span>
-                  {row.maxSpeed != null && (
-                    <span
-                      className={cn(
-                        "shrink-0 rounded px-2 py-0.5 text-sm font-medium tabular-nums",
-                        speedClass(row.maxSpeed),
-                      )}
-                    >
-                      {row.maxSpeed} km/h
-                    </span>
-                  )}
-                </div>
-                {/* Header line 2: KPIs */}
-                <div className="mb-4 text-xs text-white/40">
-                  {row.pct}% del total&nbsp;·&nbsp;{row.excesos} excesos&nbsp;·&nbsp;{row.plates} patentes
-                </div>
-
-                <TopLlavesConductoresBlock
-                  row={row}
-                  variant="cards"
-                  lastEventLabel={`Último: ${formatLastEvent(row.lastEventAt)}`}
-                />
-              </div>
+                row={row}
+                rank={i + 1}
+                accent={CARD_ACCENTS[i % CARD_ACCENTS.length]}
+                speedClass={speedClass}
+              />
             ))}
           </div>
         )}
@@ -971,19 +934,6 @@ export default function SuperDashboardPage() {
     [vehicleDetails, kpi.excesos, topDriversKeysByOperation],
   )
 
-  // Table rows
-  const tableRows = useMemo(() => {
-    const riskMap = new Map(riskVehicles.map((v) => [v.plate, v]))
-    return vehicleDetails
-      .map((v) => ({
-        plate: v.plate,
-        totalEvents: (v.excesos ?? 0) + (v.llave_sin_cargar ?? 0) + (v.no_identificados ?? 0) + (v.conductor_inactivo ?? 0) + (v.contactos ?? 0),
-        riskScore: riskMap.get(v.plate)?.maxRisk ?? 0,
-      }))
-      .sort((a, b) => b.totalEvents - a.totalEvents)
-      .slice(0, 10)
-  }, [vehicleDetails, riskVehicles])
-
   const hasData = vehicleDetails.length > 0 || riskVehicles.length > 0
 
   // Navigation
@@ -1276,70 +1226,14 @@ export default function SuperDashboardPage() {
               <h2 className="text-sm font-semibold uppercase tracking-wider text-white/60">
                 Top excesos de velocidad
               </h2>
-              <div className="grid grid-cols-1 gap-4">
-                <TopExcesosPlateTable
-                  title="Por patente"
-                  rows={topByPlate}
-                  limit={topPlateLimit}
-                  onLimitChange={setTopPlateLimit}
-                />
-                <TopExcesosOperacionTable
-                  title="Por operación"
-                  rows={topByOperacion}
-                  limit={topOpLimit}
-                  onLimitChange={setTopOpLimit}
-                />
-              </div>
+              <TopExcesosOperacionTable
+                title="Por operación"
+                rows={topByOperacion}
+                limit={topOpLimit}
+                onLimitChange={setTopOpLimit}
+              />
             </div>
           )}
-
-          {/* SECCIÓN 5 — Tabla */}
-          <Card className="border-white/5 bg-white/[0.03]">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold text-white/80">
-                Vehículos con más eventos
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {tableRows.length === 0 ? (
-                <p className="py-4 text-center text-sm text-white/30">Sin datos</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-white/5 text-left text-xs text-white/40">
-                        <th className="pb-2 font-normal">Patente</th>
-                        <th className="pb-2 text-right font-normal">Total eventos</th>
-                        <th className="pb-2 text-right font-normal">Risk score</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {tableRows.map((row) => (
-                        <tr key={row.plate} className="border-b border-white/[0.04] hover:bg-white/[0.02]">
-                          <td className="py-2 font-mono text-white/90">{row.plate}</td>
-                          <td className="py-2 text-right tabular-nums text-white/70">{row.totalEvents}</td>
-                          <td className="py-2 text-right">
-                            <span
-                              className={cn(
-                                "inline-block rounded px-2 py-0.5 text-xs font-medium tabular-nums",
-                                row.riskScore >= 15
-                                  ? "bg-red-500/20 text-red-400"
-                                  : row.riskScore >= 8
-                                    ? "bg-yellow-500/20 text-yellow-400"
-                                    : "bg-green-500/20 text-green-400",
-                              )}
-                            >
-                              {row.riskScore}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
 
         </div>
       )}
