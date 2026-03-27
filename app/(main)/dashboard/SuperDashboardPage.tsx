@@ -543,13 +543,11 @@ const CARD_ACCENTS = ["border-t-red-500/60", "border-t-yellow-500/60", "border-t
 
 interface TopExcesosOperacionTableProps {
   rows: TopOperacionRow[]
-  limit: TopLimit
-  onLimitChange: (l: TopLimit) => void
   title: string
 }
 
-function TopExcesosOperacionTable({ rows, limit, onLimitChange, title }: TopExcesosOperacionTableProps) {
-  const visible = applyLimit(rows, limit)
+function TopExcesosOperacionTable({ rows, title }: TopExcesosOperacionTableProps) {
+  const visible = applyLimit(rows, "todos")
 
   const deltaEl = (curr: number, prev: number | undefined) => {
     if (prev === undefined) return null
@@ -562,27 +560,7 @@ function TopExcesosOperacionTable({ rows, limit, onLimitChange, title }: TopExce
   return (
     <Card className="border-white/5 bg-white/[0.03]">
       <CardHeader className="pb-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <CardTitle className="text-sm font-semibold text-white/80">{title}</CardTitle>
-          <div className="flex gap-1">
-              {([5, 10, "todos"] as TopLimit[]).map((l) => (
-                <Button
-                  key={String(l)}
-                  variant="ghost"
-                  size="sm"
-                  className={cn(
-                    "h-6 px-2 text-xs",
-                    limit === l
-                      ? "border border-primary/30 bg-primary/15 text-primary dark:border-white/20 dark:bg-white/10 dark:text-white"
-                      : "text-muted-foreground hover:bg-secondary hover:text-foreground dark:text-white/40 dark:hover:bg-white/5 dark:hover:text-white/70",
-                  )}
-                  onClick={() => onLimitChange(l)}
-                >
-                  {l === "todos" ? "Todos" : `Top ${l}`}
-                </Button>
-              ))}
-            </div>
-          </div>
+        <CardTitle className="text-sm font-semibold text-white/80">{title}</CardTitle>
       </CardHeader>
 
       <CardContent>
@@ -926,9 +904,6 @@ export default function SuperDashboardPage() {
     ]
   }, [kpi])
 
-  // Top excesos state
-  const [topPlateLimit, setTopPlateLimit] = useState<TopLimit>(5)
-  const [topOpLimit, setTopOpLimit] = useState<TopLimit>(5)
 
   const topByPlate = useMemo(() => buildTopByPlate(vehicleDetails, kpi.excesos), [vehicleDetails, kpi.excesos])
   const topByOperacion = useMemo(
@@ -1268,8 +1243,6 @@ export default function SuperDashboardPage() {
               <TopExcesosOperacionTable
                 title="Por operación"
                 rows={topByOperacion}
-                limit={topOpLimit}
-                onLimitChange={setTopOpLimit}
               />
             </div>
           )}
