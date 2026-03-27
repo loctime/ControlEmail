@@ -29,7 +29,12 @@ import {
   normalizeBusinessDate,
 } from "@/lib/domain/date"
 import { cn } from "@/lib/utils"
-import type { DashboardAggregatedPayload, DashboardVehicleDetailDTO } from "@/services/api/dashboard/types"
+import type {
+  DashboardAggregatedPayload,
+  DashboardVehicleDetailDTO,
+  TopDriverKeyDTO,
+  TopDriversKeysByOperationDTO,
+} from "@/services/api/dashboard/types"
 
 type DashboardDatePreset = "day" | "week" | "month" | "year"
 
@@ -55,6 +60,7 @@ interface TopOperacionRow {
   plates: number
   maxSpeed: number | null
   lastEventAt: string | null
+  topDriversKeys: TopDriverKeyDTO[]
 }
 
 function buildTopByPlate(details: DashboardVehicleDetailDTO[], totalExcesos: number): TopPlateRow[] {
@@ -101,7 +107,11 @@ function appendResponsablesUnique(agg: OperacionAgg, names: string[]) {
   }
 }
 
-function buildTopByOperacion(details: DashboardVehicleDetailDTO[], totalExcesos: number): TopOperacionRow[] {
+function buildTopByOperacion(
+  details: DashboardVehicleDetailDTO[],
+  totalExcesos: number,
+  topDriversKeysByOperation: TopDriversKeysByOperationDTO[],
+): TopOperacionRow[] {
   const map = new Map<string, OperacionAgg>()
   for (const v of details) {
     if (v.excesos === 0) continue
@@ -127,6 +137,9 @@ function buildTopByOperacion(details: DashboardVehicleDetailDTO[], totalExcesos:
       appendResponsablesUnique(agg, names)
     }
   }
+  const topDriversByOperationMap = new Map(
+    topDriversKeysByOperation.map((item) => [item.operationName, item.topDriversKeys ?? []]),
+  )
   return Array.from(map.entries())
     .map(([operacion, data]) => ({
       operacion,
@@ -136,6 +149,7 @@ function buildTopByOperacion(details: DashboardVehicleDetailDTO[], totalExcesos:
       plates: data.plates.size,
       maxSpeed: data.maxSpeed,
       lastEventAt: data.lastEventAt,
+      topDriversKeys: topDriversByOperationMap.get(operacion) ?? [],
     }))
     .sort((a, b) => b.excesos - a.excesos)
 }
@@ -159,28 +173,6 @@ function responsableShortLabel(value: string | null): string | null {
   const at = t.indexOf("@")
   if (at > 0) return t.slice(0, at)
   return t
-}
-
-function OperacionResponsablesCell({ emails }: { emails: string[] }) {
-  if (emails.length === 0) {
-    return <span className="text-white/25">—</span>
-  }
-  return (
-    <div className="flex max-w-[min(280px,45vw)] flex-wrap gap-1.5">
-      {emails.map((email, idx) => {
-        const label = responsableShortLabel(email) ?? email
-        return (
-          <span
-            key={`${email}-${idx}`}
-            className="inline-flex max-w-full rounded-md bg-white/[0.06] px-2 py-1 text-left text-[10px] leading-snug text-white/65"
-            title={email}
-          >
-            <span className="min-w-0 break-words">{label}</span>
-          </span>
-        )
-      })}
-    </div>
-  )
 }
 
 function applyLimit<T>(rows: T[], limit: TopLimit): T[] {
@@ -297,17 +289,17 @@ function TopExcesosOperacionTable({ rows, limit, onLimitChange, title }: TopExce
   }
 
   const CARD_ACCENTS = ["border-t-red-500/60", "border-t-yellow-500/60", "border-t-blue-500/60", "border-t-green-500/60"]
-  const AVATAR_COLORS = [
-    "bg-blue-500/20 text-blue-300",
-    "bg-teal-500/20 text-teal-300",
-    "bg-amber-500/20 text-amber-300",
-    "bg-pink-500/20 text-pink-300",
-  ]
+  function topDriverTitle(item: TopDriverKeyDTO): string {
+    const driverName = item.driverName?.trim() || "—"
+    return `${item.keyLabel} - ${driverName}`
+  }
 
-  function initials(name: string): string {
-    const parts = name.split(/[.\s_-]/).filter(Boolean)
-    if (parts.length >= 2) return (parts[0]![0]! + parts[1]![0]!).toUpperCase()
-    return name.slice(0, 2).toUpperCase()
+  function topDriverSubtitle(item: TopDriverKeyDTO): string {
+    return `${item.plate ?? "-"} • ${item.excesos} excesos`
+  }
+
+  function isUnassignedKey(item: TopDriverKeyDTO): boolean {
+    return item.keyNumber == null || item.keyLabel.trim().toLowerCase() === "sin llave asignada"
   }
 
   return (
@@ -374,7 +366,7 @@ function TopExcesosOperacionTable({ rows, limit, onLimitChange, title }: TopExce
                 <tr className="border-b border-white/5 text-left text-white/40">
                   <th className="pb-2 align-bottom font-normal">#</th>
                   <th className="pb-2 align-bottom font-normal">Operación</th>
-                  <th className="pb-2 align-bottom font-normal">Responsables</th>
+                  <th className="pb-2 align-bottom font-normal">Top llaves/conductores</th>
                   <th className="pb-2 align-bottom text-right font-normal">Excesos</th>
                   <th className="pb-2 align-bottom text-right font-normal">%</th>
                   <th className="pb-2 align-bottom text-right font-normal">Patentes</th>
@@ -391,7 +383,20 @@ function TopExcesosOperacionTable({ rows, limit, onLimitChange, title }: TopExce
                       <div className="mt-1">{deltaEl(row.excesos, undefined)}</div>
                     </td>
                     <td className="py-3 align-top">
-                      <OperacionResponsablesCell emails={row.responsables} />
+                      {row.topDriversKeys.length === 0 ? (
+                        <span className="text-white/25">—</span>
+                      ) : (
+                        <div className="space-y-1.5">
+                          {row.topDriversKeys.map((item, idx) => (
+                            <div key={`${item.keyLabel}-${item.driverName}-${idx}`} className="leading-tight">
+                              <div className="text-[11px] text-white/80">
+                                {isUnassignedKey(item) ? "⚠️" : "🔑"} {topDriverTitle(item)}
+                              </div>
+                              <div className="text-[10px] text-white/45">{topDriverSubtitle(item)}</div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </td>
                     <td className="py-3 align-top text-right">
                       <div className="text-sm font-medium tabular-nums text-red-400">{row.excesos}</div>
@@ -473,37 +478,28 @@ function TopExcesosOperacionTable({ rows, limit, onLimitChange, title }: TopExce
                   </div>
                 </div>
 
-                {row.responsables.length > 0 && (
-                  <div className="border-t border-white/[0.05] pt-3">
-                    <div className="mb-2 text-[10px] font-medium uppercase tracking-wider text-white/30">
-                      Responsables
-                    </div>
-                    <div className="space-y-1.5">
-                      {row.responsables.slice(0, 3).map((email, idx) => {
-                        const label = responsableShortLabel(email) ?? email
-                        return (
-                          <div key={`${email}-${idx}`} className="flex items-center gap-2">
-                            <span className="w-3 text-[10px] text-white/25">{idx + 1}</span>
-                            <div
-                              className={cn(
-                                "flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full text-[9px] font-medium",
-                                AVATAR_COLORS[idx % AVATAR_COLORS.length],
-                              )}
-                            >
-                              {initials(label)}
-                            </div>
-                            <span className="min-w-0 flex-1 truncate text-[11px] text-white/60" title={email}>
-                              {label}
-                            </span>
-                          </div>
-                        )
-                      })}
-                      {row.responsables.length > 3 && (
-                        <div className="pl-5 text-[10px] text-white/25">+{row.responsables.length - 3} más</div>
-                      )}
-                    </div>
+                <div className="border-t border-white/[0.05] pt-3">
+                  <div className="mb-2 text-[10px] font-medium uppercase tracking-wider text-white/30">
+                    Top llaves/conductores
                   </div>
-                )}
+                  {row.topDriversKeys.length === 0 ? (
+                    <div className="text-[11px] text-white/25">Sin datos</div>
+                  ) : (
+                    <div className="space-y-2">
+                      {row.topDriversKeys.map((item, idx) => (
+                        <div key={`${item.keyLabel}-${item.driverName}-${idx}`} className="flex items-start gap-2">
+                          <span className="w-4 text-[10px] text-white/25">{idx + 1}.</span>
+                          <div className="min-w-0">
+                            <div className="truncate text-[11px] text-white/80" title={topDriverTitle(item)}>
+                              {isUnassignedKey(item) ? "⚠️" : "🔑"} {topDriverTitle(item)}
+                            </div>
+                            <div className="text-[10px] text-white/45">{topDriverSubtitle(item)}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
                 <div className="mt-3 flex items-center justify-between border-t border-white/[0.05] pt-2">
                   <span className="text-[10px] text-white/25">Último: {formatLastEvent(row.lastEventAt)}</span>
@@ -686,7 +682,16 @@ export default function SuperDashboardPage() {
   const setDate = useCallback((date: string) => dispatch({ type: "SET", date }), [])
 
   // Current period
-  const { vehicleDetails, riskVehicles, dailyBreakdown, distribution: periodDistribution, loading, error, refetch } =
+  const {
+    vehicleDetails,
+    topDriversKeysByOperation,
+    riskVehicles,
+    dailyBreakdown,
+    distribution: periodDistribution,
+    loading,
+    error,
+    refetch,
+  } =
     useDashboardData(selectedDate, preset)
 
   useEffect(() => {
@@ -832,7 +837,10 @@ export default function SuperDashboardPage() {
   const [topOpLimit, setTopOpLimit] = useState<TopLimit>(5)
 
   const topByPlate = useMemo(() => buildTopByPlate(vehicleDetails, kpi.excesos), [vehicleDetails, kpi.excesos])
-  const topByOperacion = useMemo(() => buildTopByOperacion(vehicleDetails, kpi.excesos), [vehicleDetails, kpi.excesos])
+  const topByOperacion = useMemo(
+    () => buildTopByOperacion(vehicleDetails, kpi.excesos, topDriversKeysByOperation),
+    [vehicleDetails, kpi.excesos, topDriversKeysByOperation],
+  )
 
   // Table rows
   const tableRows = useMemo(() => {

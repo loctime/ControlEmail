@@ -5,6 +5,7 @@ import type {
   DailyBreakdownPointDTO,
   TopSpeedEventDTO,
 } from "@/services/api/dashboard/types"
+import { buildTopDriversKeysByVehicle, mergeVehicleTopDriversKeys } from "@/app/api/dashboard/topDriversKeys"
 
 function getTopSpeedEvent(v: DailyAlertVehicle): TopSpeedEventDTO | null {
   const incidents = v.speedIncidents?.filter((i) => i.maxSpeed != null) ?? []
@@ -92,6 +93,7 @@ export function buildVehicleDetailFromVehicle(v: DailyAlertVehicle): DashboardVe
     maxSpeed: getMaxSpeed(v),
     topSpeedEvent: getTopSpeedEvent(v),
     speedingDrivers: Array.isArray(v.speedingDrivers) ? [...v.speedingDrivers] : [],
+    topDriversKeys: buildTopDriversKeysByVehicle(v),
     llave_sin_cargar: summary.llave_sin_cargar ?? 0,
     no_identificados: summary.no_identificados ?? 0,
     contactos: summary.contactos ?? 0,
@@ -146,6 +148,9 @@ export function mergeVehicleDetails(details: DashboardVehicleDetailDTO[]): Dashb
   const mergedResp = mergeResponsablesFromDetails(details)
   const mergedNorm = mergeResponsablesNormalizedFromDetails(details)
   const responsable = mergedResp[0] ?? null
+  const topLists = details.map((d) => d.topDriversKeys ?? []).filter((l) => l.length > 0)
+  const topDriversKeys =
+    topLists.length > 0 ? mergeVehicleTopDriversKeys(topLists) : first.topDriversKeys
   return {
     plate: first.plate,
     operacion,
@@ -157,6 +162,7 @@ export function mergeVehicleDetails(details: DashboardVehicleDetailDTO[]): Dashb
     maxSpeed,
     topSpeedEvent,
     speedingDrivers: Array.from(driverSet),
+    topDriversKeys,
     llave_sin_cargar: details.reduce((s, d) => s + d.llave_sin_cargar, 0),
     no_identificados: details.reduce((s, d) => s + d.no_identificados, 0),
     contactos: details.reduce((s, d) => s + d.contactos, 0),

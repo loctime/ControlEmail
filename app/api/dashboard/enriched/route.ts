@@ -17,6 +17,7 @@ import {
   buildVehicleDetailFromVehicle,
   buildAdminTotalsFromVehicles,
 } from "@/app/api/dashboard/enrichment"
+import { buildTopDriversKeysByOperation } from "@/app/api/dashboard/topDriversKeys"
 import type { DashboardAggregatedPayload, DashboardVehicleDetailDTO } from "@/services/api/dashboard/types"
 
 type Period = "day" | "week" | "month" | "year"
@@ -167,7 +168,7 @@ export async function GET(request: Request) {
     }
 
     const result = await getRawPayload(period, date, auth)
-    if (result.error) {
+    if ("error" in result) {
       return NextResponse.json({ error: result.error }, { status: 400 })
     }
 
@@ -175,6 +176,7 @@ export async function GET(request: Request) {
     if (payload.vehicleDetails && payload.vehicleDetails.length > 0) {
       payload.vehicleDetails = await enrichVehicleDetails(payload.vehicleDetails)
     }
+    payload.topDriversKeysByOperation = buildTopDriversKeysByOperation(payload.vehicleDetails ?? [])
 
     return NextResponse.json(payload)
   } catch (error) {

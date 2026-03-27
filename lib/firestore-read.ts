@@ -1041,6 +1041,7 @@ export interface DailyAlertVehicle {
   }
   speedIncidents: Array<{
     incidentKey: string
+    groupedSpeedIncidentKey?: string | null
     eventCategory: string | null
     eventSubtype: string | null
     groupedEventsCount: number
@@ -1192,6 +1193,7 @@ function parseSpeedIncidents(value: unknown, fallbackPlate: string): DailyAlertV
     const raw = item && typeof item === "object" && !Array.isArray(item) ? (item as Record<string, unknown>) : {}
     return {
       incidentKey: String(raw.incidentKey ?? ""),
+      groupedSpeedIncidentKey: toStringOrNull(raw.groupedSpeedIncidentKey),
       eventCategory: toStringOrNull(raw.eventCategory),
       eventSubtype: toStringOrNull(raw.eventSubtype),
       groupedEventsCount: Number(raw.groupedEventsCount ?? 0),

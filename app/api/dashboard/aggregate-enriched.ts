@@ -12,6 +12,7 @@ import {
   sumAdminTotals,
   buildDailyBreakdown,
 } from "@/app/api/dashboard/enrichment"
+import { buildTopDriversKeysByOperation } from "@/app/api/dashboard/topDriversKeys"
 
 function makeAlertId(dateKey: string, plate: string): string {
   return `${dateKey}_${plate}`
@@ -121,6 +122,7 @@ export function aggregateEnriched(
         a.plate.localeCompare(b.plate),
     ),
     vehicleDetails,
+    topDriversKeysByOperation: buildTopDriversKeysByOperation(vehicleDetails),
     adminTotals,
   }
 

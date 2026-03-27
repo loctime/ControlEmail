@@ -57,6 +57,19 @@
     timestamp: string | null
   }
 
+export interface TopDriverKeyDTO {
+  driverName: string
+  keyNumber: number | null
+  keyLabel: string
+  plate: string | null
+  excesos: number
+}
+
+export interface TopDriversKeysByOperationDTO {
+  operationName: string
+  topDriversKeys: TopDriverKeyDTO[]
+}
+
   /** Enriched per-vehicle data for SuperDashboard (Operational Risk + Admin Alerts) */
   export interface DashboardVehicleDetailDTO {
     plate: string
@@ -75,6 +88,7 @@
     no_identificados: number
     contactos: number
     conductor_inactivo: number
+  topDriversKeys?: TopDriverKeyDTO[]
   }
 
   /** Admin alerts totals for Tab 2 */
@@ -110,6 +124,8 @@
     distribution?: DashboardPeriodDistributionDTO | null
     /** SuperDashboard: per-vehicle enriched data */
     vehicleDetails?: DashboardVehicleDetailDTO[]
+  /** SuperDashboard: top final por operación para llaves/conductores */
+  topDriversKeysByOperation?: TopDriversKeysByOperationDTO[]
     /** SuperDashboard: admin alert category totals */
     adminTotals?: AdminTotalsDTO
     /** SuperDashboard: last 7 days breakdown (week response only) */

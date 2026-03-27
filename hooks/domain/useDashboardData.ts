@@ -9,6 +9,7 @@ import type {
   DashboardAggregatedPayload,
   DashboardPeriodDistributionDTO,
   DashboardVehicleDetailDTO,
+  TopDriversKeysByOperationDTO,
   MyAlertItemDTO,
   MyRiskItemDTO,
   MyStatsDTO,
@@ -88,6 +89,8 @@ export interface DashboardDataState {
   consistency: DailyConsistencyDTO | null
   /** SuperDashboard: per-vehicle enriched data */
   vehicleDetails: DashboardVehicleDetailDTO[]
+  /** SuperDashboard: top llaves/conductores agregado por operación */
+  topDriversKeysByOperation: TopDriversKeysByOperationDTO[]
   /** SuperDashboard: admin alert category totals */
   adminTotals: AdminTotalsDTO | null
   /** SuperDashboard: serie diaria de excesos (semana, mes, año cuando el API la envía) */
@@ -113,6 +116,7 @@ export function useDashboardData(
       pendingAlerts: MyAlertItemDTO[]
       consistency: DailyConsistencyDTO | null
       vehicleDetails: DashboardVehicleDetailDTO[]
+      topDriversKeysByOperation: TopDriversKeysByOperationDTO[]
       adminTotals: AdminTotalsDTO | null
       dailyBreakdown: DailyBreakdownPointDTO[] | null
       distribution: DashboardPeriodDistributionDTO | null
@@ -124,6 +128,7 @@ export function useDashboardData(
           pendingAlerts: [],
           consistency: null,
           vehicleDetails: [],
+          topDriversKeysByOperation: [],
           adminTotals: null,
           dailyBreakdown: null,
           distribution: null,
@@ -143,6 +148,9 @@ export function useDashboardData(
           : [],
         consistency: payload.consistency ?? null,
         vehicleDetails,
+        topDriversKeysByOperation: Array.isArray(payload.topDriversKeysByOperation)
+          ? payload.topDriversKeysByOperation
+          : [],
         adminTotals: payload.adminTotals ?? null,
         dailyBreakdown: Array.isArray(payload.dailyBreakdown) ? payload.dailyBreakdown : null,
         distribution: normalizeDistribution(payload),
@@ -162,6 +170,7 @@ export function useDashboardData(
     pendingAlerts: query.data?.pendingAlerts ?? [],
     consistency: query.data?.consistency ?? null,
     vehicleDetails: query.data?.vehicleDetails ?? [],
+    topDriversKeysByOperation: query.data?.topDriversKeysByOperation ?? [],
     adminTotals: query.data?.adminTotals ?? null,
     dailyBreakdown: query.data?.dailyBreakdown ?? null,
     distribution: query.data?.distribution ?? null,
