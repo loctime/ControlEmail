@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react"
 import { es } from "date-fns/locale"
-import { ArrowLeft, ArrowRight, CalendarIcon } from "lucide-react"
+import { ArrowLeft, ArrowRight } from "lucide-react"
 import { useQuery } from "@tanstack/react-query"
 import type { DateRange, Matcher } from "react-day-picker"
 import {
@@ -18,7 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { AsyncState } from "@/components/common/async-state"
 import { Calendar } from "@/components/ui/calendar"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover"
 import { useDashboardData } from "@/hooks/domain/useDashboardData"
 import { dashboardApi } from "@/services/api"
 import { queryKeys } from "@/lib/query/queryKeys"
@@ -954,10 +954,6 @@ export default function SuperDashboardPage() {
     }
     return selectedDate ? formatPeriodLabel(selectedDate, preset) : "Seleccionar fecha"
   }, [preset, selectedDate, customRange])
-  const selectedDateObj = useMemo(
-    () => (selectedDate ? new Date(`${selectedDate}T00:00:00`) : undefined),
-    [selectedDate],
-  )
   const maxDateObj = useMemo(() => new Date(`${maxAvailableDate}T00:00:00`), [maxAvailableDate])
   const disabledDays: Matcher | undefined = { after: maxDateObj }
 
@@ -1013,110 +1009,101 @@ export default function SuperDashboardPage() {
           <p className="mt-0.5 text-sm text-white/40">Vista ejecutiva · HSE, Operaciones y Gerencia</p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex flex-wrap rounded-lg border border-white/10 bg-white/[0.04] p-0.5">
-            {(["day", "week", "month", "year"] as const).map((p) => (
+        <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap rounded-lg border border-white/10 bg-white/[0.04] p-0.5">
+              {(["day", "week", "month", "year"] as const).map((p) => (
+                <Button
+                  key={p}
+                  variant="ghost"
+                  size="sm"
+                  className={cn(
+                    "h-8 px-3 text-xs font-medium",
+                    preset === p
+                      ? "border border-primary/40 bg-primary/20 text-primary shadow-sm dark:border-white/20 dark:bg-white/10 dark:text-white"
+                      : "text-muted-foreground hover:bg-secondary hover:text-foreground dark:text-white/50 dark:hover:bg-white/5 dark:hover:text-white/70",
+                  )}
+                  onClick={() => selectStandardPreset(p)}
+                >
+                  {p === "day"
+                    ? "Último día"
+                    : p === "week"
+                      ? "Últimos 7 días"
+                      : p === "month"
+                        ? "Mes"
+                        : "Año"}
+                </Button>
+              ))}
+              <PopoverAnchor asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={cn(
+                    "h-8 px-3 text-xs font-medium",
+                    preset === "custom"
+                      ? "border border-primary/40 bg-primary/20 text-primary shadow-sm dark:border-white/20 dark:bg-white/10 dark:text-white"
+                      : "text-muted-foreground hover:bg-secondary hover:text-foreground dark:text-white/50 dark:hover:bg-white/5 dark:hover:text-white/70",
+                  )}
+                  onClick={activateCustomPreset}
+                >
+                  Personalizado
+                </Button>
+              </PopoverAnchor>
+            </div>
+
+            <div className="flex items-center rounded-lg border border-white/10 bg-white/[0.04]">
               <Button
-                key={p}
                 variant="ghost"
-                size="sm"
-                className={cn(
-                  "h-8 px-3 text-xs font-medium",
-                  preset === p
-                    ? "border border-primary/40 bg-primary/20 text-primary shadow-sm dark:border-white/20 dark:bg-white/10 dark:text-white"
-                    : "text-muted-foreground hover:bg-secondary hover:text-foreground dark:text-white/50 dark:hover:bg-white/5 dark:hover:text-white/70",
-                )}
-                onClick={() => selectStandardPreset(p)}
+                size="icon"
+                className="h-9 w-9 rounded-r-none text-white/60 hover:text-white disabled:opacity-30"
+                disabled={!canGoPrev}
+                onClick={handlePrev}
               >
-                {p === "day"
-                  ? "Último día"
-                  : p === "week"
-                    ? "Últimos 7 días"
-                    : p === "month"
-                      ? "Mes"
-                      : "Año"}
+                <ArrowLeft size={15} />
               </Button>
-            ))}
-            <Button
-              variant="ghost"
-              size="sm"
-              className={cn(
-                "h-8 px-3 text-xs font-medium",
-                preset === "custom"
-                  ? "border border-primary/40 bg-primary/20 text-primary shadow-sm dark:border-white/20 dark:bg-white/10 dark:text-white"
-                  : "text-muted-foreground hover:bg-secondary hover:text-foreground dark:text-white/50 dark:hover:bg-white/5 dark:hover:text-white/70",
-              )}
-              onClick={activateCustomPreset}
-            >
-              Personalizado
-            </Button>
-          </div>
-
-          <div className="flex items-center rounded-lg border border-white/10 bg-white/[0.04]">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9 rounded-r-none text-white/60 hover:text-white disabled:opacity-30"
-              disabled={!canGoPrev}
-              onClick={handlePrev}
-            >
-              <ArrowLeft size={15} />
-            </Button>
-            <div className="h-5 w-px bg-white/10" />
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9 rounded-l-none text-white/60 hover:text-white disabled:opacity-30"
-              disabled={!canGoNext}
-              onClick={handleNext}
-            >
-              <ArrowRight size={15} />
-            </Button>
-          </div>
-
-          <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-            <PopoverTrigger asChild>
+              <div className="h-5 w-px bg-white/10" />
               <Button
-                variant="outline"
-                disabled={loadingLastDate}
-                className="h-9 gap-2 border-white/10 bg-white/[0.04] text-sm text-white/80 hover:bg-white/[0.08] hover:text-white"
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-l-none text-white/60 hover:text-white disabled:opacity-30"
+                disabled={!canGoNext}
+                onClick={handleNext}
               >
-                <CalendarIcon size={14} className="text-white/40" />
-                {selectedDateLabel}
+                <ArrowRight size={15} />
               </Button>
-            </PopoverTrigger>
-            <PopoverContent
+            </div>
+
+            <p
               className={cn(
-                "w-auto p-0",
-                "border-border bg-popover text-popover-foreground",
-                "dark:border-white/10 dark:bg-zinc-900 dark:text-zinc-50",
+                "min-h-9 whitespace-nowrap px-1 text-sm tabular-nums text-white/75",
+                loadingLastDate && "text-white/35",
               )}
+              aria-live="polite"
             >
-              {preset === "custom" ? (
-                <Calendar
-                  mode="range"
-                  locale={es}
-                  selected={customRange}
-                  onSelect={(range) => {
-                    setCustomRange(range)
-                    if (range?.from && range?.to) setDate(normalizeBusinessDate(range.to))
-                  }}
-                  disabled={disabledDays}
-                  initialFocus
-                />
-              ) : (
-                <Calendar
-                  mode="single"
-                  locale={es}
-                  selected={selectedDateObj}
-                  onSelect={(d) => { if (d) setDate(normalizeBusinessDate(d)) }}
-                  disabled={disabledDays}
-                  initialFocus
-                />
-              )}
-            </PopoverContent>
-          </Popover>
-        </div>
+              {selectedDateLabel}
+            </p>
+          </div>
+          <PopoverContent
+            align="start"
+            className={cn(
+              "w-auto p-0",
+              "border-border bg-popover text-popover-foreground",
+              "dark:border-white/10 dark:bg-zinc-900 dark:text-zinc-50",
+            )}
+          >
+            <Calendar
+              mode="range"
+              locale={es}
+              selected={customRange}
+              onSelect={(range) => {
+                setCustomRange(range)
+                if (range?.from && range?.to) setDate(normalizeBusinessDate(range.to))
+              }}
+              disabled={disabledDays}
+              initialFocus
+            />
+          </PopoverContent>
+        </Popover>
       </div>
 
       <AsyncState loading={loading} error={error} onRetry={handleRefetch} />
