@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ChevronDown, ChevronRight, Plus, X } from "lucide-react"
 import {
   AlertDialog,
@@ -96,10 +96,32 @@ export default function OperationsAdminPage() {
   const [deleteLoading, setDeleteLoading] = useState(false)
 
   const [cardExpanded, setCardExpanded] = useState<Record<string, boolean>>({})
-  const isCardExpanded = (nombre: string) => cardExpanded[nombre] !== false
+  const isCardExpanded = (nombre: string) => cardExpanded[nombre] === true
   const setCardOpen = (nombre: string, open: boolean) => {
     setCardExpanded((p) => ({ ...p, [nombre]: open }))
   }
+
+  const [searchText, setSearchText] = useState("")
+  const [activeChips, setActiveChips] = useState<Set<string>>(() => new Set())
+  const [sortBy, setSortBy] = useState<"nombre" | "patentes" | "responsables">("nombre")
+  const [allExpanded, setAllExpanded] = useState(false)
+  const prevOperationNamesRef = useRef<Set<string>>(new Set())
+
+  useEffect(() => {
+    const newNames = new Set(operations.map((o) => o.nombre))
+    const prevNamesSnapshot = new Set(prevOperationNamesRef.current)
+    setActiveChips((prev) => {
+      const next = new Set<string>()
+      for (const n of prev) {
+        if (newNames.has(n)) next.add(n)
+      }
+      for (const n of newNames) {
+        if (!prevNamesSnapshot.has(n)) next.add(n)
+      }
+      return next
+    })
+    prevOperationNamesRef.current = newNames
+  }, [operations])
 
   const [sinAsignarOpen, setSinAsignarOpen] = useState(false)
   const [assigningPlate, setAssigningPlate] = useState<string | null>(null)
@@ -108,6 +130,45 @@ export default function OperationsAdminPage() {
   const [emailAdding, setEmailAdding] = useState<Record<string, boolean>>({})
 
   const assignableOps = useMemo(
+    () => [...operations].sort((a, b) => a.nombre.localeCompare(b.nombre, "es")),
+    [operations],
+  )
+
+  const totalPlatesAllOps = useMemo(
+    () => operations.reduce((sum, o) => sum + o.plates.length, 0),
+    [operations],
+  )
+
+  const visibleOperations = useMemo(() => {
+    const q = searchText.trim().toLowerCase()
+    let list = operations.filter((op) => activeChips.has(op.nombre))
+    if (q) {
+      list = list.filter((op) => {
+        if (op.nombre.toLowerCase().includes(q)) return true
+        if (op.plates.some((p) => p.toLowerCase().includes(q))) return true
+        if (op.responsables.some((r) => r.toLowerCase().includes(q))) return true
+        return false
+      })
+    }
+    const sorted = [...list]
+    if (sortBy === "nombre") {
+      sorted.sort((a, b) => a.nombre.localeCompare(b.nombre, "es"))
+    } else if (sortBy === "patentes") {
+      sorted.sort(
+        (a, b) =>
+          b.plates.length - a.plates.length || a.nombre.localeCompare(b.nombre, "es"),
+      )
+    } else {
+      sorted.sort(
+        (a, b) =>
+          b.responsables.length - a.responsables.length ||
+          a.nombre.localeCompare(b.nombre, "es"),
+      )
+    }
+    return sorted
+  }, [operations, activeChips, searchText, sortBy])
+
+  const chipOpsOrdered = useMemo(
     () => [...operations].sort((a, b) => a.nombre.localeCompare(b.nombre, "es")),
     [operations],
   )
@@ -375,8 +436,96 @@ export default function OperationsAdminPage() {
         </div>
       )}
 
+      <div className="space-y-3 rounded-lg border bg-card p-4 shadow-sm">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
+          <Input
+            type="search"
+            placeholder="Buscar por operación, patente o email..."
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            className="lg:min-w-0 lg:flex-1"
+          />
+          <div className="flex flex-wrap items-center gap-2">
+            <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="nombre">Nombre A-Z</SelectItem>
+                <SelectItem value="patentes">Más patentes</SelectItem>
+                <SelectItem value="responsables">Más responsables</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setAllExpanded((prev) => {
+                  const next = !prev
+                  const map: Record<string, boolean> = {}
+                  for (const op of operations) {
+                    map[op.nombre] = next
+                  }
+                  setCardExpanded((p) => ({ ...p, ...map }))
+                  return next
+                })
+              }}
+            >
+              {allExpanded ? "Colapsar todo" : "Expandir todo"}
+            </Button>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {chipOpsOrdered.map((op) => {
+            const on = activeChips.has(op.nombre)
+            return (
+              <button
+                key={op.nombre}
+                type="button"
+                className="inline-flex rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                onClick={() => {
+                  setActiveChips((prev) => {
+                    const next = new Set(prev)
+                    if (next.has(op.nombre)) next.delete(op.nombre)
+                    else next.add(op.nombre)
+                    return next
+                  })
+                }}
+              >
+                <Badge variant={on ? "default" : "outline"} className="cursor-pointer">
+                  {op.nombre}
+                </Badge>
+              </button>
+            )
+          })}
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs"
+            onClick={() => setActiveChips(new Set(operations.map((o) => o.nombre)))}
+          >
+            Todas
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs"
+            onClick={() => setActiveChips(new Set())}
+          >
+            Ninguna
+          </Button>
+        </div>
+      </div>
+
+      <p className="text-xs text-muted-foreground">
+        {operations.length} operaciones · {totalPlatesAllOps} patentes · mostrando {visibleOperations.length}
+      </p>
+
       <div className="space-y-4">
-        {operations.map((op) => {
+        {visibleOperations.map((op) => {
           const pCount = op.plates.length
           const rCount = op.responsables.length
           const expanded = isCardExpanded(op.nombre)
