@@ -532,26 +532,54 @@ export default function OperationsAdminPage() {
           return (
             <Card key={op.nombre}>
               <Collapsible open={expanded} onOpenChange={(open) => setCardOpen(op.nombre, open)}>
-                <CardHeader className="space-y-0 pb-3">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="min-w-0">
-                      <h2 className="text-lg font-semibold leading-tight">{op.nombre}</h2>
-                      <p className="text-xs text-muted-foreground">
-                        {pCount} {pCount === 1 ? "patente" : "patentes"} · {rCount}{" "}
-                        {rCount === 1 ? "responsable" : "responsables"}
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
+                <CardHeader className={expanded ? "space-y-0 pb-3" : "space-y-0 p-0"}>
+                  {!expanded ? (
+                    <CollapsibleTrigger asChild>
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-3 rounded-t-lg px-6 py-5 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        aria-label={`Expandir operación ${op.nombre}`}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <h2 className="text-lg font-semibold leading-tight">{op.nombre}</h2>
+                          <p className="text-xs text-muted-foreground">
+                            {pCount} {pCount === 1 ? "patente" : "patentes"} · {rCount}{" "}
+                            {rCount === 1 ? "responsable" : "responsables"}
+                          </p>
+                        </div>
+                        <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />
+                      </button>
+                    </CollapsibleTrigger>
+                  ) : (
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <CollapsibleTrigger asChild>
-                        <Button type="button" variant="outline" size="sm">
-                          {expanded ? "Ocultar" : "Editar"}
-                        </Button>
+                        <button
+                          type="button"
+                          className="flex w-full min-w-0 flex-1 items-start gap-3 rounded-md py-0.5 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:items-center"
+                          aria-label={`Colapsar operación ${op.nombre}`}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <h2 className="text-lg font-semibold leading-tight">{op.nombre}</h2>
+                            <p className="text-xs text-muted-foreground">
+                              {pCount} {pCount === 1 ? "patente" : "patentes"} · {rCount}{" "}
+                              {rCount === 1 ? "responsable" : "responsables"}
+                            </p>
+                          </div>
+                          <ChevronDown className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />
+                        </button>
                       </CollapsibleTrigger>
-                      <Button type="button" variant="destructive" size="sm" onClick={() => setDeleteTarget(op.nombre)}>
-                        Eliminar
-                      </Button>
+                      <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
+                        <CollapsibleTrigger asChild>
+                          <Button type="button" variant="outline" size="sm">
+                            Ocultar
+                          </Button>
+                        </CollapsibleTrigger>
+                        <Button type="button" variant="destructive" size="sm" onClick={() => setDeleteTarget(op.nombre)}>
+                          Eliminar
+                        </Button>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </CardHeader>
                 <CollapsibleContent>
                   <CardContent className="border-t pt-4">
