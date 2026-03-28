@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react"
 import { es } from "date-fns/locale"
 import { ArrowLeft, ArrowRight, CalendarIcon, RefreshCw } from "lucide-react"
 import { useQuery } from "@tanstack/react-query"
@@ -283,10 +283,12 @@ function TopLlavesConductoresFootnote({
   row,
   expanded,
   displayKeys,
+  expandButton,
 }: {
   row: TopOperacionRow
   expanded: boolean
   displayKeys: TopDriverKeyDTO[]
+  expandButton?: ReactNode
 }) {
   if (displayKeys.length === 0) return null
   const shownSum = displayKeys.reduce((s, i) => s + i.excesos, 0)
@@ -294,19 +296,25 @@ function TopLlavesConductoresFootnote({
     row.topDriversAttributedTotal != null ? row.topDriversAttributedTotal : shownSum
   const otherRanked = expanded ? 0 : Math.max(0, attributed - shownSum)
   const outsideRanked = Math.max(0, row.excesos - attributed)
-  if (otherRanked === 0 && outsideRanked === 0) return null
+  if (otherRanked === 0 && outsideRanked === 0 && expandButton == null) return null
   return (
     <div className="mt-2 space-y-1 border-t border-white/[0.05] pt-2">
       {otherRanked > 0 && (
-        <p className="text-[10px] leading-snug text-white/35">
-          +{otherRanked} excesos en otras combinaciones llave/conductor (no entran en el top 3 de la lista).
-        </p>
+        <div className="flex w-full items-center justify-between gap-2">
+          <p className="min-w-0 flex-1 text-[10px] leading-snug text-white/35">
+            +{otherRanked} excesos de velocidad en este top.
+          </p>
+          {expandButton}
+        </div>
       )}
       {outsideRanked > 0 && (
         <p className="text-[10px] leading-snug text-white/35">
           {outsideRanked} excesos del total operación no aparecen en este ranking: suelen ser eventos que no se
           agrupan en incidentes de velocidad con llave/conductor, o datos incompletos en esos incidentes.
         </p>
+      )}
+      {otherRanked === 0 && expandButton != null && (
+        <div className="flex w-full justify-end">{expandButton}</div>
       )}
     </div>
   )
@@ -434,20 +442,26 @@ function TopLlavesConductoresBlock({
           )
         })}
       </div>
-      <TopLlavesConductoresFootnote row={row} expanded={expanded} displayKeys={keys} />
-      <div className="mt-2.5 flex items-center justify-between border-t border-white/[0.05] pt-2.5">
+      <TopLlavesConductoresFootnote
+        row={row}
+        expanded={expanded}
+        displayKeys={keys}
+        expandButton={
+          canExpand ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="-mr-2 h-6 shrink-0 px-2 text-[11px] text-white/50 hover:bg-white/[0.05] hover:text-white/70"
+              onClick={() => setExpanded((e) => !e)}
+            >
+              {expanded ? "Menos" : "Ver"}
+            </Button>
+          ) : undefined
+        }
+      />
+      <div className="mt-2.5 border-t border-white/[0.05] pt-2.5">
         <span className="text-[11px] text-white/25">{lastEventLabel ?? ""}</span>
-        {canExpand && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-6 px-2 text-[11px] text-white/50 hover:bg-white/[0.05] hover:text-white/70"
-            onClick={() => setExpanded((e) => !e)}
-          >
-            {expanded ? "Ver menos ∧" : `Ver ${full!.length - row.topDriversKeys.length} más ⌄`}
-          </Button>
-        )}
       </div>
     </div>
   )
