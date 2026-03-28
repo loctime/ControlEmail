@@ -883,10 +883,6 @@ function toFirestoreFields(fields: Record<string, unknown>): Record<string, Reco
   return out
 }
 
-export interface VehicleAlertsUpdate {
-  responsables: string[]
-}
-
 /** ConfiguraciÃ³n de destinatarios globales de alertas por email (documento apps/emails/config/config). */
 export interface EmailConfigDoc {
   generalRecipients: string[]
@@ -973,39 +969,6 @@ export async function updateEmailConfig(payload: EmailConfigDoc): Promise<void> 
     throw new Error(`Firestore update failed: ${res.status}`)
   }
   console.log("[firestore-read] updateEmailConfig OK")
-}
-
-/**
- * Actualiza responsables de un vehÃ­culo en apps/emails/vehicles/{plate}.
- * Si el documento no tiene responsables, se escriben los enviados (no se inicializa en lectura).
- */
-export async function updateVehicleAlerts(
-  plate: string,
-  payload: VehicleAlertsUpdate,
-): Promise<void> {
-  const docPath = `apps/emails/vehicles/${encodeURIComponent(plate)}`
-  const path = `documents/${docPath}?updateMask.fieldPaths=responsables`
-  const projectId = getEnvOrThrow(
-    "FIREBASE_PROJECT_ID",
-    "NEXT_PUBLIC_FIREBASE_PROJECT_ID",
-  )
-  const documentName = `projects/${projectId}/databases/(default)/documents/${docPath}`
-  const body = {
-    name: documentName,
-    fields: toFirestoreFields({
-      responsables: payload.responsables,
-    }),
-  }
-  const res = await firestoreRequest(path, {
-    method: "PATCH",
-    body: JSON.stringify(body),
-  })
-  if (!res.ok) {
-    const text = await res.text()
-    console.error("[firestore-read] updateVehicleAlerts failed:", res.status, text)
-    throw new Error(`Firestore update failed: ${res.status}`)
-  }
-  console.log("[firestore-read] updateVehicleAlerts OK:", plate)
 }
 
 // Daily Alerts structure for new email module

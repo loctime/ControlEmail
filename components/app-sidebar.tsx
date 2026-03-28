@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Briefcase, Car, ChevronRight, FileClock, LayoutDashboard, Settings, Truck } from "lucide-react"
+import { Briefcase, ChevronRight, FileClock, LayoutDashboard, Settings, Truck } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const baseNavItems = [
@@ -22,7 +22,6 @@ export function AppSidebar({ role, collapsed = false, onToggle }: AppSidebarProp
   const isAdmin = role != null && role !== "responsable"
   const adminNavItems = [
     { href: "/admin/email-config", label: "Destinatarios", icon: Settings },
-    { href: "/admin/vehicle-alerts", label: "Responsables", icon: Car },
     { href: "/admin/operations", label: "Operaciones", icon: Briefcase },
   ]
   const navItems = isAdmin ? [...baseNavItems, ...adminNavItems] : baseNavItems
