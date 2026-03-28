@@ -12,6 +12,8 @@ const titles: Record<string, string> = {
   "/dashboard": "Dashboard",
   "/vehiculos": "Vehiculos",
   "/historico": "Historico",
+  "/admin/operations": "Operaciones",
+  "/admin/email-config": "Destinatarios",
   "/admin/calidad": "Calidad de datos",
 }
 
