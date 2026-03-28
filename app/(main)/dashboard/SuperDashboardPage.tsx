@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react"
 import { es } from "date-fns/locale"
-import { ArrowLeft, ArrowRight, CalendarIcon, RefreshCw } from "lucide-react"
+import { ArrowLeft, ArrowRight, CalendarIcon } from "lucide-react"
 import { useQuery } from "@tanstack/react-query"
-import type { Matcher } from "react-day-picker"
+import type { DateRange, Matcher } from "react-day-picker"
 import {
   Bar,
   BarChart,
@@ -37,7 +37,7 @@ import type {
 } from "@/services/api/dashboard/types"
 import { OperacionPieChart } from "@/components/dashboard/OperacionPieChart"
 
-type DashboardDatePreset = "day" | "week" | "month" | "year"
+type DashboardDatePreset = "day" | "week" | "month" | "year" | "custom"
 
 // ─── Top Excesos helpers ───────────────────────────────────────────────────────
 
@@ -613,7 +613,7 @@ function readStoredPreset(): DashboardDatePreset | undefined {
   if (typeof window === "undefined") return undefined
   try {
     const v = localStorage.getItem(STORAGE_PRESET_KEY)
-    if (v === "day" || v === "week" || v === "month" || v === "year") return v
+    if (v === "day" || v === "week" || v === "month" || v === "year" || v === "custom") return v
     return undefined
   } catch { return undefined }
 }
@@ -727,10 +727,13 @@ function KpiCard({ label, value, prev, accentClass, prevLabel }: KpiCardProps) {
 export default function SuperDashboardPage() {
   const [dateState, dispatch] = useReducer(dateReducer, { status: "pending" })
   const [preset, setPreset] = useState<DashboardDatePreset>(() => readStoredPreset() ?? "day")
+  const [calendarOpen, setCalendarOpen] = useState(false)
+  const [customRange, setCustomRange] = useState<DateRange | undefined>(undefined)
   const [selectedOperacionForChart, setSelectedOperacionForChart] = useState<string | null>(null)
   const hasRestoredRef = useRef(false)
 
   const selectedDate = dateState.status === "ready" ? dateState.date : undefined
+  const presetForApi = preset === "custom" ? "day" : preset
 
   useEffect(() => {
     if (hasRestoredRef.current) return
@@ -778,7 +781,7 @@ export default function SuperDashboardPage() {
     error,
     refetch,
   } =
-    useDashboardData(selectedDate, preset)
+    useDashboardData(selectedDate, presetForApi)
 
   useEffect(() => {
     if (!selectedDate) return
@@ -800,18 +803,18 @@ export default function SuperDashboardPage() {
   // Previous period — compute param
   const prevApiParam = useMemo(() => {
     if (!selectedDate) return undefined
-    const raw = getPreviousParam(selectedDate, preset)
-    if (preset === "month") return raw            // already "YYYY-MM"
-    if (preset === "year") return raw             // already "YYYY"
+    const raw = getPreviousParam(selectedDate, presetForApi)
+    if (presetForApi === "month") return raw            // already "YYYY-MM"
+    if (presetForApi === "year") return raw             // already "YYYY"
     return raw                                    // full dateKey
-  }, [selectedDate, preset])
+  }, [selectedDate, presetForApi])
 
   const { data: prevPayload } = useQuery({
-    queryKey: ["dashboard", "prev", preset, prevApiParam ?? ""],
+    queryKey: ["dashboard", "prev", presetForApi, prevApiParam ?? ""],
     queryFn: async (): Promise<DashboardAggregatedPayload | null> => {
       if (!prevApiParam) return null
       try {
-        return await dashboardApi.getEnriched(preset, prevApiParam)
+        return await dashboardApi.getEnriched(presetForApi, prevApiParam)
       } catch { return null }
     },
     enabled: !!prevApiParam,
@@ -844,13 +847,13 @@ export default function SuperDashboardPage() {
 
   const prevLabel = useMemo(() => ({
     day: "día ant.", week: "semana ant.", month: "mes ant.", year: "año ant.",
-  }[preset]), [preset])
+  }[presetForApi]), [presetForApi])
 
   // Bar chart data
   const chartData = useMemo(() => {
     console.log(`[Chart] preset=${preset}, dailyBreakdown length=${dailyBreakdown?.length ?? "null"}, vehicleDetails=${vehicleDetails.length}`)
     // Preset day: mostrar top 10 patentes con más excesos
-    if (preset === "day") {
+    if (preset === "day" || preset === "custom") {
       return vehicleDetails
         .filter((v) => v.excesos > 0)
         .sort((a, b) => b.excesos - a.excesos)
@@ -933,10 +936,15 @@ export default function SuperDashboardPage() {
     () => (lastDateData?.minDate ? normalizeBusinessDate(lastDateData.minDate) : undefined),
     [lastDateData?.minDate],
   )
-  const selectedDateLabel = useMemo(
-    () => (selectedDate ? formatPeriodLabel(selectedDate, preset) : "Seleccionar fecha"),
-    [selectedDate, preset],
-  )
+  const selectedDateLabel = useMemo(() => {
+    if (preset === "custom") {
+      if (customRange?.from && customRange?.to) {
+        return `${formatDDMMYYYY(normalizeBusinessDate(customRange.from))} - ${formatDDMMYYYY(normalizeBusinessDate(customRange.to))}`
+      }
+      return "Seleccionar rango"
+    }
+    return selectedDate ? formatPeriodLabel(selectedDate, preset) : "Seleccionar fecha"
+  }, [preset, selectedDate, customRange])
   const selectedDateObj = useMemo(
     () => (selectedDate ? new Date(`${selectedDate}T00:00:00`) : undefined),
     [selectedDate],
@@ -944,11 +952,16 @@ export default function SuperDashboardPage() {
   const maxDateObj = useMemo(() => new Date(`${maxAvailableDate}T00:00:00`), [maxAvailableDate])
   const disabledDays: Matcher | undefined = { after: maxDateObj }
 
-  const canGoPrev = !!selectedDate && !!minAvailableDate && normalizeBusinessDate(selectedDate) > minAvailableDate
-  const canGoNext = !!selectedDate && normalizeBusinessDate(selectedDate) < maxAvailableDate
+  const canGoPrev =
+    preset !== "custom" &&
+    !!selectedDate &&
+    !!minAvailableDate &&
+    normalizeBusinessDate(selectedDate) > minAvailableDate
+  const canGoNext =
+    preset !== "custom" && !!selectedDate && normalizeBusinessDate(selectedDate) < maxAvailableDate
 
   const handlePrev = useCallback(() => {
-    if (!selectedDate) return
+    if (preset === "custom" || !selectedDate) return
     const d = new Date(`${selectedDate}T00:00:00`)
     if (preset === "day") d.setDate(d.getDate() - 1)
     else if (preset === "week") d.setDate(d.getDate() - 7)
@@ -958,7 +971,7 @@ export default function SuperDashboardPage() {
   }, [selectedDate, preset, setDate])
 
   const handleNext = useCallback(() => {
-    if (!selectedDate) return
+    if (preset === "custom" || !selectedDate) return
     const d = new Date(`${selectedDate}T00:00:00`)
     if (preset === "day") d.setDate(d.getDate() + 1)
     else if (preset === "week") d.setDate(d.getDate() + 7)
@@ -968,6 +981,18 @@ export default function SuperDashboardPage() {
   }, [selectedDate, preset, setDate])
 
   const handleRefetch = useCallback(() => void refetch(), [refetch])
+
+  const activateCustomPreset = useCallback(() => {
+    setPreset("custom")
+    setCustomRange(undefined)
+    setCalendarOpen(true)
+  }, [])
+
+  const selectStandardPreset = useCallback((p: "day" | "week" | "month" | "year") => {
+    setPreset(p)
+    setCustomRange(undefined)
+    setCalendarOpen(false)
+  }, [])
 
   return (
     <div className="min-h-screen space-y-6 p-6">
@@ -980,7 +1005,7 @@ export default function SuperDashboardPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex rounded-lg border border-white/10 bg-white/[0.04] p-0.5">
+          <div className="flex flex-wrap rounded-lg border border-white/10 bg-white/[0.04] p-0.5">
             {(["day", "week", "month", "year"] as const).map((p) => (
               <Button
                 key={p}
@@ -992,11 +1017,30 @@ export default function SuperDashboardPage() {
                     ? "border border-primary/40 bg-primary/20 text-primary shadow-sm dark:border-white/20 dark:bg-white/10 dark:text-white"
                     : "text-muted-foreground hover:bg-secondary hover:text-foreground dark:text-white/50 dark:hover:bg-white/5 dark:hover:text-white/70",
                 )}
-                onClick={() => setPreset(p)}
+                onClick={() => selectStandardPreset(p)}
               >
-                {p === "day" ? "Día" : p === "week" ? "Semana" : p === "month" ? "Mes" : "Año"}
+                {p === "day"
+                  ? "Último día"
+                  : p === "week"
+                    ? "Últimos 7 días"
+                    : p === "month"
+                      ? "Mes"
+                      : "Año"}
               </Button>
             ))}
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "h-8 px-3 text-xs font-medium",
+                preset === "custom"
+                  ? "border border-primary/40 bg-primary/20 text-primary shadow-sm dark:border-white/20 dark:bg-white/10 dark:text-white"
+                  : "text-muted-foreground hover:bg-secondary hover:text-foreground dark:text-white/50 dark:hover:bg-white/5 dark:hover:text-white/70",
+              )}
+              onClick={activateCustomPreset}
+            >
+              Personalizado
+            </Button>
           </div>
 
           <div className="flex items-center rounded-lg border border-white/10 bg-white/[0.04]">
@@ -1021,7 +1065,7 @@ export default function SuperDashboardPage() {
             </Button>
           </div>
 
-          <Popover>
+          <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
@@ -1033,37 +1077,30 @@ export default function SuperDashboardPage() {
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto border-white/10 bg-zinc-900 p-0">
-              <Calendar
-                mode="single"
-                locale={es}
-                selected={selectedDateObj}
-                onSelect={(d) => { if (d) setDate(normalizeBusinessDate(d)) }}
-                disabled={disabledDays}
-                initialFocus
-              />
+              {preset === "custom" ? (
+                <Calendar
+                  mode="range"
+                  locale={es}
+                  selected={customRange}
+                  onSelect={(range) => {
+                    setCustomRange(range)
+                    if (range?.from && range?.to) setDate(normalizeBusinessDate(range.to))
+                  }}
+                  disabled={disabledDays}
+                  initialFocus
+                />
+              ) : (
+                <Calendar
+                  mode="single"
+                  locale={es}
+                  selected={selectedDateObj}
+                  onSelect={(d) => { if (d) setDate(normalizeBusinessDate(d)) }}
+                  disabled={disabledDays}
+                  initialFocus
+                />
+              )}
             </PopoverContent>
           </Popover>
-
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={loadingLastDate || !lastDateData?.date}
-            className="h-9 border-white/10 bg-white/[0.04] text-xs text-white/60 hover:bg-white/[0.08] hover:text-white"
-            onClick={() => lastDateData?.date && setDate(normalizeBusinessDate(lastDateData.date))}
-          >
-            Último con datos
-          </Button>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRefetch}
-            disabled={loading || !selectedDate}
-            className="h-9 gap-1.5 border-white/10 bg-white/[0.04] text-xs text-white/60 hover:bg-white/[0.08] hover:text-white"
-          >
-            <RefreshCw size={13} className={cn(loading && "animate-spin")} />
-            Actualizar
-          </Button>
         </div>
       </div>
 
@@ -1120,7 +1157,7 @@ export default function SuperDashboardPage() {
               <CardHeader className="pb-3">
                 <CardTitle className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm font-semibold text-white/80">
                   <span>
-                    {preset === "day" && "Excesos de velocidad por patente"}
+                    {(preset === "day" || preset === "custom") && "Excesos de velocidad por patente"}
                     {preset === "week" && "Excesos de velocidad por día"}
                     {preset === "month" && "Excesos de velocidad por semana"}
                     {preset === "year" && "Excesos de velocidad por mes"}
