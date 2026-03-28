@@ -24,7 +24,7 @@ export function TopNavbar({ subtitle, onLogout }: TopNavbarProps) {
 
   const title = useMemo(() => {
     const matched = Object.keys(titles).find((path) => pathname === path || pathname.startsWith(`${path}/`))
-    return matched ? titles[matched] : "FleetGuard"
+    return matched ? titles[matched] : "ControlDoc Vehicular"
   }, [pathname])
 
   return (

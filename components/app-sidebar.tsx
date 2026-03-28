@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { BarChart3, Car, ChevronLeft, ChevronRight, FileClock, LayoutDashboard, Settings, Truck } from "lucide-react"
+import { Car, ChevronLeft, ChevronRight, FileClock, LayoutDashboard, Settings, Truck } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const baseNavItems = [
@@ -33,34 +33,41 @@ export function AppSidebar({ role, collapsed = false, onToggle }: AppSidebarProp
         collapsed ? "w-12" : "w-max min-w-[9.5rem] max-w-[13.5rem]",
       )}
     >
-      {/* Logo + toggle */}
-      <div className="flex h-14 shrink-0 items-stretch border-b">
+      {/* Header blanco: mismo px que el nav (p-1.5); logo centrado en vertical */}
+      <div className="shrink-0 border-b border-[#E5E7EB] bg-[#FFFFFF] px-0.5 py-0.5">
         {collapsed ? (
-          /* Colapsado: botón ocupa todo el header */
-          <button
-            type="button"
-            onClick={onToggle}
-            title="Expandir"
-            className="flex w-full items-center justify-center text-muted-foreground hover:bg-muted/60"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
+          <div className="flex items-center justify-center">
+            <button
+              type="button"
+              onClick={onToggle}
+              title="Expandir"
+              className="flex w-full items-center justify-center text-muted-foreground hover:bg-muted/60"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
         ) : (
-          /* Expandido: ancho natural (sin flex-1 que forzaba todo el ancho del sidebar) */
-          <>
-            <div className="flex min-w-0 items-center gap-1.5 px-2">
-              <BarChart3 className="h-4 w-4 shrink-0" />
-              <p className="whitespace-nowrap text-sm font-semibold leading-tight">FleetGuard</p>
+          <div className="grid grid-cols-[.5rem_minmax(0,1fr)_.5rem] items-stretch">
+            <div className="min-w-0" aria-hidden />
+            <div className="flex min-h-[5.5rem] min-w-0 items-center justify-center overflow-hidden px-0.5">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/icons/logo-sidebar.png"
+                alt="ControlDoc Vehicular"
+                className="h-[5.5rem] w-auto max-w-full object-contain object-center"
+                width={320}
+                height={88}
+              />
             </div>
             <button
               type="button"
               onClick={onToggle}
               title="Colapsar"
-              className="flex h-full shrink-0 items-center justify-center border-l px-2 text-muted-foreground hover:bg-muted/60"
+              className="flex min-h-[5.5rem] w-full min-w-[.5rem] items-center justify-center self-stretch border-l border-[#E5E7EB] px-0 text-muted-foreground hover:bg-muted/60"
             >
               <ChevronLeft className="h-3.5 w-3.5" />
             </button>
-          </>
+          </div>
         )}
       </div>
 

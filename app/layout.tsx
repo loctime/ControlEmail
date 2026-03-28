@@ -10,11 +10,11 @@ import { QueryProvider } from "@/components/query-provider"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "FleetGuard - Control Vehicular",
+  title: "ControlDoc Vehicular",
   description:
-    "Sistema de gestion y seguimiento de eventos vehiculares. Monitoreo de excesos de velocidad, vehiculos no identificados y desvios operativos.",
+    "Sistema de gestión y seguimiento de eventos vehiculares. Monitoreo de excesos de velocidad, vehículos no identificados y desvíos operativos.",
   icons: {
-    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+    icon: [{ url: "/icon.svg", type: "image/svg+xml", sizes: "any" }],
   },
 }
 
@@ -35,7 +35,7 @@ export default function RootLayout({
   return (
     <html lang="es" suppressHydrationWarning>
       <body className={`${inter.className} antialiased`}>
-        <ThemeProvider storageKey="fleetguard-theme">
+        <ThemeProvider storageKey="controldoc-theme">
           <QueryProvider>
             <AuthGuard>{children}</AuthGuard>
           </QueryProvider>

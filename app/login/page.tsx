@@ -89,7 +89,7 @@ function LoginForm() {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-muted/30 p-4">
         <div className="w-full max-w-sm space-y-2 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight">FleetGuard</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">ControlDoc Vehicular</h1>
           <p className="text-sm text-muted-foreground">Verificando...</p>
         </div>
       </div>
@@ -100,7 +100,7 @@ function LoginForm() {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-muted/30 p-4">
         <div className="w-full max-w-sm space-y-2 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight">FleetGuard</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">ControlDoc Vehicular</h1>
           <p className="text-sm font-medium text-destructive">{errorMessage}</p>
         </div>
         <div className="flex w-full max-w-sm gap-2">
@@ -116,7 +116,7 @@ function LoginForm() {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-muted/30 p-4">
         <div className="w-full max-w-sm space-y-2 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight">FleetGuard</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">ControlDoc Vehicular</h1>
           <p className="text-sm text-muted-foreground">Ingresa tu contrasena para {email}</p>
         </div>
         <form onSubmit={handleAuth} className="flex w-full max-w-sm flex-col gap-4 rounded-lg border bg-card p-6 shadow-sm">
@@ -150,7 +150,7 @@ function LoginForm() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-muted/30 p-4">
       <div className="w-full max-w-sm space-y-2 text-center">
-        <h1 className="text-2xl font-semibold tracking-tight">FleetGuard</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">ControlDoc Vehicular</h1>
         <p className="text-sm text-muted-foreground">Ingresa tu email para continuar</p>
       </div>
       <form onSubmit={handleContinue} className="flex w-full max-w-sm flex-col gap-4 rounded-lg border bg-card p-6 shadow-sm">
