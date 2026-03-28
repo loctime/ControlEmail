@@ -480,10 +480,10 @@ export default function HistoricoPage() {
           <div className="flex flex-wrap items-end gap-2">
             {/* Patente */}
             <Select value={selectedPlate} onValueChange={(v) => setSelectedPlate(v)}>
-              <SelectTrigger className="w-[160px] border-white/10 bg-white/[0.04] text-white/80">
+              <SelectTrigger className="w-[160px]">
                 <SelectValue placeholder="Patente" />
               </SelectTrigger>
-              <SelectContent className="border-white/10 bg-zinc-900 text-white">
+              <SelectContent>
                 <SelectItem value="Todas">Todas las patentes</SelectItem>
                 {(data?.plates ?? []).map((plate) => (
                   <SelectItem key={plate} value={plate}>
@@ -495,10 +495,10 @@ export default function HistoricoPage() {
 
             {/* Tipo de evento */}
             <Select value={selectedEventType} onValueChange={(v) => setSelectedEventType(v)}>
-              <SelectTrigger className="w-[200px] border-white/10 bg-white/[0.04] text-white/80">
+              <SelectTrigger className="w-[200px]">
                 <SelectValue placeholder="Tipo de evento" />
               </SelectTrigger>
-              <SelectContent className="border-white/10 bg-zinc-900 text-white">
+              <SelectContent>
                 <SelectItem value="Todos">Todos los tipos</SelectItem>
                 {availableEventTypes.map((t) => (
                   <SelectItem key={t} value={t}>
@@ -510,10 +510,10 @@ export default function HistoricoPage() {
 
             {/* Operación */}
             <Select value={selectedOperation} onValueChange={(v) => setSelectedOperation(v)}>
-              <SelectTrigger className="w-[180px] border-white/10 bg-white/[0.04] text-white/80">
+              <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Operación" />
               </SelectTrigger>
-              <SelectContent className="border-white/10 bg-zinc-900 text-white">
+              <SelectContent>
                 <SelectItem value="Todas">Todas las operaciones</SelectItem>
                 {availableOperations.map((op) => (
                   <SelectItem key={op} value={op}>
