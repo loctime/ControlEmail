@@ -20,7 +20,34 @@ import { eventTypeDescriptions } from "@/lib/data"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 const PAGE_LIMIT = 100
+/** Límite de páginas al traer todo el rango para filtrar en cliente (100 × 200 = 20k eventos). */
+const MAX_FETCH_PAGES = 200
 const MAX_RANGE_DAYS = 366
+
+async function fetchAllVehicleEventsPages(
+  dateFrom: string,
+  dateTo: string,
+  plate: string | undefined,
+): Promise<{ events: VehicleEventItem[]; plates: string[]; total: number }> {
+  const merged: VehicleEventItem[] = []
+  const plates = new Set<string>()
+  let page = 1
+  while (page <= MAX_FETCH_PAGES) {
+    const res = await vehiclesApi.vehicleEvents({
+      dateFrom,
+      dateTo,
+      limit: PAGE_LIMIT,
+      page,
+      ...(plate ? { plate } : {}),
+    })
+    const ev = res.events ?? []
+    for (const e of ev) merged.push(e)
+    for (const p of res.plates ?? []) plates.add(p)
+    if (ev.length < PAGE_LIMIT) break
+    page++
+  }
+  return { events: merged, plates: Array.from(plates), total: merged.length }
+}
 
 type DatePreset = "ultimo" | "semana" | "mes" | "personalizado"
 
@@ -280,22 +307,59 @@ export default function HistoricoPage() {
     selectedOperation !== "Todas" ||
     search !== ""
 
-  const queryParams = useMemo<VehicleEventsParams>(
-    () => ({ dateFrom, dateTo, limit: PAGE_LIMIT, page: currentPage }),
-    [dateFrom, dateTo, currentPage],
+  const monthly = useMemo(() => usesMonthlyHistory(new Date(dateFrom), new Date(dateTo)), [dateFrom, dateTo])
+  /** Filtros que no van al API: se aplica paginación sobre el resultado filtrado en cliente. */
+  const hasClientOnlyFilters =
+    selectedEventType !== "Todos" || selectedOperation !== "Todas" || search.trim() !== ""
+  const plateParam = selectedPlate !== "Todas" ? selectedPlate : undefined
+  const usesClientPagination = monthly || hasClientOnlyFilters
+
+  const pagedQueryParams = useMemo<VehicleEventsParams>(
+    () => ({
+      dateFrom,
+      dateTo,
+      limit: PAGE_LIMIT,
+      page: currentPage,
+      ...(plateParam ? { plate: plateParam } : {}),
+    }),
+    [dateFrom, dateTo, currentPage, plateParam],
+  )
+
+  const historicoQueryKey = useMemo(
+    () =>
+      monthly
+        ? (["historico-events", "monthly", dateFrom, dateTo, plateParam ?? ""] as const)
+        : hasClientOnlyFilters
+          ? (["historico-events", "full-range", dateFrom, dateTo, plateParam ?? ""] as const)
+          : (["historico-events", "paged", pagedQueryParams] as const),
+    [monthly, hasClientOnlyFilters, dateFrom, dateTo, plateParam, pagedQueryParams],
   )
 
   const { data, isLoading, error, refetch, isFetching } = useQuery({
-    queryKey: ["historico-events", queryParams],
+    queryKey: historicoQueryKey,
     enabled: isRangeValid,
     staleTime: 60_000,
     queryFn: async () => {
-      const response = usesMonthlyHistory(new Date(dateFrom), new Date(dateTo))
-        ? await getVehicleEventsHistory({ dateFrom, dateTo, plate: selectedPlate !== "Todas" ? selectedPlate : undefined })
-        : await vehiclesApi.vehicleEvents(queryParams)
+      if (monthly) {
+        const response = await getVehicleEventsHistory({ dateFrom, dateTo, plate: plateParam })
+        const rows = (response.events ?? []).map(mapEventRow)
+        rows.sort((a, b) => (b.eventTimestamp ?? "").localeCompare(a.eventTimestamp ?? ""))
+        return { plates: response.plates ?? [], rows, total: rows.length }
+      }
+      if (hasClientOnlyFilters) {
+        const response = await fetchAllVehicleEventsPages(dateFrom, dateTo, plateParam)
+        const rows = response.events.map(mapEventRow)
+        rows.sort((a, b) => (b.eventTimestamp ?? "").localeCompare(a.eventTimestamp ?? ""))
+        return { plates: response.plates, rows, total: response.total }
+      }
+      const response = await vehiclesApi.vehicleEvents(pagedQueryParams)
       const rows = (response.events ?? []).map(mapEventRow)
       rows.sort((a, b) => (b.eventTimestamp ?? "").localeCompare(a.eventTimestamp ?? ""))
-      return { plates: response.plates ?? [], rows, total: response.total }
+      return {
+        plates: response.plates ?? [],
+        rows,
+        total: typeof response.total === "number" ? response.total : rows.length,
+      }
     },
   })
 
@@ -329,6 +393,28 @@ export default function HistoricoPage() {
     })
   }, [data?.rows, search, selectedPlate, selectedEventType, selectedOperation])
 
+  const pageRows = useMemo(() => {
+    if (!usesClientPagination) return filteredRows
+    const start = (currentPage - 1) * PAGE_LIMIT
+    return filteredRows.slice(start, start + PAGE_LIMIT)
+  }, [usesClientPagination, filteredRows, currentPage])
+
+  const totalPages = useMemo(() => {
+    if (usesClientPagination) {
+      return Math.max(1, Math.ceil(filteredRows.length / PAGE_LIMIT))
+    }
+    if (data?.total != null) return Math.max(1, Math.ceil(data.total / PAGE_LIMIT))
+    return 1
+  }, [usesClientPagination, filteredRows.length, data?.total])
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [dateFrom, dateTo, selectedEventType, selectedOperation, search, selectedPlate, monthly, hasClientOnlyFilters])
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages)
+  }, [currentPage, totalPages])
+
   // Auto-fallback: si ayer no tiene datos, intentar anteayer (máx 1 intento)
   useEffect(() => {
     if (isLoading || isFetching || datePreset !== "ultimo" || fallbackTried) return
@@ -353,7 +439,8 @@ export default function HistoricoPage() {
 
   const visibleCols = useMemo<ColFlags>(
     () => ({
-      conductor: filteredRows.some((r) => r.driverName != null),
+      // Siempre: `driverName` viene del API (puede ser null, p. ej. contacto sin conductor).
+      conductor: true,
       llave: filteredRows.some((r) => r.keyId != null),
       velocidad: filteredRows.some((r) => r.speed != null),
       ubicacion: filteredRows.some((r) => r.location != null),
@@ -361,15 +448,14 @@ export default function HistoricoPage() {
     [filteredRows],
   )
 
-  const totalPages = data?.total != null ? Math.max(1, Math.ceil(data.total / PAGE_LIMIT)) : 1
-
   const handleExport = useCallback(async () => {
     setIsExporting(true)
     try {
-      const response = usesMonthlyHistory(new Date(dateFrom), new Date(dateTo))
-        ? await getVehicleEventsHistory({ dateFrom, dateTo, plate: selectedPlate !== "Todas" ? selectedPlate : undefined })
-        : await vehiclesApi.vehicleEvents({ dateFrom, dateTo, limit: 500, page: 1 })
-      const allRows = (response.events ?? []).map(mapEventRow)
+      const plate = selectedPlate !== "Todas" ? selectedPlate : undefined
+      const rawEvents = usesMonthlyHistory(new Date(dateFrom), new Date(dateTo))
+        ? (await getVehicleEventsHistory({ dateFrom, dateTo, plate })).events ?? []
+        : (await fetchAllVehicleEventsPages(dateFrom, dateTo, plate)).events
+      const allRows = rawEvents.map(mapEventRow)
       allRows.sort((a, b) => (b.eventTimestamp ?? "").localeCompare(a.eventTimestamp ?? ""))
 
       const q = search.trim().toLowerCase()
@@ -382,7 +468,7 @@ export default function HistoricoPage() {
       })
 
       const exportCols: ColFlags = {
-        conductor: exportRows.some((r) => r.driverName != null),
+        conductor: true,
         llave: exportRows.some((r) => r.keyId != null),
         velocidad: exportRows.some((r) => r.speed != null),
         ubicacion: exportRows.some((r) => r.location != null),
@@ -609,7 +695,7 @@ export default function HistoricoPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredRows.map((row) => (
+                  {pageRows.map((row) => (
                     <TableRow key={row.rowId} className="border-white/5 bg-white/[0.02] hover:bg-white/[0.03]">
                       <TableCell className="font-mono text-xs text-white/90">
                         {row.plate} {row.model ? `· ${row.model}` : ""}
@@ -656,8 +742,10 @@ export default function HistoricoPage() {
             {/* Pagination */}
             <div className="mt-4 flex items-center justify-between">
               <p className="text-xs text-white/40">
-                {filteredRows.length} evento{filteredRows.length !== 1 ? "s" : ""} en esta página
-                {data?.total != null && ` · ${data.total} total`}
+                {pageRows.length} evento{pageRows.length !== 1 ? "s" : ""} en esta página
+                {usesClientPagination
+                  ? filteredRows.length > 0 && ` · ${filteredRows.length} que coinciden con los filtros`
+                  : data?.total != null && ` · ${data.total} total en el período`}
                 {totalPages > 1 && ` · Página ${currentPage} de ${totalPages}`}
               </p>
               <div className="flex items-center gap-1.5">
