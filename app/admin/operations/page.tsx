@@ -104,8 +104,6 @@ export default function OperationsAdminPage() {
   const [sinAsignarOpen, setSinAsignarOpen] = useState(false)
   const [assigningPlate, setAssigningPlate] = useState<string | null>(null)
 
-  const [plateDraft, setPlateDraft] = useState<Record<string, string>>({})
-  const [plateAdding, setPlateAdding] = useState<Record<string, boolean>>({})
   const [emailDraft, setEmailDraft] = useState<Record<string, string>>({})
   const [emailAdding, setEmailAdding] = useState<Record<string, boolean>>({})
 
@@ -240,33 +238,6 @@ export default function OperationsAdminPage() {
     }
   }
 
-  const handleAddPlate = async (nombre: string) => {
-    const raw = plateDraft[nombre] ?? ""
-    const normalized = normalizePlate(raw)
-    if (!normalized) {
-      showFlash("Patente invalida")
-      return
-    }
-    try {
-      await apiClient.post<unknown, { plate: string }>(
-        operationsPath(nombre, "/plates"),
-        { plate: normalized },
-        OPS_AUTH,
-      )
-      setOperations((prev) =>
-        prev.map((o) => {
-          if (o.nombre !== nombre) return o
-          if (o.plates.includes(normalized)) return o
-          return { ...o, plates: [...o.plates, normalized] }
-        }),
-      )
-      setPlateDraft((p) => ({ ...p, [nombre]: "" }))
-      setPlateAdding((p) => ({ ...p, [nombre]: false }))
-    } catch (err) {
-      showFlash(err instanceof Error ? err.message : "Error al agregar patente")
-    }
-  }
-
   const handleRemoveResponsable = async (nombre: string, email: string) => {
     const op = operations.find((o) => o.nombre === nombre)
     if (!op) return
@@ -373,9 +344,13 @@ export default function OperationsAdminPage() {
   return (
     <div className="container mx-auto max-w-5xl space-y-6 py-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
+        <div className="min-w-0 max-w-3xl">
           <h1 className="text-2xl font-semibold tracking-tight">Operaciones</h1>
           <p className="mt-1 text-sm text-muted-foreground">Gestión de operaciones, patentes y responsables</p>
+          <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+            Solo se listan patentes que RSV haya reportado al servidor. Para incorporar una unidad nueva, asignala desde la
+            sección <span className="font-medium text-foreground">Sin asignar</span> al final de esta página.
+          </p>
         </div>
         <Button
           type="button"
@@ -435,59 +410,24 @@ export default function OperationsAdminPage() {
                       <div className="space-y-3">
                         <h3 className="text-sm font-medium">Patentes</h3>
                         <div className="flex flex-wrap gap-2">
-                          {op.plates.map((plate) => (
-                            <Badge key={plate} variant="secondary" className="gap-1 pr-1 font-mono">
-                              {plate}
-                              <button
-                                type="button"
-                                className="ml-1 rounded-full p-0.5 hover:bg-background/80"
-                                aria-label={`Quitar patente ${plate}`}
-                                onClick={() => void handleRemovePlate(op.nombre, plate)}
-                              >
-                                <X className="h-3 w-3" />
-                              </button>
-                            </Badge>
-                          ))}
+                          {op.plates.length === 0 ? (
+                            <span className="text-xs text-muted-foreground">Ninguna patente en esta operacion.</span>
+                          ) : (
+                            op.plates.map((plate) => (
+                              <Badge key={plate} variant="secondary" className="gap-1 pr-1 font-mono">
+                                {plate}
+                                <button
+                                  type="button"
+                                  className="ml-1 rounded-full p-0.5 hover:bg-background/80"
+                                  aria-label={`Quitar patente ${plate}`}
+                                  onClick={() => void handleRemovePlate(op.nombre, plate)}
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </Badge>
+                            ))
+                          )}
                         </div>
-                        {plateAdding[op.nombre] ? (
-                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                            <Input
-                              placeholder="Patente"
-                              value={plateDraft[op.nombre] ?? ""}
-                              onChange={(e) => setPlateDraft((p) => ({ ...p, [op.nombre]: e.target.value }))}
-                              className="font-mono sm:max-w-[12rem]"
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  e.preventDefault()
-                                  void handleAddPlate(op.nombre)
-                                }
-                              }}
-                            />
-                            <div className="flex gap-2">
-                              <Button type="button" size="sm" onClick={() => void handleAddPlate(op.nombre)}>
-                                Guardar
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setPlateAdding((p) => ({ ...p, [op.nombre]: false }))}
-                              >
-                                Cancelar
-                              </Button>
-                            </div>
-                          </div>
-                        ) : (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setPlateAdding((p) => ({ ...p, [op.nombre]: true }))}
-                          >
-                            <Plus className="mr-2 h-3.5 w-3.5" />
-                            agregar
-                          </Button>
-                        )}
                       </div>
 
                       <div className="space-y-3">
@@ -627,7 +567,9 @@ export default function OperationsAdminPage() {
           <form onSubmit={handleCreateOperation}>
             <DialogHeader>
               <DialogTitle>Nueva operación</DialogTitle>
-              <DialogDescription>Indica el nombre. Luego podrás agregar patentes y responsables en la tarjeta.</DialogDescription>
+              <DialogDescription>
+                Indica el nombre. Las patentes se asignan desde la seccion Sin asignar; los responsables, en la tarjeta.
+              </DialogDescription>
             </DialogHeader>
             <div className="space-y-2 py-2">
               <Label htmlFor="new-op-nombre">Nombre</Label>
