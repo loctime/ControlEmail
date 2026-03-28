@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils"
 import { formatEventDateTime } from "@/lib/ui/datetime"
 import { getVehicleEventsHistory, vehiclesApi } from "@/services/api/vehicles/vehiclesApi"
 import type { VehicleEventItem, VehicleEventsParams } from "@/services/api"
+import { authApi } from "@/services/api"
 import { eventTypeDescriptions } from "@/lib/data"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
@@ -43,7 +44,8 @@ async function fetchAllVehicleEventsPages(
     const ev = res.events ?? []
     for (const e of ev) merged.push(e)
     for (const p of res.plates ?? []) plates.add(p)
-    if (ev.length < PAGE_LIMIT) break
+    const rawPageLen = typeof res.sourcePageSize === "number" ? res.sourcePageSize : ev.length
+    if (rawPageLen < PAGE_LIMIT) break
     page++
   }
   return { events: merged, plates: Array.from(plates), total: merged.length }
@@ -249,6 +251,22 @@ export default function HistoricoPage() {
   const [selectedEventType, setSelectedEventType] = useState<string>("Todos")
   const [selectedOperation, setSelectedOperation] = useState<string>("Todas")
   const [search, setSearch] = useState<string>("")
+  const [accessMode, setAccessMode] = useState<"unknown" | "responsable" | "full">("unknown")
+
+  useEffect(() => {
+    let cancelled = false
+    void authApi
+      .me()
+      .then((me) => {
+        if (!cancelled) setAccessMode(me.role === "responsable" ? "responsable" : "full")
+      })
+      .catch(() => {
+        if (!cancelled) setAccessMode("full")
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   function validateRange(from: string, to: string): boolean {
     if (!from || !to) { setDateError(null); return false }
@@ -312,7 +330,7 @@ export default function HistoricoPage() {
   const hasClientOnlyFilters =
     selectedEventType !== "Todos" || selectedOperation !== "Todas" || search.trim() !== ""
   const plateParam = selectedPlate !== "Todas" ? selectedPlate : undefined
-  const usesClientPagination = monthly || hasClientOnlyFilters
+  const usesClientPagination = monthly || hasClientOnlyFilters || accessMode === "responsable"
 
   const pagedQueryParams = useMemo<VehicleEventsParams>(
     () => ({
@@ -328,16 +346,16 @@ export default function HistoricoPage() {
   const historicoQueryKey = useMemo(
     () =>
       monthly
-        ? (["historico-events", "monthly", dateFrom, dateTo, plateParam ?? ""] as const)
-        : hasClientOnlyFilters
-          ? (["historico-events", "full-range", dateFrom, dateTo, plateParam ?? ""] as const)
-          : (["historico-events", "paged", pagedQueryParams] as const),
-    [monthly, hasClientOnlyFilters, dateFrom, dateTo, plateParam, pagedQueryParams],
+        ? (["historico-events", "monthly", dateFrom, dateTo, plateParam ?? "", accessMode] as const)
+        : hasClientOnlyFilters || accessMode === "responsable"
+          ? (["historico-events", "full-range", dateFrom, dateTo, plateParam ?? "", accessMode] as const)
+          : (["historico-events", "paged", pagedQueryParams, accessMode] as const),
+    [monthly, hasClientOnlyFilters, accessMode, dateFrom, dateTo, plateParam, pagedQueryParams],
   )
 
   const { data, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: historicoQueryKey,
-    enabled: isRangeValid,
+    enabled: isRangeValid && accessMode !== "unknown",
     staleTime: 60_000,
     queryFn: async () => {
       if (monthly) {
@@ -346,7 +364,7 @@ export default function HistoricoPage() {
         rows.sort((a, b) => (b.eventTimestamp ?? "").localeCompare(a.eventTimestamp ?? ""))
         return { plates: response.plates ?? [], rows, total: rows.length }
       }
-      if (hasClientOnlyFilters) {
+      if (hasClientOnlyFilters || accessMode === "responsable") {
         const response = await fetchAllVehicleEventsPages(dateFrom, dateTo, plateParam)
         const rows = response.events.map(mapEventRow)
         rows.sort((a, b) => (b.eventTimestamp ?? "").localeCompare(a.eventTimestamp ?? ""))
@@ -491,7 +509,9 @@ export default function HistoricoPage() {
         <div>
           <h1 className="text-xl font-semibold tracking-tight text-white">Histórico de eventos</h1>
           <p className="mt-0.5 text-sm text-white/40">
-            Listado completo · Todos los vehículos
+            {accessMode === "responsable"
+              ? "Solo eventos de patentes donde figuras como responsable"
+              : "Listado completo · Todos los vehículos"}
             {data?.total != null && (
               <span className="ml-2 text-white/30">· {data.total} evento{data.total !== 1 ? "s" : ""}</span>
             )}

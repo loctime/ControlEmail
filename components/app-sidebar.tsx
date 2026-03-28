@@ -5,11 +5,12 @@ import { usePathname } from "next/navigation"
 import { Briefcase, ChevronRight, FileClock, LayoutDashboard, Settings, Truck } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-const baseNavItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+const dashboardNavItem = { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard }
+const baseNavItemsResponsable = [
   { href: "/historico", label: "Historico", icon: FileClock },
   { href: "/vehiculos", label: "Vehículos", icon: Truck },
 ]
+const baseNavItemsFull = [dashboardNavItem, ...baseNavItemsResponsable]
 
 interface AppSidebarProps {
   role?: string
@@ -20,6 +21,8 @@ interface AppSidebarProps {
 export function AppSidebar({ role, collapsed = false, onToggle }: AppSidebarProps) {
   const pathname = usePathname()
   const isAdmin = role != null && role !== "responsable"
+  const isResponsable = role === "responsable"
+  const baseNavItems = isResponsable ? baseNavItemsResponsable : baseNavItemsFull
   const adminNavItems = [
     { href: "/admin/email-config", label: "Destinatarios", icon: Settings },
     { href: "/admin/operations", label: "Operaciones", icon: Briefcase },

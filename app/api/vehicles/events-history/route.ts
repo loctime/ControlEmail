@@ -1,4 +1,13 @@
-import { getAuthUserFromRequest, authUnauthorizedResponse, AUTH_COOKIE_NAME } from "@/lib/auth-user"
+import {
+  getAuthUserWithPlates,
+  authUnauthorizedResponse,
+  AUTH_COOKIE_NAME,
+} from "@/lib/auth-user"
+import { normalizePlate } from "@/lib/utils"
+import {
+  normalizedAllowedPlates,
+  filterEventsByAllowedPlates,
+} from "@/lib/vehicle-events-scope"
 
 function extractToken(request: Request): string | null {
   const authHeader = request.headers.get("authorization") ?? request.headers.get("Authorization")
@@ -46,7 +55,7 @@ interface BackendEventsPayload {
 }
 
 export async function GET(request: Request) {
-  const auth = await getAuthUserFromRequest(request)
+  const auth = await getAuthUserWithPlates(request)
   if (!auth) return authUnauthorizedResponse()
 
   const token = extractToken(request)
@@ -56,6 +65,17 @@ export async function GET(request: Request) {
   const dateFrom = searchParams.get("dateFrom")
   const dateTo = searchParams.get("dateTo")
   const plate = searchParams.get("plate")
+  const normalizedAllowed = normalizedAllowedPlates(auth.allowedPlates)
+
+  if (!auth.fullPlateAccess && plate) {
+    const want = normalizePlate(plate)
+    if (!want || !normalizedAllowed.has(want)) {
+      return new Response(JSON.stringify({ error: "forbidden_plate" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      })
+    }
+  }
 
   if (!dateFrom || !dateTo) {
     return new Response(JSON.stringify({ error: "dateFrom and dateTo are required" }), {
@@ -97,8 +117,22 @@ export async function GET(request: Request) {
       for (const p of result.plates ?? []) allPlates.add(p)
     }
 
+    let eventsOut = allEvents
+    let platesOut = Array.from(allPlates)
+    if (!auth.fullPlateAccess) {
+      eventsOut = filterEventsByAllowedPlates(allEvents, normalizedAllowed)
+      const allowedSet = new Set<string>()
+      for (const ev of eventsOut) {
+        if (ev && typeof ev === "object" && typeof (ev as { plate?: unknown }).plate === "string") {
+          const n = normalizePlate((ev as { plate: string }).plate)
+          if (n) allowedSet.add(n)
+        }
+      }
+      platesOut = Array.from(allowedSet).sort()
+    }
+
     return new Response(
-      JSON.stringify({ events: allEvents, plates: Array.from(allPlates), total: allEvents.length }),
+      JSON.stringify({ events: eventsOut, plates: platesOut, total: eventsOut.length }),
       { status: 200, headers: { "Content-Type": "application/json" } },
     )
   } catch (error) {

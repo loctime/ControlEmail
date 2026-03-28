@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,6 +9,7 @@ import { AsyncState } from "@/components/common/async-state"
 import { VehicleDrawer } from "@/components/vehicles/VehicleDrawer"
 import { useVehiclesList, type VehicleListRow } from "@/hooks/domain/useVehiclesList"
 import { useNav } from "@/components/layout/nav-context"
+import { authApi } from "@/services/api"
 import { cn } from "@/lib/utils"
 
 // ─── Formatters ───────────────────────────────────────────────────────────────
@@ -101,6 +102,22 @@ const PAGE_SIZE = 15
 export default function VehiclesPage() {
   const { rows, loading, error, refetch } = useVehiclesList()
   const { collapse, expand } = useNav()
+  const [isResponsable, setIsResponsable] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    void authApi
+      .me()
+      .then((me) => {
+        if (!cancelled) setIsResponsable(me.role === "responsable")
+      })
+      .catch(() => {
+        if (!cancelled) setIsResponsable(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const [search, setSearch] = useState("")
   const [selectedOperation, setSelectedOperation] = useState<string | null>(null)
@@ -175,7 +192,11 @@ export default function VehiclesPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-xl font-semibold tracking-tight text-white">Vehiculos</h1>
-            <p className="mt-0.5 text-sm text-white/40">Listado consolidado con riesgo y responsables.</p>
+            <p className="mt-0.5 text-sm text-white/40">
+              {isResponsable
+                ? "Solo vehículos de tus patentes (donde figuras como responsable)."
+                : "Listado consolidado con riesgo y responsables."}
+            </p>
           </div>
           <LastClosedDateBadge />
         </div>

@@ -106,6 +106,8 @@ async function getAllPlates(): Promise<Set<string>> {
 
 export interface AuthUserWithPlates extends AuthUser {
   allowedPlates: Set<string>
+  /** true para admin, general y report (ven todas las patentes del sistema). */
+  fullPlateAccess: boolean
 }
 
 /**
@@ -123,12 +125,12 @@ export async function getAuthUserWithPlates(request: Request): Promise<AuthUserW
     const accessUser = await getEmailAccessUserByEmail(user.email)
     const role = accessUser?.role ?? "responsable"
 
-    const allowedPlates =
-      ROLES_WITH_ALL_PLATES.includes(role as (typeof ROLES_WITH_ALL_PLATES)[number])
-        ? await getAllPlates()
-        : await getAllowedPlatesForEmail(user.email)
+    const fullPlateAccess = ROLES_WITH_ALL_PLATES.includes(
+      role as (typeof ROLES_WITH_ALL_PLATES)[number],
+    )
+    const allowedPlates = fullPlateAccess ? await getAllPlates() : await getAllowedPlatesForEmail(user.email)
 
-    return { ...user, allowedPlates }
+    return { ...user, allowedPlates, fullPlateAccess }
   } catch (err) {
     console.error("[auth-user] getAuthUserWithPlates error:", err)
     return null

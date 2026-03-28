@@ -75,6 +75,8 @@ export interface VehicleEventsResponse {
   limit: number
   plates: string[]
   dateRange: { from: string; to: string }
+  /** Cantidad de eventos en la página del backend antes de filtrar por permisos (solo responsables). */
+  sourcePageSize?: number
 }
 
 export interface VehiclePlateDetailDTO {
