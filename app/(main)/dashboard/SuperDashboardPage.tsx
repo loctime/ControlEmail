@@ -64,7 +64,7 @@ interface TopOperacionRow {
   topDriversKeys: TopDriverKeyDTO[]
   /** Ranking completo por operación (si viene del API); si no, null. */
   topDriversKeysAll: TopDriverKeyDTO[] | null
-  /** Suma de excesos en todas las combinaciones del ranking llave/conductor (API), no solo las 3 filas mostradas. */
+  /** Suma de excesos en todas las combinaciones del ranking llave/conductor (API), no solo las 6 filas mostradas. */
   topDriversAttributedTotal: number | null
 }
 
@@ -366,7 +366,7 @@ function TopLlavesConductoresBlock({
       <div className="space-y-1.5">
         {canExpand && !expanded && (
           <p className="text-[10px] leading-snug text-white/30">
-            Primeras 3 combinaciones.{" "}
+            Primeras 6 combinaciones.{" "}
             <span className="text-white/45">Expandí con «Ver más».</span>
           </p>
         )}

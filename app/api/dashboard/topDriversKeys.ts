@@ -220,7 +220,7 @@ export function mergeVehicleTopDriversKeys(lists: TopDriverKeyDTO[][]): TopDrive
     .sort((a, b) => b.excesos - a.excesos)
 }
 
-/** Agregado por operación (top 3 para UI); incluye total atribuido en el ranking completo. */
+/** Agregado por operación (top 6 para UI); incluye total atribuido en el ranking completo. */
 export function buildTopDriversKeysByOperation(
   vehicleDetails: DashboardVehicleDetailDTO[],
 ): TopDriversKeysByOperationDTO[] {
@@ -271,7 +271,7 @@ export function buildTopDriversKeysByOperation(
 
     return {
       operationName,
-      topDriversKeys: allRows.slice(0, 3),
+      topDriversKeys: allRows.slice(0, 6),
       topDriversKeysAll: allRows,
       topDriversKeysAttributedTotal,
     }

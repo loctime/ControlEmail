@@ -70,7 +70,7 @@ export interface TopDriversKeysByOperationDTO {
   topDriversKeys: TopDriverKeyDTO[]
   /** Ranking completo ordenado por excesos (misma estructura que topDriversKeys, sin recorte). */
   topDriversKeysAll?: TopDriverKeyDTO[]
-  /** Suma de excesos en todas las combinaciones llave/conductor de la operación (no solo el top 3 mostrado). */
+  /** Suma de excesos en todas las combinaciones llave/conductor de la operación (no solo el top 6 mostrado). */
   topDriversKeysAttributedTotal?: number
 }
 
