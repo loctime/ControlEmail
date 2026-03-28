@@ -58,7 +58,8 @@ export async function emailApiFetch<T>(url: string, options: RequestInit = {}): 
     ...(options.headers ?? {}),
   }
 
-  if (!(options.body instanceof FormData) && !(headers as Record<string, string>)["Content-Type"]) {
+  const hasJsonBody = options.body !== undefined && !(options.body instanceof FormData)
+  if (hasJsonBody && !(headers as Record<string, string>)["Content-Type"]) {
     ;(headers as Record<string, string>)["Content-Type"] = "application/json"
   }
 
@@ -95,7 +96,8 @@ export async function sessionApiFetch<T>(url: string, options: RequestInit = {})
     ...(options.headers ?? {}),
   }
 
-  if (!(options.body instanceof FormData) && !(headers as Record<string, string>)["Content-Type"]) {
+  const hasJsonBody = options.body !== undefined && !(options.body instanceof FormData)
+  if (hasJsonBody && !(headers as Record<string, string>)["Content-Type"]) {
     ;(headers as Record<string, string>)["Content-Type"] = "application/json"
   }
 

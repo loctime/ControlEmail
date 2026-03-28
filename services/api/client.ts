@@ -32,12 +32,17 @@ function buildInit<TBody>(config: InternalRequestConfig<TBody>): RequestInit {
   return init
 }
 
+function jsonContentTypeIfNeeded(init: RequestInit): Record<string, string> {
+  const hasJsonBody = init.body !== undefined && !(init.body instanceof FormData)
+  return hasJsonBody ? { "Content-Type": "application/json" } : {}
+}
+
 async function fetchWithSession(path: string, init: RequestInit): Promise<Response> {
   return fetch(path, {
     ...init,
     credentials: "include",
     headers: {
-      ...(init.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
+      ...jsonContentTypeIfNeeded(init),
       ...(init.headers ?? {}),
     },
   })
@@ -59,7 +64,7 @@ async function fetchWithFirebase(path: string, init: RequestInit): Promise<Respo
     ...init,
     headers: {
       Authorization: `Bearer ${token}`,
-      ...(init.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
+      ...jsonContentTypeIfNeeded(init),
       ...(init.headers ?? {}),
     },
   })

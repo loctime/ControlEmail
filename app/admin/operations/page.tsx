@@ -73,7 +73,7 @@ function emptySinAsignar(): FleetOperation {
   return { nombre: SIN_ASIGNAR_NOMBRE, plates: [], responsables: [] }
 }
 
-/** API de operaciones en backend remoto: identidad con Bearer Firebase. */
+/** Backend controlfile exige Authorization: Bearer (Firebase); la cookie de sesión no alcanza. */
 const OPS_AUTH = { authMode: "firebase" as const }
 
 export default function OperationsAdminPage() {
