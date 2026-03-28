@@ -1,10 +1,11 @@
 "use client"
 
+import Link from "next/link"
 import { useEffect, useState } from "react"
+import { Plus, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Plus, X } from "lucide-react"
+import { canAccessAdminPages } from "@/lib/can-access-admin-pages"
 import { adminApi, authApi } from "@/services/api"
 
 const REPORTS_EMAIL = "diegobertosi@gmail.com"
@@ -37,25 +38,27 @@ const REPORT_SECTION: { key: SectionKey; title: string } = {
 
 export default function EmailConfigPage() {
   const [loading, setLoading] = useState(true)
+  const [sessionRequired, setSessionRequired] = useState(false)
+  const [accessForbidden, setAccessForbidden] = useState(false)
   const [canSeeReports, setCanSeeReports] = useState(false)
-  const [needsLogin, setNeedsLogin] = useState(false)
   const [generalRecipients, setGeneralRecipients] = useState<string[]>([])
   const [ccRecipients, setCcRecipients] = useState<string[]>([])
   const [reportRecipients, setReportRecipients] = useState<string[]>([])
   const [fetchError, setFetchError] = useState<string | null>(null)
-
-  const [password, setPassword] = useState("")
-  const [loginError, setLoginError] = useState<string | null>(null)
-  const [loginLoading, setLoginLoading] = useState(false)
 
   const [saving, setSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
 
   useEffect(() => {
-    authApi.me()
-      .then((me) => { if (me.email === REPORTS_EMAIL) setCanSeeReports(true) })
-      .catch(() => { /* sin acceso al email → no mostrar sección */ })
+    authApi
+      .me()
+      .then((me) => {
+        if (me.email === REPORTS_EMAIL) setCanSeeReports(true)
+      })
+      .catch(() => {
+        /* sin acceso al email → no mostrar sección */
+      })
   }, [])
 
   useEffect(() => {
@@ -63,8 +66,15 @@ export default function EmailConfigPage() {
 
     const load = async () => {
       setFetchError(null)
-      setNeedsLogin(false)
+      setSessionRequired(false)
+      setAccessForbidden(false)
       try {
+        const me = await authApi.me()
+        if (cancelled) return
+        if (!canAccessAdminPages(me.role)) {
+          setAccessForbidden(true)
+          return
+        }
         const data = await adminApi.getEmailConfig()
         if (cancelled) return
         setGeneralRecipients(Array.isArray(data.generalRecipients) ? data.generalRecipients : [])
@@ -74,7 +84,7 @@ export default function EmailConfigPage() {
         if (cancelled) return
         const status = (err as { status?: number })?.status
         if (status === 401) {
-          setNeedsLogin(true)
+          setSessionRequired(true)
         } else {
           setFetchError(err instanceof Error ? err.message : "Error al cargar")
         }
@@ -88,22 +98,6 @@ export default function EmailConfigPage() {
       cancelled = true
     }
   }, [])
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoginError(null)
-    setLoginLoading(true)
-    try {
-      await adminApi.login({ password })
-      window.location.reload()
-    } catch (err) {
-      const apiErr = err as { message?: string }
-      const msg = apiErr?.message === "invalid_password" ? "Contrasena incorrecta" : apiErr?.message || "Error al ingresar"
-      setLoginError(msg)
-    } finally {
-      setLoginLoading(false)
-    }
-  }
 
   const setList = (key: SectionKey, updater: (prev: string[]) => string[]) => {
     if (key === "generalRecipients") setGeneralRecipients(updater)
@@ -165,31 +159,25 @@ export default function EmailConfigPage() {
     )
   }
 
-  if (needsLogin) {
+  if (sessionRequired) {
     return (
-      <div className="flex min-h-[80vh] items-center justify-center px-4">
-        <div className="w-full max-w-sm space-y-6 rounded-lg border bg-card p-6 shadow-sm">
-          <h1 className="text-center text-xl font-semibold">Acceso administrador</h1>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="admin-password">Contrasena</Label>
-              <Input
-                id="admin-password"
-                type="password"
-                autoComplete="current-password"
-                placeholder="Contrasena"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                disabled={loginLoading}
-                className="w-full"
-              />
-            </div>
-            {loginError && <p className="text-sm text-destructive">{loginError}</p>}
-            <Button type="submit" className="w-full" disabled={loginLoading}>
-              {loginLoading ? "Ingresando..." : "Ingresar"}
-            </Button>
-          </form>
-        </div>
+      <div className="container mx-auto max-w-lg py-16 text-center">
+        <h1 className="text-xl font-semibold">Sesion requerida</h1>
+        <p className="mt-2 text-sm text-muted-foreground">Inicia sesion para acceder a esta seccion.</p>
+        <Button asChild className="mt-6">
+          <Link href={`/login?next=${encodeURIComponent("/admin/email-config")}`}>Ir al inicio de sesion</Link>
+        </Button>
+      </div>
+    )
+  }
+
+  if (accessForbidden) {
+    return (
+      <div className="container mx-auto max-w-lg py-16 text-center">
+        <h1 className="text-xl font-semibold">Acceso denegado</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Esta seccion solo esta disponible para cuentas con permisos de administracion (no responsables de flota).
+        </p>
       </div>
     )
   }
@@ -233,13 +221,7 @@ export default function EmailConfigPage() {
                   </Button>
                 </div>
               ))}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => handleAddEmail(key)}
-                className="mt-2"
-              >
+              <Button type="button" variant="outline" size="sm" onClick={() => handleAddEmail(key)} className="mt-2">
                 <Plus className="mr-2 h-4 w-4" />
                 Agregar email
               </Button>

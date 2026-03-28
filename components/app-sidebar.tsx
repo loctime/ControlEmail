@@ -19,7 +19,7 @@ interface AppSidebarProps {
 
 export function AppSidebar({ role, collapsed = false, onToggle }: AppSidebarProps) {
   const pathname = usePathname()
-  const isAdmin = role === "admin"
+  const isAdmin = role != null && role !== "responsable"
   const adminNavItems = [
     { href: "/admin/email-config", label: "Destinatarios", icon: Settings },
     { href: "/admin/vehicle-alerts", label: "Responsables", icon: Car },

@@ -1,16 +1,11 @@
 import { NextResponse } from "next/server"
 import { listVehicles, updateVehicleAlerts } from "@/lib/firestore-read"
-import { hasValidAdminSession, unauthorizedResponse } from "@/lib/admin-session"
+import { hasAdminAccess, unauthorizedResponse } from "@/lib/admin-session"
 import { normalizePlate } from "@/lib/utils"
 import type { VehicleDoc } from "@/lib/firestore-read"
 
-function checkAdmin(request: Request) {
-  if (!hasValidAdminSession(request)) return null
-  return true
-}
-
 export async function GET(request: Request) {
-  if (!checkAdmin(request)) return unauthorizedResponse()
+  if (!(await hasAdminAccess(request))) return unauthorizedResponse()
   try {
     const vehicles: VehicleDoc[] = await listVehicles()
     return NextResponse.json(vehicles)
@@ -24,7 +19,7 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  if (!checkAdmin(request)) return unauthorizedResponse()
+  if (!(await hasAdminAccess(request))) return unauthorizedResponse()
   try {
     const body = await request.json()
 

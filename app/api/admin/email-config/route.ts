@@ -1,17 +1,12 @@
 import { NextResponse } from "next/server"
 import { getEmailConfig, updateEmailConfig, upsertEmailAccess } from "@/lib/firestore-read"
-import { hasValidAdminSession, unauthorizedResponse } from "@/lib/admin-session"
+import { hasAdminAccess, unauthorizedResponse } from "@/lib/admin-session"
 
 // Emails gestionados manualmente en Firestore — nunca tocar via esta sincronización.
 const PROTECTED_EMAILS = new Set(["diegobertosi@gmail.com"])
 
-function checkAdmin(request: Request) {
-  if (!hasValidAdminSession(request)) return null
-  return true
-}
-
 export async function GET(request: Request) {
-  if (!checkAdmin(request)) return unauthorizedResponse()
+  if (!(await hasAdminAccess(request))) return unauthorizedResponse()
   try {
     const config = await getEmailConfig()
     return NextResponse.json(config)
@@ -25,7 +20,7 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  if (!checkAdmin(request)) return unauthorizedResponse()
+  if (!(await hasAdminAccess(request))) return unauthorizedResponse()
   try {
     const body = await request.json()
     const toStrArr = (v: unknown): string[] => {

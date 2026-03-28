@@ -1,7 +1,11 @@
 /**
- * Validación simple de sesión admin para /admin/vehicle-alerts.
- * Cookie httpOnly admin_alerts_session (valor fijo cuando el login es correcto).
+ * Acceso a rutas /api/admin/*:
+ * - Cookie httpOnly admin_alerts_session (login legacy por contraseña), o
+ * - Sesión Firebase (cookie auth_token / Bearer) con rol distinto de responsable.
  */
+
+import { getAuthUserFromRequest } from "@/lib/auth-user"
+import { getEmailAccessUserByEmail } from "@/lib/firestore-read"
 
 const COOKIE_NAME = "admin_alerts_session"
 const COOKIE_VALUE = "ok"
@@ -17,6 +21,15 @@ export function getAdminSessionCookie(request: Request): string | null {
 export function hasValidAdminSession(request: Request): boolean {
   const value = getAdminSessionCookie(request)
   return value === COOKIE_VALUE
+}
+
+export async function hasAdminAccess(request: Request): Promise<boolean> {
+  if (hasValidAdminSession(request)) return true
+  const user = await getAuthUserFromRequest(request)
+  if (!user) return false
+  const accessUser = await getEmailAccessUserByEmail(user.email)
+  const role = accessUser?.role ?? "responsable"
+  return role !== "responsable"
 }
 
 export function unauthorizedResponse() {

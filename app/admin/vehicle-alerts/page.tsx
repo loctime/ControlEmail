@@ -1,37 +1,41 @@
 "use client"
 
+import Link from "next/link"
 import { useEffect, useState } from "react"
 import { VehicleAlertsTable, type VehicleAlertRow } from "@/components/vehicle-alerts-table"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { canAccessAdminPages } from "@/lib/can-access-admin-pages"
 import { normalizePlate } from "@/lib/utils"
-import { adminApi } from "@/services/api"
+import { adminApi, authApi } from "@/services/api"
 
 export default function VehicleAlertsPage() {
   const [loading, setLoading] = useState(true)
-  const [needsLogin, setNeedsLogin] = useState(false)
+  const [sessionRequired, setSessionRequired] = useState(false)
+  const [accessForbidden, setAccessForbidden] = useState(false)
   const [vehicles, setVehicles] = useState<VehicleAlertRow[]>([])
   const [fetchError, setFetchError] = useState<string | null>(null)
-
-  const [password, setPassword] = useState("")
-  const [loginError, setLoginError] = useState<string | null>(null)
-  const [loginLoading, setLoginLoading] = useState(false)
 
   useEffect(() => {
     let cancelled = false
 
     const load = async () => {
       setFetchError(null)
-      setNeedsLogin(false)
+      setSessionRequired(false)
+      setAccessForbidden(false)
       try {
+        const me = await authApi.me()
+        if (cancelled) return
+        if (!canAccessAdminPages(me.role)) {
+          setAccessForbidden(true)
+          return
+        }
         const data = await adminApi.getVehicleAlerts()
         if (!cancelled) setVehicles(Array.isArray(data) ? data : [])
       } catch (err) {
         if (cancelled) return
         const status = (err as { status?: number })?.status
         if (status === 401) {
-          setNeedsLogin(true)
+          setSessionRequired(true)
         } else {
           setFetchError(err instanceof Error ? err.message : "Error al cargar")
         }
@@ -45,22 +49,6 @@ export default function VehicleAlertsPage() {
       cancelled = true
     }
   }, [])
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoginError(null)
-    setLoginLoading(true)
-    try {
-      await adminApi.login({ password })
-      window.location.reload()
-    } catch (err) {
-      const apiErr = err as { message?: string }
-      const msg = apiErr?.message === "invalid_password" ? "Contrasena incorrecta" : apiErr?.message || "Error al ingresar"
-      setLoginError(msg)
-    } finally {
-      setLoginLoading(false)
-    }
-  }
 
   const handleSave = async (plate: string, payload: { responsables: string[] }) => {
     const normalizedPlate = normalizePlate(plate)
@@ -94,31 +82,25 @@ export default function VehicleAlertsPage() {
     )
   }
 
-  if (needsLogin) {
+  if (sessionRequired) {
     return (
-      <div className="flex min-h-[80vh] items-center justify-center px-4">
-        <div className="w-full max-w-sm space-y-6 rounded-lg border bg-card p-6 shadow-sm">
-          <h1 className="text-center text-xl font-semibold">Acceso administrador</h1>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="admin-password">Contrasena</Label>
-              <Input
-                id="admin-password"
-                type="password"
-                autoComplete="current-password"
-                placeholder="Contrasena"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                disabled={loginLoading}
-                className="w-full"
-              />
-            </div>
-            {loginError && <p className="text-sm text-destructive">{loginError}</p>}
-            <Button type="submit" className="w-full" disabled={loginLoading}>
-              {loginLoading ? "Ingresando..." : "Ingresar"}
-            </Button>
-          </form>
-        </div>
+      <div className="container mx-auto max-w-lg py-16 text-center">
+        <h1 className="text-xl font-semibold">Sesion requerida</h1>
+        <p className="mt-2 text-sm text-muted-foreground">Inicia sesion para acceder a esta seccion.</p>
+        <Button asChild className="mt-6">
+          <Link href={`/login?next=${encodeURIComponent("/admin/vehicle-alerts")}`}>Ir al inicio de sesion</Link>
+        </Button>
+      </div>
+    )
+  }
+
+  if (accessForbidden) {
+    return (
+      <div className="container mx-auto max-w-lg py-16 text-center">
+        <h1 className="text-xl font-semibold">Acceso denegado</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Esta seccion solo esta disponible para cuentas con permisos de administracion (no responsables de flota).
+        </p>
       </div>
     )
   }

@@ -34,9 +34,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { canAccessAdminPages } from "@/lib/can-access-admin-pages"
 import { normalizePlate } from "@/lib/utils"
 import { apiClient } from "@/services/api/client"
-import { adminApi, authApi, sessionApiFetch } from "@/services/api"
+import { authApi, emailApiFetch } from "@/services/api"
 
 const SIN_ASIGNAR_NOMBRE = "SIN_ASIGNAR"
 
@@ -72,21 +73,19 @@ function emptySinAsignar(): FleetOperation {
   return { nombre: SIN_ASIGNAR_NOMBRE, plates: [], responsables: [] }
 }
 
+/** API de operaciones en backend remoto: identidad con Bearer Firebase. */
+const OPS_AUTH = { authMode: "firebase" as const }
+
 export default function OperationsAdminPage() {
   const [bootDone, setBootDone] = useState(false)
   const [sessionRequired, setSessionRequired] = useState(false)
   const [accessForbidden, setAccessForbidden] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [needsAdminLogin, setNeedsAdminLogin] = useState(false)
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [flashError, setFlashError] = useState<string | null>(null)
 
   const [operations, setOperations] = useState<FleetOperation[]>([])
   const [sinAsignar, setSinAsignar] = useState<FleetOperation>(emptySinAsignar)
-
-  const [password, setPassword] = useState("")
-  const [loginError, setLoginError] = useState<string | null>(null)
-  const [loginLoading, setLoginLoading] = useState(false)
 
   const [createOpen, setCreateOpen] = useState(false)
   const [createNombre, setCreateNombre] = useState("")
@@ -126,17 +125,11 @@ export default function OperationsAdminPage() {
 
   const loadOperations = useCallback(async () => {
     setFetchError(null)
-    setNeedsAdminLogin(false)
     try {
-      const raw = await apiClient.get<unknown>("/api/admin/operations")
+      const raw = await apiClient.get<unknown>("/api/admin/operations", OPS_AUTH)
       applyPayload(parseOperationsPayload(raw))
     } catch (err) {
-      const status = (err as { status?: number })?.status
-      if (status === 401) {
-        setNeedsAdminLogin(true)
-      } else {
-        setFetchError(err instanceof Error ? err.message : "Error al cargar operaciones")
-      }
+      setFetchError(err instanceof Error ? err.message : "Error al cargar operaciones")
     }
   }, [applyPayload])
 
@@ -149,7 +142,7 @@ export default function OperationsAdminPage() {
       try {
         const me = await authApi.me()
         if (cancelled) return
-        if (me.role !== "admin") {
+        if (!canAccessAdminPages(me.role)) {
           setAccessForbidden(true)
           setLoading(false)
           setBootDone(true)
@@ -183,25 +176,6 @@ export default function OperationsAdminPage() {
     window.setTimeout(() => setFlashError(null), 6000)
   }
 
-  const handleAdminLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoginError(null)
-    setLoginLoading(true)
-    try {
-      await adminApi.login({ password })
-      setNeedsAdminLogin(false)
-      setPassword("")
-      await loadOperations()
-    } catch (err) {
-      const apiErr = err as { message?: string }
-      const msg =
-        apiErr?.message === "invalid_password" ? "Contrasena incorrecta" : apiErr?.message || "Error al ingresar"
-      setLoginError(msg)
-    } finally {
-      setLoginLoading(false)
-    }
-  }
-
   const handleCreateOperation = async (e: React.FormEvent) => {
     e.preventDefault()
     const nombre = createNombre.trim()
@@ -212,10 +186,14 @@ export default function OperationsAdminPage() {
     setCreateError(null)
     setCreateLoading(true)
     try {
-      await apiClient.post<unknown, { nombre: string; responsables: string[] }>("/api/admin/operations", {
-        nombre,
-        responsables: [],
-      })
+      await apiClient.post<unknown, { nombre: string; responsables: string[] }>(
+        "/api/admin/operations",
+        {
+          nombre,
+          responsables: [],
+        },
+        OPS_AUTH,
+      )
       setCreateOpen(false)
       setCreateNombre("")
       setOperations((prev) => {
@@ -235,7 +213,7 @@ export default function OperationsAdminPage() {
     if (!deleteTarget) return
     setDeleteLoading(true)
     try {
-      await apiClient.delete(operationsPath(deleteTarget))
+      await apiClient.delete(operationsPath(deleteTarget), undefined, OPS_AUTH)
       setOperations((prev) => prev.filter((o) => o.nombre !== deleteTarget))
       await loadOperations()
       setDeleteTarget(null)
@@ -249,7 +227,7 @@ export default function OperationsAdminPage() {
   const handleRemovePlate = async (nombre: string, plate: string) => {
     const normalized = normalizePlate(plate)
     try {
-      await apiClient.delete(operationsPath(nombre, `/plates/${encodeURIComponent(normalized)}`))
+      await apiClient.delete(operationsPath(nombre, `/plates/${encodeURIComponent(normalized)}`), undefined, OPS_AUTH)
       setOperations((prev) =>
         prev.map((o) =>
           o.nombre === nombre
@@ -270,7 +248,11 @@ export default function OperationsAdminPage() {
       return
     }
     try {
-      await apiClient.post<unknown, { plate: string }>(operationsPath(nombre, "/plates"), { plate: normalized })
+      await apiClient.post<unknown, { plate: string }>(
+        operationsPath(nombre, "/plates"),
+        { plate: normalized },
+        OPS_AUTH,
+      )
       setOperations((prev) =>
         prev.map((o) => {
           if (o.nombre !== nombre) return o
@@ -290,7 +272,7 @@ export default function OperationsAdminPage() {
     if (!op) return
     const next = op.responsables.filter((r) => r !== email)
     try {
-      await sessionApiFetch<unknown>(operationsPath(nombre), {
+      await emailApiFetch<unknown>(operationsPath(nombre), {
         method: "PUT",
         body: JSON.stringify({ responsables: next }),
       })
@@ -315,7 +297,7 @@ export default function OperationsAdminPage() {
     }
     const next = [...op.responsables, raw]
     try {
-      await sessionApiFetch<unknown>(operationsPath(nombre), {
+      await emailApiFetch<unknown>(operationsPath(nombre), {
         method: "PUT",
         body: JSON.stringify({ responsables: next }),
       })
@@ -332,9 +314,11 @@ export default function OperationsAdminPage() {
     if (!targetNombre || !normalized) return
     setAssigningPlate(normalized)
     try {
-      await apiClient.post<unknown, { plate: string }>(operationsPath(targetNombre, "/plates"), {
-        plate: normalized,
-      })
+      await apiClient.post<unknown, { plate: string }>(
+        operationsPath(targetNombre, "/plates"),
+        { plate: normalized },
+        OPS_AUTH,
+      )
       setSinAsignar((prev) => ({
         ...prev,
         plates: prev.plates.filter((p) => normalizePlate(p) !== normalized && p !== plate),
@@ -377,36 +361,9 @@ export default function OperationsAdminPage() {
     return (
       <div className="container mx-auto max-w-lg py-16 text-center">
         <h1 className="text-xl font-semibold">Acceso denegado</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Solo usuarios con rol administrador pueden ver esta pagina.</p>
-      </div>
-    )
-  }
-
-  if (needsAdminLogin) {
-    return (
-      <div className="flex min-h-[80vh] items-center justify-center px-4">
-        <div className="w-full max-w-sm space-y-6 rounded-lg border bg-card p-6 shadow-sm">
-          <h1 className="text-center text-xl font-semibold">Acceso administrador</h1>
-          <form onSubmit={handleAdminLogin} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="admin-password-ops">Contrasena</Label>
-              <Input
-                id="admin-password-ops"
-                type="password"
-                autoComplete="current-password"
-                placeholder="Contrasena"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                disabled={loginLoading}
-                className="w-full"
-              />
-            </div>
-            {loginError && <p className="text-sm text-destructive">{loginError}</p>}
-            <Button type="submit" className="w-full" disabled={loginLoading}>
-              {loginLoading ? "Ingresando..." : "Ingresar"}
-            </Button>
-          </form>
-        </div>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Esta seccion solo esta disponible para cuentas con permisos de administracion (no responsables de flota).
+        </p>
       </div>
     )
   }
