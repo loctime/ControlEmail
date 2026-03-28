@@ -15,15 +15,15 @@ import type {
   MyStatsDTO,
 } from "@/services/api/dashboard/types"
 import type { DailyConsistencyDTO } from "@/services/api/quality/types"
+import type { DashboardRangeParams } from "@/services/dashboard-api"
 import { queryKeys } from "@/lib/query/queryKeys"
 
 const STALE_TIME_MS = 5 * 60 * 1000
 
+type DashboardPeriodMode = "day" | "week" | "month" | "year"
+
 /** `date` del query string según period (dateKey = YYYY-MM-DD) */
-function enrichedDateParam(
-  dateKey: string,
-  mode: "day" | "week" | "month" | "year",
-): string {
+function enrichedDateParam(dateKey: string, mode: DashboardPeriodMode): string {
   if (mode === "day" || mode === "week") return dateKey
   if (mode === "month") return dateKey.slice(0, 7)
   return dateKey.slice(0, 4)
@@ -82,6 +82,37 @@ function normalizeStats(
   }
 }
 
+const emptyDashboardData = {
+  stats: null,
+  riskVehicles: [] as MyRiskItemDTO[],
+  pendingAlerts: [] as MyAlertItemDTO[],
+  consistency: null,
+  vehicleDetails: [] as DashboardVehicleDetailDTO[],
+  topDriversKeysByOperation: [] as TopDriversKeysByOperationDTO[],
+  adminTotals: null,
+  dailyBreakdown: null,
+  distribution: null,
+}
+
+function mapPayloadToState(payload: DashboardAggregatedPayload) {
+  const vehicleDetails = Array.isArray(payload.vehicleDetails) ? payload.vehicleDetails : []
+  return {
+    stats: normalizeStats(payload),
+    riskVehicles: riskVehiclesFromVehicleDetails(vehicleDetails),
+    pendingAlerts: Array.isArray(payload.pendingAlerts)
+      ? payload.pendingAlerts.filter((a) => !a.alertSent)
+      : [],
+    consistency: payload.consistency ?? null,
+    vehicleDetails,
+    topDriversKeysByOperation: Array.isArray(payload.topDriversKeysByOperation)
+      ? payload.topDriversKeysByOperation
+      : [],
+    adminTotals: payload.adminTotals ?? null,
+    dailyBreakdown: Array.isArray(payload.dailyBreakdown) ? payload.dailyBreakdown : null,
+    distribution: normalizeDistribution(payload),
+  }
+}
+
 export interface DashboardDataState {
   stats: MyStatsDTO["stats"] | null
   riskVehicles: MyRiskItemDTO[]
@@ -102,14 +133,32 @@ export interface DashboardDataState {
   refetch: () => Promise<void>
 }
 
+/**
+ * @param startDate @param endDate Cuando ambos están definidos (misma forma que `DashboardRangeParams` con range custom),
+ * se llama a `/api/dashboard/enriched?startDate=&endDate=` en lugar de period/date.
+ */
 export function useDashboardData(
   dateKey: string | undefined,
-  mode: "day" | "week" | "month" | "year",
+  mode: DashboardPeriodMode | "custom",
+  startDate?: string,
+  endDate?: string,
 ): DashboardDataState {
-  const param = dateKey ? enrichedDateParam(dateKey, mode) : ""
+  const customRangeActive =
+    mode === "custom" &&
+    typeof startDate === "string" &&
+    startDate.length > 0 &&
+    typeof endDate === "string" &&
+    endDate.length > 0
 
   const query = useQuery({
-    queryKey: queryKeys.dashboard.aggregated(mode, param),
+    queryKey: customRangeActive
+      ? queryKeys.dashboard.aggregatedRange(startDate!, endDate!)
+      : mode === "custom"
+        ? (["dashboard", "custom", "incomplete"] as const)
+        : queryKeys.dashboard.aggregated(
+            mode,
+            dateKey ? enrichedDateParam(dateKey, mode) : "",
+          ),
     queryFn: async (): Promise<{
       stats: MyStatsDTO["stats"] | null
       riskVehicles: MyRiskItemDTO[]
@@ -121,42 +170,25 @@ export function useDashboardData(
       dailyBreakdown: DailyBreakdownPointDTO[] | null
       distribution: DashboardPeriodDistributionDTO | null
     }> => {
+      if (customRangeActive) {
+        const rangeParams: Pick<DashboardRangeParams, "startDate" | "endDate"> & {
+          startDate: string
+          endDate: string
+        } = { startDate: startDate!, endDate: endDate! }
+        const payload = await dashboardApi.getEnrichedRange(rangeParams)
+        return mapPayloadToState(payload)
+      }
+
       if (!dateKey) {
-        return {
-          stats: null,
-          riskVehicles: [],
-          pendingAlerts: [],
-          consistency: null,
-          vehicleDetails: [],
-          topDriversKeysByOperation: [],
-          adminTotals: null,
-          dailyBreakdown: null,
-          distribution: null,
-        }
+        return emptyDashboardData
       }
 
-      const dateParam = enrichedDateParam(dateKey, mode)
-      const payload = await dashboardApi.getEnriched(mode, dateParam)
-
-      const vehicleDetails = Array.isArray(payload.vehicleDetails) ? payload.vehicleDetails : []
-
-      return {
-        stats: normalizeStats(payload),
-        riskVehicles: riskVehiclesFromVehicleDetails(vehicleDetails),
-        pendingAlerts: Array.isArray(payload.pendingAlerts)
-          ? payload.pendingAlerts.filter((a) => !a.alertSent)
-          : [],
-        consistency: payload.consistency ?? null,
-        vehicleDetails,
-        topDriversKeysByOperation: Array.isArray(payload.topDriversKeysByOperation)
-          ? payload.topDriversKeysByOperation
-          : [],
-        adminTotals: payload.adminTotals ?? null,
-        dailyBreakdown: Array.isArray(payload.dailyBreakdown) ? payload.dailyBreakdown : null,
-        distribution: normalizeDistribution(payload),
-      }
+      const periodMode = mode as DashboardPeriodMode
+      const dateParam = enrichedDateParam(dateKey, periodMode)
+      const payload = await dashboardApi.getEnriched(periodMode, dateParam)
+      return mapPayloadToState(payload)
     },
-    enabled: !!dateKey,
+    enabled: customRangeActive || (mode !== "custom" && !!dateKey),
     staleTime: STALE_TIME_MS,
   })
 

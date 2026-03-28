@@ -733,7 +733,15 @@ export default function SuperDashboardPage() {
   const hasRestoredRef = useRef(false)
 
   const selectedDate = dateState.status === "ready" ? dateState.date : undefined
-  const presetForApi = preset === "custom" ? "day" : preset
+
+  const customRangeStart =
+    preset === "custom" && customRange?.from && customRange?.to
+      ? normalizeBusinessDate(customRange.from)
+      : undefined
+  const customRangeEnd =
+    preset === "custom" && customRange?.from && customRange?.to
+      ? normalizeBusinessDate(customRange.to)
+      : undefined
 
   useEffect(() => {
     if (hasRestoredRef.current) return
@@ -781,7 +789,7 @@ export default function SuperDashboardPage() {
     error,
     refetch,
   } =
-    useDashboardData(selectedDate, presetForApi)
+    useDashboardData(selectedDate, preset, customRangeStart, customRangeEnd)
 
   useEffect(() => {
     if (!selectedDate) return
@@ -801,20 +809,21 @@ export default function SuperDashboardPage() {
   }, [vehicleDetails])
 
   // Previous period — compute param
+  const prevPeriodPreset = preset === "custom" ? "day" : preset
   const prevApiParam = useMemo(() => {
     if (!selectedDate) return undefined
-    const raw = getPreviousParam(selectedDate, presetForApi)
-    if (presetForApi === "month") return raw            // already "YYYY-MM"
-    if (presetForApi === "year") return raw             // already "YYYY"
+    const raw = getPreviousParam(selectedDate, prevPeriodPreset)
+    if (prevPeriodPreset === "month") return raw            // already "YYYY-MM"
+    if (prevPeriodPreset === "year") return raw             // already "YYYY"
     return raw                                    // full dateKey
-  }, [selectedDate, presetForApi])
+  }, [selectedDate, prevPeriodPreset])
 
   const { data: prevPayload } = useQuery({
-    queryKey: ["dashboard", "prev", presetForApi, prevApiParam ?? ""],
+    queryKey: ["dashboard", "prev", prevPeriodPreset, prevApiParam ?? ""],
     queryFn: async (): Promise<DashboardAggregatedPayload | null> => {
       if (!prevApiParam) return null
       try {
-        return await dashboardApi.getEnriched(presetForApi, prevApiParam)
+        return await dashboardApi.getEnriched(prevPeriodPreset, prevApiParam)
       } catch { return null }
     },
     enabled: !!prevApiParam,
@@ -847,7 +856,7 @@ export default function SuperDashboardPage() {
 
   const prevLabel = useMemo(() => ({
     day: "día ant.", week: "semana ant.", month: "mes ant.", year: "año ant.",
-  }[presetForApi]), [presetForApi])
+  }[prevPeriodPreset]), [prevPeriodPreset])
 
   // Bar chart data
   const chartData = useMemo(() => {
@@ -1076,7 +1085,13 @@ export default function SuperDashboardPage() {
                 {selectedDateLabel}
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto border-white/10 bg-zinc-900 p-0">
+            <PopoverContent
+              className={cn(
+                "w-auto p-0",
+                "border-border bg-popover text-popover-foreground",
+                "dark:border-white/10 dark:bg-zinc-900 dark:text-zinc-50",
+              )}
+            >
               {preset === "custom" ? (
                 <Calendar
                   mode="range"

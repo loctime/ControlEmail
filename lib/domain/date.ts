@@ -153,3 +153,22 @@ export function getDateKeysInYear(year: string): string[] {
   }
   return keys
 }
+
+/** Claves YYYY-MM-DD desde startKey hasta endKey inclusive (orden natural). */
+export function getDateKeysInclusiveRange(startKey: string, endKey: string): string[] {
+  const start = normalizeBusinessDate(startKey)
+  const end = normalizeBusinessDate(endKey)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end) || start > end) {
+    return []
+  }
+  const keys: string[] = []
+  const cur = parseBusinessDate(start)
+  const endDate = parseBusinessDate(end)
+  while (cur <= endDate) {
+    keys.push(
+      `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}-${String(cur.getDate()).padStart(2, "0")}`,
+    )
+    cur.setDate(cur.getDate() + 1)
+  }
+  return keys
+}

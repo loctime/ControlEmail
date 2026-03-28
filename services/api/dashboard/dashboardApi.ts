@@ -7,11 +7,26 @@ import type {
   MyRiskDTO,
   MyStatsDTO,
 } from "@/services/api/dashboard/types"
+import type { DashboardRangeParams } from "@/services/dashboard-api"
 
 export const dashboardApi = {
   /** GET /api/dashboard/enriched?period=&date= — único endpoint agregado enriquecido */
   getEnriched: (period: "day" | "week" | "month" | "year", dateParam: string) => {
     const qs = new URLSearchParams({ period, date: dateParam })
+    return apiClient.get<DashboardAggregatedPayload>(`/api/dashboard/enriched?${qs.toString()}`, {
+      authMode: "firebase",
+    })
+  },
+
+  /**
+   * GET /api/dashboard/enriched?startDate=&endDate=
+   * Rango arbitrario (YYYY-MM-DD). Alineado con `DashboardRangeParams` cuando range es "custom".
+   */
+  getEnrichedRange: (params: Pick<DashboardRangeParams, "startDate" | "endDate"> & { startDate: string; endDate: string }) => {
+    const qs = new URLSearchParams({
+      startDate: params.startDate,
+      endDate: params.endDate,
+    })
     return apiClient.get<DashboardAggregatedPayload>(`/api/dashboard/enriched?${qs.toString()}`, {
       authMode: "firebase",
     })

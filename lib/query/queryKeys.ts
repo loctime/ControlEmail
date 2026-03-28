@@ -5,6 +5,8 @@ export const queryKeys = {
     /** [mode, param] e.g. ["day","2026-03-04"] | ["week","2026-03-10"] | ["month","2026-03"] | ["year","2026"] */
     aggregated: (mode: "day" | "week" | "month" | "year", param: string) =>
       ["dashboard", mode, param] as const,
+    aggregatedRange: (startDate: string, endDate: string) =>
+      ["dashboard", "range", startDate, endDate] as const,
     lastDate: () => ["dashboard", "lastDate"] as const,
   },
   vehicles: {

@@ -11,6 +11,7 @@ import {
   getDateKeysLast7Days,
   getDateKeysInMonth,
   getDateKeysInYear,
+  getDateKeysInclusiveRange,
 } from "@/lib/domain/date"
 import { aggregateEnriched } from "@/app/api/dashboard/aggregate-enriched"
 import {
@@ -145,8 +146,34 @@ async function getRawPayload(
   return { error: "invalid_period" }
 }
 
+async function getRawPayloadFromDateRange(
+  startDate: string,
+  endDate: string,
+  auth: Awaited<ReturnType<typeof getAuthUserWithPlates>>,
+): Promise<{ payload: DashboardAggregatedPayload; error?: never } | { payload?: never; error: string }> {
+  if (!auth) return { error: "unauthorized" }
+  const start = normalizeBusinessDate(startDate)
+  const end = normalizeBusinessDate(endDate)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end)) {
+    return { error: "invalid_date_range" }
+  }
+  if (start > end) return { error: "start_after_end" }
+  const dateKeys = getDateKeysInclusiveRange(start, end)
+  if (dateKeys.length === 0) return { error: "invalid_date_range" }
+  const dailyResults: { dateKey: string; metrics: DailyAlertsResponse }[] = []
+  for (let i = 0; i < dateKeys.length; i += YEAR_BATCH_SIZE) {
+    const batch = dateKeys.slice(i, i + YEAR_BATCH_SIZE)
+    const batchResults = await Promise.all(
+      batch.map(async (dk) => ({ dateKey: dk, metrics: await getDailyMetrics(dk) })),
+    )
+    dailyResults.push(...batchResults)
+  }
+  return { payload: aggregateEnriched(dailyResults, auth, { includeDailyBreakdown: true }) }
+}
+
 /**
  * GET /api/dashboard/enriched?period=day|week|month|year&date=YYYY-MM-DD
+ * GET /api/dashboard/enriched?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
  *
  * Unified dashboard endpoint that returns operacion and responsable always
  * up-to-date by reading from apps/emails/vehicles after aggregation.
@@ -157,6 +184,29 @@ export async function GET(request: Request) {
 
   try {
     const { searchParams } = new URL(request.url)
+    const startDate = searchParams.get("startDate")
+    const endDate = searchParams.get("endDate")
+
+    if ((startDate != null && startDate !== "") !== (endDate != null && endDate !== "")) {
+      return NextResponse.json(
+        { error: "startDate_and_endDate_required_together" },
+        { status: 400 },
+      )
+    }
+
+    if (startDate && endDate) {
+      const result = await getRawPayloadFromDateRange(startDate, endDate, auth)
+      if ("error" in result) {
+        return NextResponse.json({ error: result.error }, { status: 400 })
+      }
+      const payload = result.payload
+      if (payload.vehicleDetails && payload.vehicleDetails.length > 0) {
+        payload.vehicleDetails = await enrichVehicleDetails(payload.vehicleDetails)
+      }
+      payload.topDriversKeysByOperation = buildTopDriversKeysByOperation(payload.vehicleDetails ?? [])
+      return NextResponse.json(payload)
+    }
+
     const period = searchParams.get("period") as Period | null
     const date = searchParams.get("date")
 
