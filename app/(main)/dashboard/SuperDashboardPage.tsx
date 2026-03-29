@@ -409,7 +409,7 @@ function TopLlavesConductoresBlock({
   return (
     <div>
       <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-white/30">
-        Top conductores / llaves
+        Top conductores / llaves con más excesos de velocidad
       </div>
       <div className="mb-1.5 grid text-[11px] text-white/25" style={{ gridTemplateColumns: colTemplate }}>
         <span>Llave</span>
@@ -1037,11 +1037,18 @@ export default function SuperDashboardPage() {
     setCalendarOpen(true)
   }, [])
 
-  const selectStandardPreset = useCallback((p: "day" | "week" | "month" | "year") => {
-    setPreset(p)
-    setCustomRange(undefined)
-    setCalendarOpen(false)
-  }, [])
+  const selectStandardPreset = useCallback(
+    (p: "day" | "week" | "month" | "year") => {
+      setPreset(p)
+      setCustomRange(undefined)
+      setCalendarOpen(false)
+      // Anclar siempre al último día con datos: día / 7 días / mes / año son relativos a ese cierre, no a la fecha que quedó con las flechas.
+      if (lastDateData?.date) {
+        setDate(normalizeBusinessDate(lastDateData.date))
+      }
+    },
+    [lastDateData?.date, setDate],
+  )
 
   return (
     <div className="min-h-screen space-y-6 p-6">

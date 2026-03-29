@@ -544,7 +544,7 @@ export default function HistoricoPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <Link href="/">
+          <Link href="/dashboard">
             <Button
               variant="outline"
               size="sm"
