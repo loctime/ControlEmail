@@ -497,7 +497,7 @@ function OperacionCard({
         <span className="shrink-0 rounded bg-white/[0.06] px-2 py-0.5 text-xs text-white/45">🏆 #{rank}</span>
         {row.maxSpeed != null && (
           <span className={cn("shrink-0 rounded px-2 py-0.5 text-sm font-medium tabular-nums", speedClass(row.maxSpeed))}>
-            {row.maxSpeed} km/h
+            vel max: {row.maxSpeed} km/h
           </span>
         )}
       </div>
