@@ -172,3 +172,51 @@ export function getDateKeysInclusiveRange(startKey: string, endKey: string): str
   }
   return keys
 }
+
+export type DashboardHistoricoPreset = "day" | "week" | "month" | "year" | "custom"
+
+/**
+ * Mismo rango calendario que usa GET /api/dashboard/enriched para el período seleccionado,
+ * para enlazar al histórico con fechas alineadas al dashboard.
+ */
+export function historicoRangeFromDashboardSelection(
+  selectedDate: string,
+  preset: DashboardHistoricoPreset,
+  customStart?: string,
+  customEnd?: string,
+): { dateFrom: string; dateTo: string } | null {
+  if (preset === "custom") {
+    if (!customStart || !customEnd) return null
+    const dateFrom = normalizeBusinessDate(customStart)
+    const dateTo = normalizeBusinessDate(customEnd)
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateFrom) || !/^\d{4}-\d{2}-\d{2}$/.test(dateTo) || dateFrom > dateTo) {
+      return null
+    }
+    return { dateFrom, dateTo }
+  }
+
+  const dk = normalizeBusinessDate(selectedDate)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dk)) return null
+
+  if (preset === "day") {
+    return { dateFrom: dk, dateTo: dk }
+  }
+
+  if (preset === "week") {
+    const keys = getDateKeysLast7Days(dk)
+    if (keys.length === 0) return null
+    return { dateFrom: keys[0], dateTo: keys[keys.length - 1] }
+  }
+
+  if (preset === "month") {
+    const month = dk.slice(0, 7)
+    const keys = getDateKeysInMonth(month)
+    if (keys.length === 0) return null
+    return { dateFrom: keys[0], dateTo: keys[keys.length - 1] }
+  }
+
+  const year = dk.slice(0, 4)
+  const keys = getDateKeysInYear(year)
+  if (keys.length === 0) return null
+  return { dateFrom: keys[0], dateTo: keys[keys.length - 1] }
+}

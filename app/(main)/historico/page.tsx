@@ -1,7 +1,8 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import { AlertTriangle, ArrowLeft, ChevronLeft, ChevronRight, Download, RefreshCw, X } from "lucide-react"
 import { useQuery } from "@tanstack/react-query"
 import { Badge } from "@/components/ui/badge"
@@ -231,6 +232,9 @@ const DATE_PRESET_LABELS: Record<DatePreset, string> = {
 }
 
 export default function HistoricoPage() {
+  const searchParams = useSearchParams()
+  const appliedUrlFiltersKey = useRef<string | null>(null)
+
   const initialDate = useMemo(() => {
     const d = new Date()
     d.setDate(d.getDate() - 1)
@@ -279,6 +283,27 @@ export default function HistoricoPage() {
     setDateError(null)
     return true
   }
+
+  useEffect(() => {
+    const desde = searchParams.get("desde")
+    const hasta = searchParams.get("hasta")
+    const tipo = searchParams.get("tipo")
+    const operacion = searchParams.get("operacion")
+    if (!desde || !hasta) return
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(desde) || !/^\d{4}-\d{2}-\d{2}$/.test(hasta)) return
+
+    const key = `${desde}|${hasta}|${tipo ?? ""}|${operacion ?? ""}`
+    if (appliedUrlFiltersKey.current === key) return
+    appliedUrlFiltersKey.current = key
+
+    setDatePreset("personalizado")
+    setDateFrom(desde)
+    setDateTo(hasta)
+    setCurrentPage(1)
+    if (!validateRange(desde, hasta)) return
+    if (tipo) setSelectedEventType(tipo)
+    if (operacion) setSelectedOperation(operacion)
+  }, [searchParams])
 
   function handlePreset(preset: DatePreset) {
     setDatePreset(preset)

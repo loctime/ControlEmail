@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react"
+import Link from "next/link"
 import { es } from "date-fns/locale"
 import { ArrowLeft, ArrowRight } from "lucide-react"
 import { useQuery } from "@tanstack/react-query"
@@ -26,6 +27,7 @@ import {
   formatDDMMYYYY,
   getDateKeysLast7Days,
   getYesterdayKey,
+  historicoRangeFromDashboardSelection,
   normalizeBusinessDate,
 } from "@/lib/domain/date"
 import { cn } from "@/lib/utils"
@@ -467,16 +469,20 @@ function TopLlavesConductoresBlock({
   )
 }
 
+const HISTORICO_EXCESO_VELOCIDAD_LABEL = "Exceso de velocidad"
+
 function OperacionCard({
   row,
   rank,
   accent,
   speedClass,
+  historicoDetailsHref,
 }: {
   row: TopOperacionRow
   rank: number
   accent: string
   speedClass: (speed: number | null) => string
+  historicoDetailsHref: string | null
 }) {
   const [showAllResp, setShowAllResp] = useState(false)
   const names = row.responsables.map((r) => r.replace(/@\S+/g, "").trim()).filter(Boolean)
@@ -542,6 +548,18 @@ function OperacionCard({
         variant="cards"
         lastEventLabel={`Último: ${formatLastEvent(row.lastEventAt)}`}
       />
+      {historicoDetailsHref && (
+        <div className="mt-4 flex justify-end border-t border-white/[0.05] pt-3">
+          <Button
+            asChild
+            variant="outline"
+            size="sm"
+            className="h-8 border-white/10 bg-white/[0.04] text-xs text-white/70 hover:bg-white/[0.08] hover:text-white"
+          >
+            <Link href={historicoDetailsHref}>Ver detalles</Link>
+          </Button>
+        </div>
+      )}
     </div>
   )
 }
@@ -558,9 +576,10 @@ const CARD_ACCENTS = ["border-t-red-500/60", "border-t-yellow-500/60", "border-t
 interface TopExcesosOperacionTableProps {
   rows: TopOperacionRow[]
   title: string
+  historicoHrefForOperacion: (operacion: string) => string | null
 }
 
-function TopExcesosOperacionTable({ rows, title }: TopExcesosOperacionTableProps) {
+function TopExcesosOperacionTable({ rows, title, historicoHrefForOperacion }: TopExcesosOperacionTableProps) {
   const visible = applyLimit(rows, "todos")
 
   const deltaEl = (curr: number, prev: number | undefined) => {
@@ -589,6 +608,7 @@ function TopExcesosOperacionTable({ rows, title }: TopExcesosOperacionTableProps
                 rank={i + 1}
                 accent={CARD_ACCENTS[i % CARD_ACCENTS.length]}
                 speedClass={speedClass}
+                historicoDetailsHref={historicoHrefForOperacion(row.operacion)}
               />
             ))}
           </div>
@@ -775,6 +795,30 @@ export default function SuperDashboardPage() {
   useEffect(() => {
     if (selectedDate) writeStoredDate(selectedDate)
   }, [selectedDate])
+
+  const historicoRange = useMemo(() => {
+    if (!selectedDate) return null
+    return historicoRangeFromDashboardSelection(
+      selectedDate,
+      preset,
+      customRangeStart,
+      customRangeEnd,
+    )
+  }, [selectedDate, preset, customRangeStart, customRangeEnd])
+
+  const historicoHrefForOperacion = useCallback(
+    (operacion: string) => {
+      if (!historicoRange) return null
+      const params = new URLSearchParams({
+        desde: historicoRange.dateFrom,
+        hasta: historicoRange.dateTo,
+        tipo: HISTORICO_EXCESO_VELOCIDAD_LABEL,
+        operacion,
+      })
+      return `/historico?${params.toString()}`
+    },
+    [historicoRange],
+  )
 
   const setDate = useCallback((date: string) => dispatch({ type: "SET", date }), [])
 
@@ -1275,6 +1319,7 @@ export default function SuperDashboardPage() {
                         rank={topByOperacion.findIndex((r) => r.operacion === selectedOperacionForChart) + 1}
                         accent={CARD_ACCENTS[(topByOperacion.findIndex((r) => r.operacion === selectedOperacionForChart)) % CARD_ACCENTS.length]}
                         speedClass={speedClass}
+                        historicoDetailsHref={historicoHrefForOperacion(selectedOperacionForChart)}
                       />
                     ) : (
                       <div className="flex items-center justify-center h-full text-white/30 text-sm">
@@ -1296,6 +1341,7 @@ export default function SuperDashboardPage() {
               <TopExcesosOperacionTable
                 title="Por operación"
                 rows={topByOperacion}
+                historicoHrefForOperacion={historicoHrefForOperacion}
               />
             </div>
           )}
