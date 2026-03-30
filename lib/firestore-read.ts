@@ -356,25 +356,9 @@ export interface VehicleDoc {
 }
 
 /**
- * Comprueba si existe el documento apps/emails/access/{email}.
- * El email se normaliza (trim + lowercase). Usado para autorizaciÃ³n de acceso.
- * La colecciÃ³n access es la fuente de verdad (sincronizada por POST /email/sync-access-users).
+ * apps/emails/access/{email}: roles y enabled.
+ * Los admin de listas en /admin/email-config se sincronizan aqui al guardar (PATCH): ver app/api/admin/email-config.
  */
-export async function allowedUserExistsByEmail(email: string): Promise<boolean> {
-  const normalized = email.trim().toLowerCase()
-  if (!normalized) return false
-  const docPath = `apps/emails/access/${encodeURIComponent(normalized)}`
-  const path = `documents/${docPath}`
-  const res = await firestoreRequest(path, { method: "GET" }, { quiet404: true })
-  const exists = res.ok
-  console.log("[auth] allowedUserExistsByEmail:", {
-    email: normalized,
-    path: docPath,
-    exists,
-    status: res.status,
-  })
-  return exists
-}
 
 export interface EmailAccessUser {
   email: string

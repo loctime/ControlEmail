@@ -6,7 +6,7 @@
  */
 
 import { verifyIdToken, getFirebaseAuth } from "@/lib/firebase-admin"
-import { listVehicles, allowedUserExistsByEmail, getEmailAccessUserByEmail } from "@/lib/firestore-read"
+import { listVehicles, getEmailAccessUserByEmail } from "@/lib/firestore-read"
 
 export interface CheckUserResult {
   allowed: boolean
@@ -14,15 +14,20 @@ export interface CheckUserResult {
 }
 
 /**
- * Comprueba si un email esta autorizado (existe en apps/emails/users/{email})
- * y si ya existe un usuario de Firebase Auth con ese email.
- * No crea usuario en Auth; la creacion la hace el frontend con createUserWithEmailAndPassword.
+ * Comprueba si un email puede usar la app y si ya existe en Firebase Auth.
+ *
+ * - Con documento en apps/emails/access: hace falta enabled === true (active/enabled en Firestore).
+ *   Al quitar el email de destinatarios en /admin/email-config, se pone enabled:false pero el doc sigue existiendo.
+ * - Sin documento: solo si figura como responsable en al menos un vehículo (no depende de /admin/operations).
  */
 export async function checkUserByEmail(email: string): Promise<CheckUserResult> {
   const normalized = email.trim().toLowerCase()
   if (!normalized) return { allowed: false, authExists: false }
 
-  const allowed = await allowedUserExistsByEmail(normalized)
+  const access = await getEmailAccessUserByEmail(normalized)
+  const allowed =
+    access != null ? access.enabled : (await getAllowedPlatesForEmail(normalized)).size > 0
+
   if (!allowed) return { allowed: false, authExists: false }
 
   let authExists = false
@@ -123,6 +128,8 @@ export async function getAuthUserWithPlates(request: Request): Promise<AuthUserW
     if (!user) return null
 
     const accessUser = await getEmailAccessUserByEmail(user.email)
+    if (accessUser != null && !accessUser.enabled) return null
+
     const role = accessUser?.role ?? "responsable"
 
     const fullPlateAccess = ROLES_WITH_ALL_PLATES.includes(

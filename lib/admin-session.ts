@@ -28,6 +28,7 @@ export async function hasAdminAccess(request: Request): Promise<boolean> {
   const user = await getAuthUserFromRequest(request)
   if (!user) return false
   const accessUser = await getEmailAccessUserByEmail(user.email)
+  if (accessUser != null && !accessUser.enabled) return false
   const role = accessUser?.role ?? "responsable"
   return role !== "responsable"
 }
