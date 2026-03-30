@@ -330,11 +330,9 @@ type TopLlavesVariant = "table" | "cards"
 function TopLlavesConductoresBlock({
   row,
   variant,
-  lastEventLabel,
 }: {
   row: TopOperacionRow
   variant: TopLlavesVariant
-  lastEventLabel?: string
 }) {
   const [expanded, setExpanded] = useState(false)
   const full = row.topDriversKeysAll
@@ -465,9 +463,6 @@ function TopLlavesConductoresBlock({
           ) : undefined
         }
       />
-      <div className="mt-2.5 border-t border-white/[0.05] pt-2.5">
-        <span className="text-[11px] text-white/25">{lastEventLabel ?? ""}</span>
-      </div>
     </div>
   )
 }
@@ -546,11 +541,7 @@ function OperacionCard({
           {row.plates} patentes
         </span>
       </div>
-      <TopLlavesConductoresBlock
-        row={row}
-        variant="cards"
-        lastEventLabel={`Último: ${formatLastEvent(row.lastEventAt)}`}
-      />
+      <TopLlavesConductoresBlock row={row} variant="cards" />
       {historicoDetailsHref && (
         <div className="mt-4 flex justify-end border-t border-white/[0.05] pt-3">
           <Button
@@ -1013,9 +1004,32 @@ export default function SuperDashboardPage() {
     staleTime: STALE_TIME,
   })
 
+  /** Vista "Año" solo si hay excesos en 3+ meses distintos del año consultado (toda la flota). */
+  const distinctMonthsWithExcessInYear = useMemo(() => {
+    const points = yearTrendPayload?.dailyBreakdownByOperation
+    if (!points || points.length === 0) return 0
+    const months = new Set<number>()
+    for (const point of points) {
+      const totalDay = Object.values(point.operations ?? {}).reduce((s, v) => s + (Number(v) || 0), 0)
+      if (totalDay <= 0) continue
+      const m = Number(point.date.slice(5, 7))
+      if (Number.isFinite(m) && m >= 1 && m <= 12) months.add(m)
+    }
+    return months.size
+  }, [yearTrendPayload?.dailyBreakdownByOperation])
+
+  const canShowYearTrendView = distinctMonthsWithExcessInYear >= 3
+
+  useEffect(() => {
+    if (!canShowYearTrendView && trendGranularity === "year") setTrendGranularity("month")
+  }, [canShowYearTrendView, trendGranularity])
+
+  const effectiveTrendGranularity =
+    !canShowYearTrendView && trendGranularity === "year" ? "month" : trendGranularity
+
   const yearTrendOperations = useMemo(() => {
     const rows =
-      trendGranularity === "year"
+      effectiveTrendGranularity === "year"
         ? (yearTrendPayload?.vehicleDetails ?? [])
         : (monthTrendPayload?.vehicleDetails ?? [])
     const set = new Set<string>()
@@ -1025,7 +1039,7 @@ export default function SuperDashboardPage() {
       set.add(op)
     }
     return Array.from(set).sort((a, b) => a.localeCompare(b, "es"))
-  }, [trendGranularity, yearTrendPayload?.vehicleDetails, monthTrendPayload?.vehicleDetails])
+  }, [effectiveTrendGranularity, yearTrendPayload?.vehicleDetails, monthTrendPayload?.vehicleDetails])
 
   useEffect(() => {
     if (selectedOperacionYearTrend !== "all" && !yearTrendOperations.includes(selectedOperacionYearTrend)) {
@@ -1034,7 +1048,7 @@ export default function SuperDashboardPage() {
   }, [selectedOperacionYearTrend, yearTrendOperations])
 
   const yearlyOperationLineData = useMemo(() => {
-    if (trendGranularity === "month") {
+    if (effectiveTrendGranularity === "month") {
       const points = monthTrendPayload?.dailyBreakdownByOperation ?? []
       const dayTotals = new Map<number, number>()
       for (const point of points) {
@@ -1108,7 +1122,7 @@ export default function SuperDashboardPage() {
       .filter((point) => point.monthIndex >= firstMonthWithData && point.monthIndex <= maxMonthIndex)
       .map(({ label, excesos }) => ({ label, excesos }))
   }, [
-    trendGranularity,
+    effectiveTrendGranularity,
     monthViewMode,
     monthTrendPayload?.dailyBreakdownByOperation,
     selectedOperacionYearTrend,
@@ -1441,50 +1455,92 @@ export default function SuperDashboardPage() {
             <CardHeader className="pb-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <CardTitle className="text-sm font-semibold text-white/80">
-                  {trendGranularity === "year"
+                  {effectiveTrendGranularity === "year"
                     ? `Excesos de velocidad por mes (${selectedYear ?? "año"}) - gráfico lineal`
                     : `Excesos de velocidad por ${monthViewMode === "week" ? "semana" : "día"} (${selectedMonth ?? "mes"}) - gráfico lineal`}
                 </CardTitle>
-                <div className="flex w-full flex-wrap justify-end gap-2">
-                  <div className="w-full max-w-[180px]">
-                    <Select value={trendGranularity} onValueChange={(v: "month" | "year") => setTrendGranularity(v)}>
+                <div className="flex w-full flex-wrap items-center justify-end gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex rounded-lg border border-white/10 bg-white/[0.04] p-0.5">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className={cn(
+                          "h-8 px-3 text-xs font-medium",
+                          effectiveTrendGranularity === "month"
+                            ? "border border-primary/40 bg-primary/20 text-primary shadow-sm dark:border-white/20 dark:bg-white/10 dark:text-white"
+                            : "text-muted-foreground hover:bg-secondary hover:text-foreground dark:text-white/50 dark:hover:bg-white/5 dark:hover:text-white/70",
+                        )}
+                        onClick={() => setTrendGranularity("month")}
+                      >
+                        Mes
+                      </Button>
+                      {canShowYearTrendView && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className={cn(
+                            "h-8 px-3 text-xs font-medium",
+                            effectiveTrendGranularity === "year"
+                              ? "border border-primary/40 bg-primary/20 text-primary shadow-sm dark:border-white/20 dark:bg-white/10 dark:text-white"
+                              : "text-muted-foreground hover:bg-secondary hover:text-foreground dark:text-white/50 dark:hover:bg-white/5 dark:hover:text-white/70",
+                          )}
+                          onClick={() => setTrendGranularity("year")}
+                        >
+                          Año
+                        </Button>
+                      )}
+                    </div>
+                    {effectiveTrendGranularity === "month" && (
+                      <div className="flex rounded-lg border border-white/10 bg-white/[0.04] p-0.5">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className={cn(
+                            "h-8 px-3 text-xs font-medium",
+                            monthViewMode === "day"
+                              ? "border border-primary/40 bg-primary/20 text-primary shadow-sm dark:border-white/20 dark:bg-white/10 dark:text-white"
+                              : "text-muted-foreground hover:bg-secondary hover:text-foreground dark:text-white/50 dark:hover:bg-white/5 dark:hover:text-white/70",
+                          )}
+                          onClick={() => setMonthViewMode("day")}
+                        >
+                          Día
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className={cn(
+                            "h-8 px-3 text-xs font-medium",
+                            monthViewMode === "week"
+                              ? "border border-primary/40 bg-primary/20 text-primary shadow-sm dark:border-white/20 dark:bg-white/10 dark:text-white"
+                              : "text-muted-foreground hover:bg-secondary hover:text-foreground dark:text-white/50 dark:hover:bg-white/5 dark:hover:text-white/70",
+                          )}
+                          onClick={() => setMonthViewMode("week")}
+                        >
+                          Semana
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                  <div className="w-full max-w-xs sm:w-auto sm:min-w-[200px]">
+                    <Select value={selectedOperacionYearTrend} onValueChange={setSelectedOperacionYearTrend}>
                       <SelectTrigger className="h-8 border-white/10 bg-white/[0.04] text-xs text-white/80">
-                        <SelectValue placeholder="Vista" />
+                        <SelectValue placeholder="Filtrar por operación" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="month">Mes</SelectItem>
-                        <SelectItem value="year">Año</SelectItem>
+                        <SelectItem value="all">Todas las operaciones</SelectItem>
+                        {yearTrendOperations.map((op) => (
+                          <SelectItem key={op} value={op}>
+                            {op}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
-                  {trendGranularity === "month" && (
-                    <div className="w-full max-w-[180px]">
-                      <Select value={monthViewMode} onValueChange={(v: "day" | "week") => setMonthViewMode(v)}>
-                        <SelectTrigger className="h-8 border-white/10 bg-white/[0.04] text-xs text-white/80">
-                          <SelectValue placeholder="Agrupación mensual" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="day">Por día</SelectItem>
-                          <SelectItem value="week">Por semana</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-                  <div className="w-full max-w-xs">
-                    <Select value={selectedOperacionYearTrend} onValueChange={setSelectedOperacionYearTrend}>
-                    <SelectTrigger className="h-8 border-white/10 bg-white/[0.04] text-xs text-white/80">
-                      <SelectValue placeholder="Filtrar por operación" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todas las operaciones</SelectItem>
-                      {yearTrendOperations.map((op) => (
-                        <SelectItem key={op} value={op}>
-                          {op}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
                 </div>
               </div>
             </CardHeader>
