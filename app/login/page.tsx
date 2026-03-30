@@ -20,6 +20,8 @@ function LoginForm() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [errorMessage, setErrorMessage] = useState("")
+  /** Si ya existe en Firebase Auth (según el servidor). Evita depender de auth/user-not-found: a veces Firebase devuelve solo auth/invalid-credential. */
+  const [firebaseUserExists, setFirebaseUserExists] = useState<boolean | null>(null)
 
   const handleContinue = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -37,6 +39,7 @@ function LoginForm() {
         return
       }
 
+      setFirebaseUserExists(data.authExists === true)
       setStep("password")
       setPassword("")
     } catch (err) {
@@ -54,17 +57,24 @@ function LoginForm() {
     setStep("loading")
 
     try {
+      const trimmed = email.trim()
       let idToken: string
-      try {
-        const userCred = await signInWithEmailAndPassword(auth, email.trim(), password)
+
+      if (firebaseUserExists === true) {
+        const userCred = await signInWithEmailAndPassword(auth, trimmed, password)
         idToken = await userCred.user.getIdToken()
-      } catch (err: unknown) {
-        const code = (err as { code?: string })?.code
-        if (code === "auth/user-not-found") {
-          const userCred = await createUserWithEmailAndPassword(auth, email.trim(), password)
+      } else {
+        try {
+          const userCred = await createUserWithEmailAndPassword(auth, trimmed, password)
           idToken = await userCred.user.getIdToken()
-        } else {
-          throw err
+        } catch (err: unknown) {
+          const code = (err as { code?: string })?.code
+          if (code === "auth/email-already-in-use") {
+            const userCred = await signInWithEmailAndPassword(auth, trimmed, password)
+            idToken = await userCred.user.getIdToken()
+          } else {
+            throw err
+          }
         }
       }
 
@@ -82,6 +92,7 @@ function LoginForm() {
   const backToEmail = () => {
     setErrorMessage("")
     setPassword("")
+    setFirebaseUserExists(null)
     setStep("email")
   }
 
@@ -117,7 +128,11 @@ function LoginForm() {
       <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-muted/30 p-4">
         <div className="w-full max-w-sm space-y-2 text-center">
           <h1 className="text-2xl font-semibold tracking-tight">ControlDoc Vehicular</h1>
-          <p className="text-sm text-muted-foreground">Ingresa tu contrasena para {email}</p>
+          <p className="text-sm text-muted-foreground">
+            {firebaseUserExists
+              ? `Ingresa tu contrasena para ${email}`
+              : `Crea una contrasena para activar tu cuenta (${email})`}
+          </p>
         </div>
         <form onSubmit={handleAuth} className="flex w-full max-w-sm flex-col gap-4 rounded-lg border bg-card p-6 shadow-sm">
           <div className="grid gap-2">
@@ -129,7 +144,7 @@ function LoginForm() {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="********"
               required
-              autoComplete="current-password"
+              autoComplete={firebaseUserExists ? "current-password" : "new-password"}
               autoFocus
             />
           </div>
