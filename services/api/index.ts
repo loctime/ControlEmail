@@ -19,5 +19,5 @@ export type * from "@/services/api/quality/types"
 export { adminApi } from "@/services/api/admin/adminApi"
 export type * from "@/services/api/admin/types"
 
-export { emailApiFetch, sessionApiFetch } from "@/services/api/http"
+export { emailApiFetch, hybridSessionFirebaseFetch, sessionApiFetch } from "@/services/api/http"
 export type { ApiError } from "@/services/api/http"

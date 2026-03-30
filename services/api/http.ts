@@ -115,3 +115,35 @@ export async function sessionApiFetch<T>(url: string, options: RequestInit = {})
 
   return data
 }
+
+/**
+ * Misma petición que sesión (cookie auth_token), y si Firebase tiene currentUser agrega Bearer.
+ * Sirve para el proxy /api/admin/operations cuando la cookie expiró o falta pero la sesión Firebase sigue en el cliente.
+ */
+export async function hybridSessionFirebaseFetch<T>(url: string, options: RequestInit = {}): Promise<T> {
+  const headers: HeadersInit = { ...(options.headers ?? {}) }
+  const user = auth.currentUser
+  if (user) {
+    const token = await user.getIdToken()
+    ;(headers as Record<string, string>)["Authorization"] = `Bearer ${token}`
+  }
+
+  const hasJsonBody = options.body !== undefined && !(options.body instanceof FormData)
+  if (hasJsonBody && !(headers as Record<string, string>)["Content-Type"]) {
+    ;(headers as Record<string, string>)["Content-Type"] = "application/json"
+  }
+
+  const response = await fetch(url, {
+    ...options,
+    credentials: "include",
+    headers,
+  })
+
+  const data = await parseResponseData<T>(response)
+
+  if (!response.ok) {
+    throw buildApiError(response, data)
+  }
+
+  return data
+}

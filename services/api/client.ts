@@ -1,7 +1,7 @@
 import { auth } from "@/lib/firebase-client"
-import { emailApiFetch, sessionApiFetch } from "@/services/api/http"
+import { emailApiFetch, hybridSessionFirebaseFetch, sessionApiFetch } from "@/services/api/http"
 
-export type ApiAuthMode = "session" | "firebase"
+export type ApiAuthMode = "session" | "firebase" | "hybrid"
 
 export interface ApiClientError extends Error {
   status?: number
@@ -16,7 +16,7 @@ interface RequestConfig<TBody = unknown> {
 }
 
 interface InternalRequestConfig<TBody = unknown> extends RequestConfig<TBody> {
-  method: "GET" | "POST" | "PATCH" | "DELETE"
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"
 }
 
 function buildInit<TBody>(config: InternalRequestConfig<TBody>): RequestInit {
@@ -76,9 +76,12 @@ async function requestWithStatuses<TResponse, TBody = unknown>(
 ): Promise<TResponse> {
   const authMode = config.authMode ?? "session"
   const init = buildInit(config)
-  const response = authMode === "firebase"
-    ? await fetchWithFirebase(path, init)
-    : await fetchWithSession(path, init)
+  const response =
+    authMode === "firebase"
+      ? await fetchWithFirebase(path, init)
+      : authMode === "hybrid"
+        ? await hybridSessionFirebaseFetch(path, init)
+        : await fetchWithSession(path, init)
 
   const data = (response.status === 204
     ? {}
@@ -104,7 +107,9 @@ async function request<TResponse, TBody = unknown>(path: string, config: Interna
   const authMode = config.authMode ?? "session"
   return authMode === "firebase"
     ? emailApiFetch<TResponse>(path, init)
-    : sessionApiFetch<TResponse>(path, init)
+    : authMode === "hybrid"
+      ? hybridSessionFirebaseFetch<TResponse>(path, init)
+      : sessionApiFetch<TResponse>(path, init)
 }
 
 export const apiClient = {
@@ -114,6 +119,8 @@ export const apiClient = {
     request<TResponse, TBody>(path, { ...config, method: "POST", body }),
   patch: <TResponse, TBody = unknown>(path: string, body?: TBody, config: Omit<RequestConfig<TBody>, "body"> = {}) =>
     request<TResponse, TBody>(path, { ...config, method: "PATCH", body }),
+  put: <TResponse, TBody = unknown>(path: string, body?: TBody, config: Omit<RequestConfig<TBody>, "body"> = {}) =>
+    request<TResponse, TBody>(path, { ...config, method: "PUT", body }),
   delete: <TResponse, TBody = unknown>(path: string, body?: TBody, config: Omit<RequestConfig<TBody>, "body"> = {}) =>
     request<TResponse, TBody>(path, { ...config, method: "DELETE", body }),
 }

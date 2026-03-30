@@ -37,9 +37,43 @@ import {
 import { canAccessAdminPages } from "@/lib/can-access-admin-pages"
 import { normalizePlate } from "@/lib/utils"
 import { apiClient } from "@/services/api/client"
-import { authApi, emailApiFetch } from "@/services/api"
+import { authApi } from "@/services/api"
 
 const SIN_ASIGNAR_NOMBRE = "SIN_ASIGNAR"
+
+/** Filtrá la consola por este texto para depurar carga y filtros. */
+const OPS_LOG = "[OperacionesAdmin]"
+
+function summarizeOperationsResponse(raw: unknown): Record<string, unknown> {
+  if (raw === null || raw === undefined) return { forma: "null_o_undefined" }
+  if (Array.isArray(raw)) {
+    const first = raw[0]
+    return {
+      forma: "array_raiz",
+      length: raw.length,
+      primerElemento:
+        first !== null && typeof first === "object"
+          ? Object.keys(first as object)
+          : typeof first,
+    }
+  }
+  if (typeof raw === "object") {
+    const o = raw as Record<string, unknown>
+    const keys = Object.keys(o)
+    const nested = (k: string) => (Array.isArray(o[k]) ? (o[k] as unknown[]).length : null)
+    return {
+      forma: "object",
+      keys,
+      longitudes: {
+        operations: nested("operations"),
+        data: nested("data"),
+        items: nested("items"),
+        results: nested("results"),
+      },
+    }
+  }
+  return { forma: typeof raw }
+}
 
 type FleetOperation = {
   nombre: string
@@ -47,21 +81,64 @@ type FleetOperation = {
   responsables: string[]
 }
 
-function isFleetOperationRow(x: unknown): x is FleetOperation {
-  if (x === null || typeof x !== "object") return false
+/** El backend a veces manda patentes o mails como objeto o número; antes el guard estricto descartaba toda la fila. */
+function cellToString(v: unknown): string {
+  if (v === null || v === undefined) return ""
+  if (typeof v === "string") return v.trim()
+  if (typeof v === "number" && Number.isFinite(v)) return String(v)
+  if (typeof v === "object") {
+    const r = v as Record<string, unknown>
+    const pick =
+      r.plate ??
+      r.patente ??
+      r.email ??
+      r.mail ??
+      r.value ??
+      r.id ??
+      r.nombre
+    if (typeof pick === "string") return pick.trim()
+    if (typeof pick === "number" && Number.isFinite(pick)) return String(pick)
+  }
+  return ""
+}
+
+function normalizeFleetOperation(x: unknown): FleetOperation | null {
+  if (x === null || typeof x !== "object") return null
   const o = x as Record<string, unknown>
-  return (
-    typeof o.nombre === "string" &&
-    Array.isArray(o.plates) &&
-    o.plates.every((p) => typeof p === "string") &&
-    Array.isArray(o.responsables) &&
-    o.responsables.every((r) => typeof r === "string")
-  )
+  if (typeof o.nombre !== "string" || !o.nombre.trim()) return null
+  const platesRaw = Array.isArray(o.plates) ? o.plates : []
+  const responsablesRaw = Array.isArray(o.responsables) ? o.responsables : []
+  const plates = platesRaw.map(cellToString).filter(Boolean)
+  const responsables = responsablesRaw.map(cellToString).filter(Boolean)
+  return { nombre: o.nombre.trim(), plates, responsables }
 }
 
 function parseOperationsPayload(raw: unknown): FleetOperation[] {
-  if (!Array.isArray(raw)) return []
-  return raw.filter(isFleetOperationRow)
+  let list: unknown[] = []
+  let nestedKey: string | null = null
+  if (Array.isArray(raw)) {
+    list = raw
+  } else if (raw !== null && typeof raw === "object") {
+    const o = raw as Record<string, unknown>
+    for (const key of ["operations", "data", "items", "results"] as const) {
+      const v = o[key]
+      if (Array.isArray(v)) {
+        nestedKey = key
+        list = v
+        break
+      }
+    }
+  }
+  const valid = list.map(normalizeFleetOperation).filter((r): r is FleetOperation => r !== null)
+  if (list.length > 0 && valid.length === 0) {
+    const first = list[0]
+    console.warn(OPS_LOG, "Hay candidatos pero ninguna fila se pudo normalizar (revisá nombre / plates[] / responsables[]).", {
+      candidatos: list.length,
+      muestraPrimerElemento: first,
+      claveAnidadaUsada: nestedKey,
+    })
+  }
+  return valid
 }
 
 function operationsPath(nombre: string, suffix = "") {
@@ -73,8 +150,8 @@ function emptySinAsignar(): FleetOperation {
   return { nombre: SIN_ASIGNAR_NOMBRE, plates: [], responsables: [] }
 }
 
-/** Backend controlfile exige Authorization: Bearer (Firebase); la cookie de sesión no alcanza. */
-const OPS_AUTH = { authMode: "firebase" as const }
+/** Cookie auth_token + Bearer de Firebase si hay currentUser (proxy local reenvía a controlfile). */
+const OPS_AUTH = { authMode: "hybrid" as const }
 
 export default function OperationsAdminPage() {
   const [bootDone, setBootDone] = useState(false)
@@ -173,6 +250,22 @@ export default function OperationsAdminPage() {
     [operations],
   )
 
+  useEffect(() => {
+    const visiblesPorChip = operations.filter((op) => activeChips.has(op.nombre)).length
+    console.info(OPS_LOG, "Estado filtros UI (chips + búsqueda).", {
+      operacionesEnMemoria: operations.length,
+      chipsActivos: activeChips.size,
+      nombresEnChipsActivos: [...activeChips],
+      operacionesQuePasarianSoloChip: visiblesPorChip,
+      visiblesTrasBusquedaYOrden: visibleOperations.length,
+      textoBusqueda: searchText.trim() || "(vacío)",
+      nota:
+        operations.length > 0 && activeChips.size === 0
+          ? "Ningún chip activo: lista visible vacía. Probá «Todas»."
+          : undefined,
+    })
+  }, [operations, activeChips, visibleOperations, searchText])
+
   const applyPayload = useCallback((list: FleetOperation[]) => {
     const sin = list.find((o) => o.nombre === SIN_ASIGNAR_NOMBRE)
     const rest = list
@@ -180,14 +273,34 @@ export default function OperationsAdminPage() {
       .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"))
     setSinAsignar(sin ?? emptySinAsignar())
     setOperations(rest)
+    console.info(OPS_LOG, "Payload aplicado al estado.", {
+      operacionesSinSinAsignar: rest.length,
+      nombresOperaciones: rest.map((o) => o.nombre),
+      patentesSinAsignar: sin?.plates?.length ?? 0,
+      totalPatentesEnOperaciones: rest.reduce((n, o) => n + o.plates.length, 0),
+    })
   }, [])
 
   const loadOperations = useCallback(async () => {
     setFetchError(null)
+    const t0 = typeof performance !== "undefined" ? performance.now() : 0
+    console.info(OPS_LOG, "Inicio GET /api/admin/operations (auth: hybrid = cookie + Firebase si hay sesión SDK).")
     try {
       const raw = await apiClient.get<unknown>("/api/admin/operations", OPS_AUTH)
-      applyPayload(parseOperationsPayload(raw))
+      const ms = typeof performance !== "undefined" ? Math.round(performance.now() - t0) : null
+      console.info(OPS_LOG, "Respuesta OK.", { ms, resumen: summarizeOperationsResponse(raw) })
+      const parsed = parseOperationsPayload(raw)
+      console.info(OPS_LOG, "Tras parseo (filas válidas):", {
+        count: parsed.length,
+        nombres: parsed.map((o) => o.nombre),
+      })
+      applyPayload(parsed)
     } catch (err) {
+      const status = (err as { status?: number })?.status
+      console.error(OPS_LOG, "Fallo al cargar operaciones.", {
+        status,
+        mensaje: err instanceof Error ? err.message : String(err),
+      })
       setFetchError(err instanceof Error ? err.message : "Error al cargar operaciones")
     }
   }, [applyPayload])
@@ -201,6 +314,7 @@ export default function OperationsAdminPage() {
       try {
         const me = await authApi.me()
         if (cancelled) return
+        console.info(OPS_LOG, "Sesión /api/auth/me OK.", { email: me.email, role: me.role })
         if (!canAccessAdminPages(me.role)) {
           setAccessForbidden(true)
           setLoading(false)
@@ -304,10 +418,11 @@ export default function OperationsAdminPage() {
     if (!op) return
     const next = op.responsables.filter((r) => r !== email)
     try {
-      await emailApiFetch<unknown>(operationsPath(nombre), {
-        method: "PUT",
-        body: JSON.stringify({ responsables: next }),
-      })
+      await apiClient.put<unknown, { responsables: string[] }>(
+        operationsPath(nombre),
+        { responsables: next },
+        OPS_AUTH,
+      )
       setOperations((prev) => prev.map((o) => (o.nombre === nombre ? { ...o, responsables: next } : o)))
     } catch (err) {
       showFlash(err instanceof Error ? err.message : "Error al quitar responsable")
@@ -329,10 +444,11 @@ export default function OperationsAdminPage() {
     }
     const next = [...op.responsables, raw]
     try {
-      await emailApiFetch<unknown>(operationsPath(nombre), {
-        method: "PUT",
-        body: JSON.stringify({ responsables: next }),
-      })
+      await apiClient.put<unknown, { responsables: string[] }>(
+        operationsPath(nombre),
+        { responsables: next },
+        OPS_AUTH,
+      )
       setOperations((prev) => prev.map((o) => (o.nombre === nombre ? { ...o, responsables: next } : o)))
       setEmailDraft((p) => ({ ...p, [nombre]: "" }))
       setEmailAdding((p) => ({ ...p, [nombre]: false }))
