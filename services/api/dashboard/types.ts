@@ -119,6 +119,12 @@ export interface TopDriversKeysByOperationDTO {
     avgRisk: number
   }
 
+/** Per-day excess events split by operation name */
+export interface DailyBreakdownByOperationPointDTO {
+  date: string
+  operations: Record<string, number>
+}
+
   export interface DashboardAggregatedPayload {
     stats: DashboardAggregatedStats
     vehicles?: MyRiskItemDTO[]
@@ -134,4 +140,6 @@ export interface TopDriversKeysByOperationDTO {
     adminTotals?: AdminTotalsDTO
     /** SuperDashboard: last 7 days breakdown (week response only) */
     dailyBreakdown?: DailyBreakdownPointDTO[]
+  /** SuperDashboard: per-day excess split by operation (when backend includes it) */
+  dailyBreakdownByOperation?: DailyBreakdownByOperationPointDTO[]
   }

@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query"
 import { dashboardApi } from "@/services/api"
 import type {
   AdminTotalsDTO,
+  DailyBreakdownByOperationPointDTO,
   DailyBreakdownPointDTO,
   DashboardAggregatedPayload,
   DashboardPeriodDistributionDTO,
@@ -91,6 +92,7 @@ const emptyDashboardData = {
   topDriversKeysByOperation: [] as TopDriversKeysByOperationDTO[],
   adminTotals: null,
   dailyBreakdown: null,
+  dailyBreakdownByOperation: null,
   distribution: null,
 }
 
@@ -109,6 +111,9 @@ function mapPayloadToState(payload: DashboardAggregatedPayload) {
       : [],
     adminTotals: payload.adminTotals ?? null,
     dailyBreakdown: Array.isArray(payload.dailyBreakdown) ? payload.dailyBreakdown : null,
+    dailyBreakdownByOperation: Array.isArray(payload.dailyBreakdownByOperation)
+      ? payload.dailyBreakdownByOperation
+      : null,
     distribution: normalizeDistribution(payload),
   }
 }
@@ -126,6 +131,8 @@ export interface DashboardDataState {
   adminTotals: AdminTotalsDTO | null
   /** SuperDashboard: serie diaria de excesos (semana, mes, año cuando el API la envía) */
   dailyBreakdown: DailyBreakdownPointDTO[] | null
+  /** SuperDashboard: serie diaria de excesos por operación */
+  dailyBreakdownByOperation: DailyBreakdownByOperationPointDTO[] | null
   /** Totales del período por categoría (cuando el backend los envía en `distribution`) */
   distribution: DashboardPeriodDistributionDTO | null
   loading: boolean
@@ -168,6 +175,7 @@ export function useDashboardData(
       topDriversKeysByOperation: TopDriversKeysByOperationDTO[]
       adminTotals: AdminTotalsDTO | null
       dailyBreakdown: DailyBreakdownPointDTO[] | null
+      dailyBreakdownByOperation: DailyBreakdownByOperationPointDTO[] | null
       distribution: DashboardPeriodDistributionDTO | null
     }> => {
       if (customRangeActive) {
@@ -205,6 +213,7 @@ export function useDashboardData(
     topDriversKeysByOperation: query.data?.topDriversKeysByOperation ?? [],
     adminTotals: query.data?.adminTotals ?? null,
     dailyBreakdown: query.data?.dailyBreakdown ?? null,
+    dailyBreakdownByOperation: query.data?.dailyBreakdownByOperation ?? null,
     distribution: query.data?.distribution ?? null,
     loading: query.isPending,
     error:

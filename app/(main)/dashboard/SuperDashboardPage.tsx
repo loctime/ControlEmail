@@ -10,6 +10,8 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Line,
+  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -20,6 +22,7 @@ import { Button } from "@/components/ui/button"
 import { AsyncState } from "@/components/common/async-state"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useDashboardData } from "@/hooks/domain/useDashboardData"
 import { dashboardApi } from "@/services/api"
 import { queryKeys } from "@/lib/query/queryKeys"
@@ -750,6 +753,9 @@ export default function SuperDashboardPage() {
   const [calendarOpen, setCalendarOpen] = useState(false)
   const [customRange, setCustomRange] = useState<DateRange | undefined>(undefined)
   const [selectedOperacionForChart, setSelectedOperacionForChart] = useState<string | null>(null)
+  const [selectedOperacionYearTrend, setSelectedOperacionYearTrend] = useState<string>("all")
+  const [trendGranularity, setTrendGranularity] = useState<"month" | "year">("month")
+  const [monthViewMode, setMonthViewMode] = useState<"day" | "week">("day")
   const hasRestoredRef = useRef(false)
 
   const selectedDate = dateState.status === "ready" ? dateState.date : undefined
@@ -828,6 +834,7 @@ export default function SuperDashboardPage() {
     topDriversKeysByOperation,
     riskVehicles,
     dailyBreakdown,
+    dailyBreakdownByOperation,
     distribution: periodDistribution,
     loading,
     error,
@@ -982,6 +989,134 @@ export default function SuperDashboardPage() {
   )
 
   const hasData = vehicleDetails.length > 0 || riskVehicles.length > 0
+
+  const selectedYear = useMemo(() => (selectedDate ? selectedDate.slice(0, 4) : undefined), [selectedDate])
+  const selectedMonth = useMemo(() => (selectedDate ? selectedDate.slice(0, 7) : undefined), [selectedDate])
+
+  const { data: yearTrendPayload } = useQuery({
+    queryKey: ["dashboard", "yearly", "operation-trend", selectedYear ?? ""],
+    queryFn: async () => {
+      if (!selectedYear) return null
+      return dashboardApi.getEnriched("year", selectedYear)
+    },
+    enabled: !!selectedYear,
+    staleTime: STALE_TIME,
+  })
+
+  const { data: monthTrendPayload } = useQuery({
+    queryKey: ["dashboard", "monthly", "operation-trend", selectedMonth ?? ""],
+    queryFn: async () => {
+      if (!selectedMonth) return null
+      return dashboardApi.getEnriched("month", selectedMonth)
+    },
+    enabled: !!selectedMonth,
+    staleTime: STALE_TIME,
+  })
+
+  const yearTrendOperations = useMemo(() => {
+    const rows =
+      trendGranularity === "year"
+        ? (yearTrendPayload?.vehicleDetails ?? [])
+        : (monthTrendPayload?.vehicleDetails ?? [])
+    const set = new Set<string>()
+    for (const row of rows) {
+      if ((row.excesos ?? 0) <= 0) continue
+      const op = String(row.operacion ?? "Sin operación").trim() || "Sin operación"
+      set.add(op)
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "es"))
+  }, [trendGranularity, yearTrendPayload?.vehicleDetails, monthTrendPayload?.vehicleDetails])
+
+  useEffect(() => {
+    if (selectedOperacionYearTrend !== "all" && !yearTrendOperations.includes(selectedOperacionYearTrend)) {
+      setSelectedOperacionYearTrend("all")
+    }
+  }, [selectedOperacionYearTrend, yearTrendOperations])
+
+  const yearlyOperationLineData = useMemo(() => {
+    if (trendGranularity === "month") {
+      const points = monthTrendPayload?.dailyBreakdownByOperation ?? []
+      const dayTotals = new Map<number, number>()
+      for (const point of points) {
+        const day = Number(point.date.slice(8, 10))
+        if (!Number.isFinite(day) || day < 1 || day > 31) continue
+        if (selectedOperacionYearTrend === "all") {
+          const totalDay = Object.values(point.operations ?? {}).reduce((sum, v) => sum + (Number(v) || 0), 0)
+          dayTotals.set(day, (dayTotals.get(day) ?? 0) + totalDay)
+        } else {
+          dayTotals.set(day, (dayTotals.get(day) ?? 0) + Number(point.operations?.[selectedOperacionYearTrend] ?? 0))
+        }
+      }
+      const sortedDays = Array.from(dayTotals.keys()).sort((a, b) => a - b)
+      if (sortedDays.length === 0) return []
+      const firstDayWithData = sortedDays[0]
+      const now = new Date()
+      const [monthYearStr, monthStr] = (selectedMonth ?? "").split("-")
+      const selectedMonthYear = Number(monthYearStr)
+      const selectedMonthNum = Number(monthStr)
+      const isCurrentMonth =
+        Number.isFinite(selectedMonthYear) &&
+        Number.isFinite(selectedMonthNum) &&
+        selectedMonthYear === now.getFullYear() &&
+        selectedMonthNum === now.getMonth() + 1
+      const maxDay = isCurrentMonth ? now.getDate() : sortedDays[sortedDays.length - 1]
+
+      if (monthViewMode === "week") {
+        const weekTotals = new Map<number, number>()
+        for (let day = firstDayWithData; day <= maxDay; day++) {
+          const week = Math.ceil(day / 7)
+          weekTotals.set(week, (weekTotals.get(week) ?? 0) + (dayTotals.get(day) ?? 0))
+        }
+        return Array.from(weekTotals.entries())
+          .sort((a, b) => a[0] - b[0])
+          .map(([week, excesos]) => ({ label: `Sem ${week}`, excesos }))
+      }
+
+      const chart: Array<{ label: string; excesos: number }> = []
+      for (let day = firstDayWithData; day <= maxDay; day++) {
+        chart.push({ label: String(day).padStart(2, "0"), excesos: dayTotals.get(day) ?? 0 })
+      }
+      return chart
+    }
+
+    const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+    const totalsByMonth = Array.from({ length: 12 }, () => 0)
+    const points = yearTrendPayload?.dailyBreakdownByOperation ?? dailyBreakdownByOperation ?? []
+    for (const point of points) {
+      const month = Number(point.date.slice(5, 7))
+      if (!Number.isFinite(month) || month < 1 || month > 12) continue
+      if (selectedOperacionYearTrend === "all") {
+        const totalDay = Object.values(point.operations ?? {}).reduce((sum, v) => sum + (Number(v) || 0), 0)
+        totalsByMonth[month - 1] += totalDay
+      } else {
+        totalsByMonth[month - 1] += Number(point.operations?.[selectedOperacionYearTrend] ?? 0)
+      }
+    }
+    const firstMonthWithData = totalsByMonth.findIndex((value) => value > 0)
+    if (firstMonthWithData < 0) return []
+
+    const now = new Date()
+    const currentYear = now.getFullYear()
+    const selectedYearNum = Number(selectedYear)
+    const isCurrentYear = Number.isFinite(selectedYearNum) && selectedYearNum === currentYear
+    const maxMonthIndex = isCurrentYear
+      ? now.getMonth()
+      : totalsByMonth.reduce((last, value, idx) => (value > 0 ? idx : last), firstMonthWithData)
+
+    return monthNames
+      .map((label, idx) => ({ label, excesos: totalsByMonth[idx], monthIndex: idx }))
+      .filter((point) => point.monthIndex >= firstMonthWithData && point.monthIndex <= maxMonthIndex)
+      .map(({ label, excesos }) => ({ label, excesos }))
+  }, [
+    trendGranularity,
+    monthViewMode,
+    monthTrendPayload?.dailyBreakdownByOperation,
+    selectedOperacionYearTrend,
+    selectedMonth,
+    yearTrendPayload?.dailyBreakdownByOperation,
+    dailyBreakdownByOperation,
+    selectedYear,
+  ])
 
   // Navigation
   const maxAvailableDate = useMemo(() => getYesterdayKey(), [])
@@ -1300,6 +1435,103 @@ export default function SuperDashboardPage() {
               </CardContent>
             </Card>
           </div>
+
+          {/* SECCIÓN 3a — Tendencia anual por operación (línea) */}
+          <Card className="border-white/5 bg-white/[0.03]">
+            <CardHeader className="pb-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <CardTitle className="text-sm font-semibold text-white/80">
+                  {trendGranularity === "year"
+                    ? `Excesos de velocidad por mes (${selectedYear ?? "año"}) - gráfico lineal`
+                    : `Excesos de velocidad por ${monthViewMode === "week" ? "semana" : "día"} (${selectedMonth ?? "mes"}) - gráfico lineal`}
+                </CardTitle>
+                <div className="flex w-full flex-wrap justify-end gap-2">
+                  <div className="w-full max-w-[180px]">
+                    <Select value={trendGranularity} onValueChange={(v: "month" | "year") => setTrendGranularity(v)}>
+                      <SelectTrigger className="h-8 border-white/10 bg-white/[0.04] text-xs text-white/80">
+                        <SelectValue placeholder="Vista" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="month">Mes</SelectItem>
+                        <SelectItem value="year">Año</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {trendGranularity === "month" && (
+                    <div className="w-full max-w-[180px]">
+                      <Select value={monthViewMode} onValueChange={(v: "day" | "week") => setMonthViewMode(v)}>
+                        <SelectTrigger className="h-8 border-white/10 bg-white/[0.04] text-xs text-white/80">
+                          <SelectValue placeholder="Agrupación mensual" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="day">Por día</SelectItem>
+                          <SelectItem value="week">Por semana</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  <div className="w-full max-w-xs">
+                    <Select value={selectedOperacionYearTrend} onValueChange={setSelectedOperacionYearTrend}>
+                    <SelectTrigger className="h-8 border-white/10 bg-white/[0.04] text-xs text-white/80">
+                      <SelectValue placeholder="Filtrar por operación" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas las operaciones</SelectItem>
+                      {yearTrendOperations.map((op) => (
+                        <SelectItem key={op} value={op}>
+                          {op}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {yearlyOperationLineData.some((p) => p.excesos > 0) ? (
+                <ResponsiveContainer width="100%" height={260}>
+                  <LineChart data={yearlyOperationLineData} margin={{ left: 0, right: 8, top: 4, bottom: 4 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
+                    <XAxis
+                      dataKey="label"
+                      tick={{ fill: "hsl(var(--muted-foreground) / 0.85)", fontSize: 11 }}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis
+                      tick={{ fill: "hsl(var(--muted-foreground) / 0.85)", fontSize: 11 }}
+                      tickLine={false}
+                      axisLine={false}
+                      width={28}
+                      allowDecimals={false}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        background: "#18181b",
+                        border: "1px solid rgba(255,255,255,0.1)",
+                        borderRadius: "6px",
+                        fontSize: "12px",
+                      }}
+                      labelStyle={{ color: "rgba(255,255,255,0.6)" }}
+                      itemStyle={{ color: "#f87171" }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="excesos"
+                      name="Excesos"
+                      stroke="#ef4444"
+                      strokeWidth={2.5}
+                      dot={{ r: 3, fill: "#ef4444" }}
+                      activeDot={{ r: 5 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <p className="py-10 text-center text-sm text-white/30">Sin excesos para el filtro seleccionado</p>
+              )}
+            </CardContent>
+          </Card>
 
           {/* SECCIÓN 3b — Gráfico de distribución de excesos por operación */}
           {kpi.excesos > 0 && (

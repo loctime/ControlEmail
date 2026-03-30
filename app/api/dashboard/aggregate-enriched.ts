@@ -1,6 +1,7 @@
 import type { AuthUserWithPlates } from "@/lib/auth-user"
 import type { DailyAlertsResponse } from "@/lib/firestore-read"
 import type {
+  DailyBreakdownByOperationPointDTO,
   DashboardAggregatedPayload,
   MyAlertItemDTO,
   MyRiskItemDTO,
@@ -41,12 +42,14 @@ export function aggregateEnriched(
   >()
   const pendingAlerts: MyAlertItemDTO[] = []
   const dailyBreakdownData: { dateKey: string; totalExcessEvents: number; avgRisk: number }[] = []
+  const dailyBreakdownByOperationData: DailyBreakdownByOperationPointDTO[] = []
 
   for (const { dateKey, metrics } of dailyResults) {
     const vehicles = metrics.vehicles.filter((v) => auth.allowedPlates.has(v.plate))
     let dayExcess = 0
     let dayRiskSum = 0
     let dayRiskCount = 0
+    const dayOperationsExcess = new Map<string, number>()
 
     totalAlerts += vehicles.length
     for (const v of vehicles) {
@@ -58,7 +61,12 @@ export function aggregateEnriched(
       riskCount++
       dayRiskSum += risk
       dayRiskCount++
-      dayExcess += v.summary?.excesos ?? 0
+      const vehicleExcesos = v.summary?.excesos ?? 0
+      dayExcess += vehicleExcesos
+      if (vehicleExcesos > 0) {
+        const operationName = String(v.operacion ?? v.operationName ?? "Sin operación").trim() || "Sin operación"
+        dayOperationsExcess.set(operationName, (dayOperationsExcess.get(operationName) ?? 0) + vehicleExcesos)
+      }
 
       const existing = vehicleMap.get(v.plate)
       const alerts = v.summary.totalEvents
@@ -90,6 +98,10 @@ export function aggregateEnriched(
         dateKey,
         totalExcessEvents: dayExcess,
         avgRisk: dayRiskCount > 0 ? Math.round((dayRiskSum / dayRiskCount) * 100) / 100 : 0,
+      })
+      dailyBreakdownByOperationData.push({
+        date: dateKey,
+        operations: Object.fromEntries(dayOperationsExcess),
       })
     }
   }
@@ -128,6 +140,7 @@ export function aggregateEnriched(
 
   if (includeDailyBreakdown && dailyBreakdownData.length > 0) {
     payload.dailyBreakdown = buildDailyBreakdown(dailyBreakdownData)
+    payload.dailyBreakdownByOperation = dailyBreakdownByOperationData
   }
 
   return payload
